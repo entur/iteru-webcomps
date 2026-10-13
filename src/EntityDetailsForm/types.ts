@@ -51,6 +51,12 @@ export interface FieldSpec {
    *  `serverManaged`, which means backend-owned and is *derived* by distill from
    *  the Entity/Input diff — `locked` is assigned explicitly. */
   locked?: boolean;
+  /** Declared by the patch overlay (`schema/sobek.patch.graphqls`), not by the
+   *  live schema. Editable, and round-trips through `onChange`, but the wire edge
+   *  strips it — it is **not saved**. The form flags it with a trailing `*`.
+   *  *Derived* by distill from the overlay, so the mark goes away with the
+   *  `extend` line once sobek ships the field. */
+  patched?: boolean;
 }
 
 /** One field's placement within a section. `K` is the entity's flat field-key

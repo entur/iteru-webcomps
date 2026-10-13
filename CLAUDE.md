@@ -263,8 +263,20 @@ right after `toInputEntity`, before the `dataOwnerRef` stamp (a wire field, so
 unaffected). The `satisfies Record<keyof <Entity>Input, 1>` on each mask is a
 real guard, not decoration: keys come from `generateDocuments`' schema read, the
 type from graphql-codegen's — feed the patch to either and the build fails.
-`distillTypes.ts` and `toInput.ts` are deliberately untouched, so patched fields
-stay editable and round-trip through `onChange`; only the wire edge strips them.
+`toInput.ts` is deliberately untouched, and `distillTypes.ts` changes nothing
+about what a patched field *is* — they stay editable and round-trip through
+`onChange`; only the wire edge strips them.
+
+**The `*` marker.** Distill does read the overlay for one thing: `parsePatch`
+collects each `extend type <Entity>` and stamps `patched: true` on the derived
+`FIELDS` entries (hoisted leaves of a patched object included). Display
+metadata only — it never decides what is sent. The form draws a `*` in a column
+*after* the control, outside the input (`row()` in `abstractForm`), with a
+"not saved" hint as `title`/`aria-label`. The column is reserved for the whole
+form or not at all (`hasPatched` in `utils/sections`): per row a marked control
+would be narrower than its neighbours, per section a tab switch would resize
+them. `FormSkeleton` reserves the same `PATCH_MARK_COL_PX`. Derived, so the mark
+disappears with the `extend` line.
 Residue: `Types.<Entity>Input` in `sobekTypes.ts` stays patched, so the
 *variables type* still permits those keys at compile time — only the runtime
 mask stops them.

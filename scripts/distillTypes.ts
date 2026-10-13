@@ -14,6 +14,7 @@
  */
 import ts from 'typescript';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { parse, Kind } from 'graphql';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 
 const GENERATED = 'src/generated/sobekTypes.ts';
 const MANIFEST = 'entities.manifest.json';
+const PATCH = 'schema/sobek.patch.graphqls';
 const OUT_DIR = 'src/entities';
 const GEN_IMPORT = '../generated/sobekTypes';
 const TYPES_IMPORT = '../EntityDetailsForm/types';
@@ -128,6 +130,7 @@ interface FieldOut {
   optionEnum?: string;
   serverManaged?: boolean;
   locked?: boolean;
+  patched?: boolean;
 }
 
 const hasIdentity = (lit: ts.TypeLiteralNode): boolean =>
@@ -254,10 +257,38 @@ const refNames = (node: ts.TypeNode, acc: Set<string>): void => {
 const camel = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1);
 
 /**
+ * Read the patch overlay's read-type extensions: which fields each entity has
+ * only because the overlay declares them. Display metadata only — this decides
+ * the `patched` marker, never what goes on the wire (that stays the job of the
+ * `<Entity>InputKeys` mask, which is read from the live schema alone).
+ *
+ * @param sdl source of `schema/sobek.patch.graphqls`
+ * @returns type name → field names added by `extend type <name> { … }`
+ */
+export const parsePatch = (sdl: string): Map<string, Set<string>> =>
+  parse(sdl)
+    .definitions.filter(d => d.kind === Kind.OBJECT_TYPE_EXTENSION)
+    .reduce((acc, d) => {
+      const names = acc.get(d.name.value) ?? new Set<string>();
+      (d.fields ?? []).forEach(f => names.add(f.name.value));
+      return acc.set(d.name.value, names);
+    }, new Map<string, Set<string>>());
+
+/**
  * Distill one read/write pair into an entity-module source string.
+ * @param src generated `sobekTypes.ts` source
+ * @param entity read type name
+ * @param inpEntity input type name
+ * @param patched read-type fields that exist only in the patch overlay
+ * @returns source of the entity module
  * @throws if a write-only field (in `inpEntity`, not `entity`) is found.
  */
-export function distillModule(src: string, entity: string, inpEntity: string): string {
+export function distillModule(
+  src: string,
+  entity: string,
+  inpEntity: string,
+  patched: ReadonlySet<string> = new Set()
+): string {
   const model = parseModel(src);
   const lit = model.objects.get(entity);
   const inpLit = model.objects.get(inpEntity);
@@ -280,6 +311,9 @@ export function distillModule(src: string, entity: string, inpEntity: string): s
   // FIELDS, in read-schema member order.
   const taken = new Set<string>();
   const fields: FieldOut[] = [];
+  // A patched member marks every field derived from it (hoisted leaves too).
+  const mark = (name: string, f: FieldOut): FieldOut =>
+    patched.has(name) ? { ...f, patched: true } : f;
   for (const [name, type] of readMembers) {
     const serverManaged = !inpNames.has(name);
     // Client-supplied (LOCKED_FIELDS) and user-writable — serverManaged wins if a
@@ -291,10 +325,14 @@ export function distillModule(src: string, entity: string, inpEntity: string): s
     if (leaf) {
       // `locked` rides along: a locked field written as a pure reference is still
       // locked (fieldLine only emits it when true, so nothing changes downstream).
-      fields.push(push(taken, { key: name, kind: 'reference', path: [name, leaf], locked }));
+      fields.push(
+        mark(name, push(taken, { key: name, kind: 'reference', path: [name, leaf], locked }))
+      );
       continue;
     }
-    fields.push(...deriveFields(name, type, model, [], serverManaged, locked, taken));
+    fields.push(
+      ...deriveFields(name, type, model, [], serverManaged, locked, taken).map(f => mark(name, f))
+    );
   }
 
   // Verbatim interface members + referenced type names.
@@ -320,6 +358,7 @@ export function distillModule(src: string, entity: string, inpEntity: string): s
     if (f.optionEnum) parts.push(`options: Object.values(${f.optionEnum})`);
     if (f.serverManaged) parts.push('serverManaged: true');
     if (f.locked) parts.push('locked: true');
+    if (f.patched) parts.push('patched: true');
     return `  ${f.key}: { ${parts.join(', ')} },`;
   };
 
@@ -390,8 +429,9 @@ const main = (): void => {
     readFileSync(resolve(MANIFEST), 'utf8')
   );
   const rows = manifest.map(toRow);
+  const patch = parsePatch(readFileSync(resolve(PATCH), 'utf8'));
   for (const r of rows) {
-    const out = distillModule(src, r.entity, r.inpEntity);
+    const out = distillModule(src, r.entity, r.inpEntity, patch.get(r.entity));
     const path = resolve(OUT_DIR, `${r.file}.ts`);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, out);

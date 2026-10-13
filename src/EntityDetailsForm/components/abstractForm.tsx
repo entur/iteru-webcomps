@@ -2,13 +2,21 @@ import { useState, type FC, type ReactNode } from 'react';
 import { Box, Stack, Tab, Tabs, Typography } from '@mui/material';
 import type { EntityDetailsFormProps, FieldSpec } from '../types';
 import { getPath, setPath } from '../utils/paths';
-import { resolveSections, type ResolvedField } from '../utils/sections';
+import {
+  hasPatched,
+  PATCH_MARK_COL_PX,
+  resolveSections,
+  type ResolvedField,
+} from '../utils/sections';
 import { useSectionSpy } from '../hooks/useSectionSpy';
 import { renderControl } from './controls';
 import { ObjectGrid } from '../../ObjectGrid';
 
 /** Theme spacing kept above a section scrolled into view by `activeSection`. */
 const SECTION_SCROLL_MARGIN = 2;
+/** Shown on hover and read out for a `patched` field's `*` (English default; no
+ *  i18n runtime here). */
+const PATCH_HINT = 'Not saved — not yet in the backend schema';
 
 /**
  * Build a presentational (dumb) entity form bound to a generated `FIELDS`
@@ -44,6 +52,27 @@ export function createAbstractEntityDetailsForm<E>(
       onActiveChange: onActiveSectionChange,
     });
 
+    const marks = hasPatched(fields, sections);
+    // One row per field: the control, then — in a form with any patched field —
+    // a fixed column that holds the `*` or stays empty, so every control keeps
+    // the same width whether or not it is marked.
+    const row = (key: string, control: ReactNode): ReactNode => (
+      <Box key={key} sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>{control}</Box>
+        {marks && (
+          <Box
+            sx={{ width: PATCH_MARK_COL_PX, flexShrink: 0, textAlign: 'right', color: 'text.secondary' }}
+          >
+            {fields[key].patched && (
+              <span title={PATCH_HINT} aria-label={PATCH_HINT} data-patch-mark>
+                *
+              </span>
+            )}
+          </Box>
+        )}
+      </Box>
+    );
+
     const field = (
       { key, label, cols, options }: ResolvedField,
       _i: number,
@@ -52,16 +81,15 @@ export function createAbstractEntityDetailsForm<E>(
       const spec = fields[key];
 
       if (spec.kind === 'grid') {
-        return (
-          <Box key={key} sx={{ mb: 2 }}>
-            <ObjectGrid
-              rows={getPath(value, spec.path)}
-              label={label}
-              showLabel={arr.length > 1}
-              cols={cols}
-              dataGrid={slotProps?.grid?.dataGrid}
-            />
-          </Box>
+        return row(
+          key,
+          <ObjectGrid
+            rows={getPath(value, spec.path)}
+            label={label}
+            showLabel={arr.length > 1}
+            cols={cols}
+            dataGrid={slotProps?.grid?.dataGrid}
+          />
         );
       }
 
@@ -76,11 +104,7 @@ export function createAbstractEntityDetailsForm<E>(
         slotProps,
         error: errors?.[key],
       });
-      return (
-        <Box key={key} sx={{ mb: 2 }}>
-          {control}
-        </Box>
-      );
+      return row(key, control);
     };
 
     if (sections.length < 2) {

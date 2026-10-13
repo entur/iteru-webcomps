@@ -42,7 +42,7 @@ export interface Entity {
 }
 /** Flat, addressable field registry — value-object leaves hoisted, each with a path. */
 export const FIELDS = {
-  carLoading: { kind: 'switch', path: ['carLoading'] },
+  carLoading: { kind: 'switch', path: ['carLoading'], patched: true },
   changed: { kind: 'datetime', path: ['changed'], serverManaged: true },
   changedBy: { kind: 'text', path: ['changedBy'], serverManaged: true },
   created: { kind: 'datetime', path: ['created'], serverManaged: true },
@@ -52,12 +52,12 @@ export const FIELDS = {
   euroClass: { kind: 'text', path: ['euroClass'] },
   formDragCoefficient: { kind: 'number', path: ['formDragCoefficient'] },
   fuelTypes: { kind: 'enumMulti', path: ['fuelTypes'], options: Object.values(FuelType) },
-  fullCharge: { kind: 'number', path: ['fullCharge'] },
+  fullCharge: { kind: 'number', path: ['fullCharge'], patched: true },
   height: { kind: 'number', path: ['height'] },
   hybridCategory: { kind: 'enum', path: ['hybridCategory'], options: Object.values(HybridCategory) },
   length: { kind: 'number', path: ['length'] },
   lowFloor: { kind: 'switch', path: ['lowFloor'] },
-  manufacturer: { kind: 'text', path: ['manufacturer'] },
+  manufacturer: { kind: 'text', path: ['manufacturer'], patched: true },
   maximumEngineEffectKW: { kind: 'number', path: ['maximumEngineEffectKW'] },
   maximumRange: { kind: 'number', path: ['maximumRange'] },
   maximumVelocity: { kind: 'number', path: ['maximumVelocity'] },
@@ -75,7 +75,7 @@ export const FIELDS = {
   type: { kind: 'text', path: ['privateCode', 'type'] },
   value: { kind: 'text', path: ['privateCode', 'value'] },
   propulsionTypes: { kind: 'enumMulti', path: ['propulsionTypes'], options: Object.values(PropulsionType) },
-  range: { kind: 'number', path: ['range'] },
+  range: { kind: 'number', path: ['range'], patched: true },
   rollResistanceCoefficient: { kind: 'number', path: ['rollResistanceCoefficient'] },
   selfPropelled: { kind: 'switch', path: ['selfPropelled'] },
   shortName: { kind: 'name', path: ['shortName'] },

@@ -316,3 +316,41 @@ describe('stacked sections ↔ host navigation', () => {
     expect(scrolled).toEqual([]);
   });
 });
+
+describe('patched fields', () => {
+  const PForm = createAbstractEntityDetailsForm<V>({
+    ...fields,
+    length: { ...fields.length, patched: true },
+  });
+  const mount = (layout?: EntityDetailsFormProps<V>['layout']) =>
+    render(<PForm value={{}} onChange={() => {}} mode="edit" layout={layout} />);
+  /** The row a labelled control sits in: control cell + mark cell. */
+  const rowOf = (label: string) => screen.getByLabelText(label).closest('.MuiFormControl-root')!
+    .parentElement!.parentElement!;
+
+  it('puts a * after a patched control, outside the input, and nowhere else', () => {
+    mount();
+    const marks = [...document.querySelectorAll('[data-patch-mark]')];
+    expect(marks).toHaveLength(1);
+    expect(marks[0]).toHaveTextContent('*');
+    expect(marks[0]).toHaveAccessibleName(/not saved/i);
+    const row = rowOf('Length');
+    expect(row).toContainElement(marks[0] as HTMLElement);
+    // After the control's cell, not inside it.
+    expect(row.lastElementChild).toContainElement(marks[0] as HTMLElement);
+    expect(row.firstElementChild).not.toContainElement(marks[0] as HTMLElement);
+  });
+
+  it('keeps the column on unmarked rows too, so every control is the same width', () => {
+    mount();
+    expect(rowOf('Name').children).toHaveLength(2);
+    expect(rowOf('Name').lastElementChild).toBeEmptyDOMElement();
+  });
+
+  it('adds no column when no rendered field is patched', () => {
+    mount({ Edit: ['name'] });
+    expect(rowOf('Name').children).toHaveLength(1);
+    render(<Host />);
+    expect(document.querySelector('[data-patch-mark]')).toBeNull();
+  });
+});
