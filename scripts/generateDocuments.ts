@@ -13,7 +13,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildSchema, getNamedType, getNullableType, isInputObjectType, isListType, isObjectType, print, visit, OperationTypeNode, type FieldNode, type SelectionNode, type OperationDefinitionNode } from 'graphql';
+import { buildSchema, getNamedType, getNullableType, isEnumType, isInputObjectType, isListType, isObjectType, print, visit, OperationTypeNode, type FieldNode, type SelectionNode, type OperationDefinitionNode } from 'graphql';
 import { buildOperationNodeForField } from '@graphql-tools/utils';
 
 const MANIFEST = 'entities.manifest.json';
@@ -34,6 +34,15 @@ const FILTER_FILE = 'filterFields.ts';
 const FILTER_ARG = 'filter';
 /** Filter args supplied from session context, never offered to the user. */
 const CONTEXT_FILTER_ARGS = ['dataOwnerRef'];
+/** The only scalar a free-text `contains` box can feed. */
+const TEXT_SCALAR = 'String';
+
+/** Singular candidates for a plural list arg (`categories` → `category`), most specific first. */
+const singulars = (name: string): string[] => [
+  name.replace(/ies$/, 'y'),
+  name.replace(/es$/, ''),
+  name.replace(/s$/, ''),
+];
 
 /** How deeply `buildOperationNodeForField` expands nested object fields. */
 const OPERATION_DEPTH_LIMIT = 3;
@@ -311,8 +320,11 @@ export function buildInputKeysModule(
  * codegen.
  *
  * A filter arg maps to the entity field of the same name, or — for a list-typed
- * arg — to its singular (`transportModes` → `transportMode`). List args become
- * `anyOf`, scalar args `contains`. Args with no matching field are skipped.
+ * arg — to its singular (`transportModes` → `transportMode`). A list of strings
+ * or enums becomes `anyOf`, a `String` scalar `contains`. Anything else (a
+ * Boolean, an Int, a lone enum, an arg with no matching top-level field) is
+ * skipped with a warning: the form has no control that could feed it a value
+ * of the right type, and a silent skip would hide a filter sobek just shipped.
  *
  * @param entries manifest entries to emit a map for
  * @param schema  live sobek schema (no patch overlay)
@@ -334,9 +346,15 @@ export function buildFilterFieldsModule(
       .filter(f => !CONTEXT_FILTER_ARGS.includes(f.name))
       .flatMap(f => {
         const list = isListType(getNullableType(f.type));
-        const singular = f.name.replace(/s$/, '');
-        const field = entityKeys.has(f.name) ? f.name : list && entityKeys.has(singular) ? singular : undefined;
-        return field ? [`  ${field}: { arg: '${f.name}', op: '${list ? 'anyOf' : 'contains'}' },`] : [];
+        const named = getNamedType(f.type);
+        const textual = named.name === TEXT_SCALAR || (list && isEnumType(named));
+        const field = [f.name, ...(list ? singulars(f.name) : [])].find(k => entityKeys.has(k));
+        if (!field || !textual) {
+          const why = field ? `unsupported type ${named.name}` : 'no matching entity field';
+          console.warn(`[docs] ${entry.entity}: filter arg '${f.name}' is not offered (${why}).`);
+          return [];
+        }
+        return [`  ${field}: { arg: '${f.name}', op: '${list ? 'anyOf' : 'contains'}' },`];
       });
     return [`export const ${entry.entity}FilterFields = {`, ...lines, `} as const;`].join('\n');
   });

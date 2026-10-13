@@ -7,7 +7,7 @@
 import { lazy, Suspense, useMemo } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import type { DataGridProps, GridColDef, GridDensity } from '@mui/x-data-grid';
-import { PAGE_SIZES, type CollectionLabels, type CollectionQuery, type Column } from '../types';
+import { pageSizesFor, type CollectionLabels, type CollectionQuery, type Column } from '../types';
 import { formatValue, rawValue, rowId } from '../utils/values';
 
 const COL_MIN_W = 120;
@@ -71,6 +71,10 @@ export function GridView({
 }: GridViewProps): React.ReactNode {
   const colDefs = useMemo(() => columns.map(c => toColDef(c, labels)), [columns, labels]);
   const ids = useMemo(() => new Map(rows.map((r, i) => [r, rowId(r, i)])), [rows]);
+  // A sort on a field that is no column (stale host state) must not reach the
+  // grid: it drops the unknown item and reports an empty model back, which
+  // would rewrite the host's query — and its page — without anyone clicking.
+  const sort = query.sort && columns.some(c => c.key === query.sort?.field) ? query.sort : null;
 
   return (
     // Flex column parent → the grid sizes to its content instead of needing a fixed height.
@@ -86,7 +90,7 @@ export function GridView({
           disableColumnFilter
           disableColumnMenu
           disableRowSelectionOnClick
-          pageSizeOptions={PAGE_SIZES}
+          pageSizeOptions={pageSizesFor(query.pageSize)}
           {...dataGrid}
           rows={rows as object[]}
           columns={colDefs}
@@ -94,7 +98,7 @@ export function GridView({
           density={density}
           columnVisibilityModel={hidden}
           sortingMode="server"
-          sortModel={query.sort ? [{ field: query.sort.field, sort: query.sort.dir }] : []}
+          sortModel={sort ? [{ field: sort.field, sort: sort.dir }] : []}
           onSortModelChange={model =>
             onQuery({ sort: model[0]?.sort ? { field: model[0].field, dir: model[0].sort } : null })
           }

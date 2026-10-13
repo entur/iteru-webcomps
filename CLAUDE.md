@@ -232,9 +232,17 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
 - **Filter reach is generated, not chosen.** `generateDocuments` emits
   `<Entity>FilterFields` from the `filter` argument of the entity's list query
   in the live schema (`dataOwnerRef` excluded — session context). Only those
-  fields get a control; every other column is listed disabled. A field sobek
-  adds becomes selectable on the next codegen. One condition per field, AND
-  across fields.
+  fields get a control; every other column is listed disabled. A `String` arg
+  becomes `contains`, a list of strings or enums `anyOf` (plural → singular
+  field: `transportModes` → `transportMode`); those turn selectable on the next
+  codegen. Any other arg (Boolean, Int, a lone enum, one with no matching
+  top-level field) is skipped with a `[docs] … is not offered` warning in the
+  generate output — no control here could feed it a value of the right type.
+  One condition per field, AND across fields.
+- `pageSize` is normalised to `1..100` (`usablePageSize`): the community
+  DataGrid throws above 100. A stale `sort` field is dropped before it reaches
+  the grid, which would otherwise report an empty sort model back and rewrite
+  the host's query.
 - `filterMode: 'client'` (default) applies the filters to `rows`;
   `'server'` skips that step and only emits them — `toSobekFilter(filters,
   filterFields)` gives the host the list query's `filter` argument. Search and

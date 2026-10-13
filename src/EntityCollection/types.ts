@@ -107,6 +107,28 @@ export interface ResolvedCard {
 
 export const PAGE_SIZES = [10, 25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
+/** The community DataGrid throws above this. */
+const MAX_PAGE_SIZE = 100;
+
+/**
+ * A page size both views can render: a whole number in `1..100`. Anything else
+ * (zero, negative, `NaN`) falls back to the default; larger values are capped.
+ *
+ * @param size the requested page size
+ * @returns the usable page size
+ */
+export const usablePageSize = (size: number): number =>
+  Number.isFinite(size) && size >= 1 ? Math.min(Math.trunc(size), MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
+
+/**
+ * The pager's size choices, with the current size added when it is not one of
+ * the standard ones (a pager cannot show a size it does not list).
+ *
+ * @param size the current page size
+ * @returns ascending size options
+ */
+export const pageSizesFor = (size: number): number[] =>
+  PAGE_SIZES.includes(size) ? PAGE_SIZES : [...PAGE_SIZES, size].sort((a, b) => a - b);
 
 export const ALL_TOOLS: readonly CollectionTool[] = ['search', 'filter', 'sort', 'columns', 'density'];
 

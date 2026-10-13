@@ -11,7 +11,8 @@ import type { FieldSpec } from '../../EntityDetailsForm/types';
 import {
   ALL_TOOLS,
   DEFAULT_LABELS,
-  PAGE_SIZES,
+  pageSizesFor,
+  usablePageSize,
   defaultCollectionQuery,
   type CollectionOptions,
   type CollectionQuery,
@@ -58,7 +59,9 @@ export function createEntityCollection<E>(
     const [density, setDensity] = useState<GridDensity>(DEFAULT_DENSITY);
     const [hidden, setHidden] = useState<Record<string, boolean>>({});
 
-    const query = controlled ?? inner;
+    // Normalised once, so the pipeline and both pagers agree on the page size.
+    const raw = controlled ?? inner;
+    const query = useMemo<CollectionQuery>(() => ({ ...raw, pageSize: usablePageSize(raw.pageSize) }), [raw]);
     const L = useMemo(() => ({ ...DEFAULT_LABELS, ...labels }), [labels]);
     const cols = useMemo(() => resolveColumns(fields, columns), [columns]);
     const resolvedCard = useMemo(() => resolveCard(fields, cols, card), [cols, card]);
@@ -122,7 +125,7 @@ export function createEntityCollection<E>(
               count={result.total}
               page={result.page}
               rowsPerPage={query.pageSize}
-              rowsPerPageOptions={PAGE_SIZES}
+              rowsPerPageOptions={pageSizesFor(query.pageSize)}
               onPageChange={(_e, page) => onQuery({ page })}
               onRowsPerPageChange={e => onQuery({ pageSize: Number(e.target.value) })}
             />

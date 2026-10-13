@@ -136,15 +136,59 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
     );
   });
 
-  it('applies a filter in client mode and only emits it in server mode', async () => {
+  it('applies a filter in client mode and leaves the rows alone in server mode', async () => {
     const filterable = cols.find(c => filterFields[c.key]?.op === 'contains' && c.spec.path.length === 1);
-    if (!filterable) return; // entity has no top-level contains filter to drive
+    if (!filterable) throw new Error(`${entity} has no top-level contains filter to drive this test with`);
     const filters = { [filterable.key]: `${filterable.key}-1` };
     await mount({ view: 'cards', query: { ...defaultCollectionQuery, filters } });
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
     cleanup();
     await mount({ view: 'cards', filterMode: 'server', query: { ...defaultCollectionQuery, filters } });
     expect(screen.getAllByRole('listitem')).toHaveLength(ROW_COUNT);
+  });
+
+  it('renders no column for a patched or grid field', async () => {
+    await mount({ view: 'grid' });
+    await gridRows();
+    Object.entries(fields)
+      .filter(([, s]) => s.patched || s.kind === 'grid')
+      .forEach(([key]) => expect(screen.queryByRole('columnheader', { name: humanize(key) })).toBeNull());
+  });
+
+  it('shows the last valid page in the grid when a controlled page is out of range', async () => {
+    await mount({ view: 'grid', query: { ...defaultCollectionQuery, pageSize: 2, page: 9 } });
+    expect(await gridRows()).toBe(ROW_COUNT - 2);
+  });
+
+  it('ignores a stale sort field in the grid without rewriting the host query', async () => {
+    const onQueryChange = vi.fn();
+    await mount({
+      view: 'grid',
+      onQueryChange,
+      query: { ...defaultCollectionQuery, page: 1, pageSize: 2, sort: { field: 'no-such-field', dir: 'asc' } },
+    });
+    expect(await gridRows()).toBe(ROW_COUNT - 2);
+    expect(onQueryChange).not.toHaveBeenCalled();
+  });
+
+  it('survives a page size the grid cannot take', async () => {
+    await mount({ view: 'grid', query: { ...defaultCollectionQuery, pageSize: 250 } });
+    expect(await gridRows()).toBe(ROW_COUNT);
+    cleanup();
+    await mount({ view: 'cards', query: { ...defaultCollectionQuery, pageSize: 0 } });
+    expect(screen.getAllByRole('listitem')).toHaveLength(ROW_COUNT);
+    expect(screen.getByText(`1–${ROW_COUNT} of ${ROW_COUNT}`)).toBeTruthy();
+  });
+
+  it('reorders the grid when a header is clicked', async () => {
+    await mount({ view: 'grid', columns: [textCol.key] });
+    await gridRows();
+    const firstCell = (): string | null => screen.getAllByRole('row')[1].textContent;
+    const header = screen.getByRole('columnheader', { name: textCol.label });
+    fireEvent.click(header);
+    expect(firstCell()).toContain(`${textCol.key}-0`);
+    fireEvent.click(header);
+    expect(firstCell()).toContain(`${textCol.key}-${ROW_COUNT - 1}`);
   });
 
   it('trims the toolbar to the tools asked for', async () => {
