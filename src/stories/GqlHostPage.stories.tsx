@@ -16,8 +16,13 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import {
   SaveSnackbar,
+  SectionToc,
   VehicleForm,
   VehicleTypeForm,
+  resolveSections,
+  vehicleFields,
+  vehicleTypeFields,
+  type FieldSpec,
   type Layout,
   type LayoutVariant,
   type ControlSlotProps,
@@ -35,7 +40,9 @@ import { installStoriesMock, setMockLatency } from "./mockEndpoint";
  * activates that entity's form. Reproduces the host-guide "complete host
  * page" (list → select → view/edit → save), and shows the parts the guide only
  * describes in prose: `SaveSnackbar` fed from onSaved/onError, and
- * `onDirtyChange` gating the exit from edit mode. Discard is not the page's job
+ * `onDirtyChange` gating the exit from edit mode. With `tabStyle: none` a third
+ * column appears between the lists and the form: a `SectionToc` wired to the
+ * stacked form's `activeSection` / `onActiveSectionChange`. Discard is not the page's job
  * any more — the form renders its own `EditFooter`, whose Cancel restores the
  * loaded entity without the remount this page used to do.
  */
@@ -43,7 +50,8 @@ import { installStoriesMock, setMockLatency } from "./mockEndpoint";
 // Serve both seeds before any story renders (module scope beats effect ordering).
 installStoriesMock();
 
-const LIST_WIDTH = 260;
+const LIST_WIDTH = 260,
+  TOC_WIDTH = 180;
 const NEW_KEY = "new";
 /** Slow enough that the skeleton and the arrival fade are actually watchable. */
 const DEFAULT_READ_DELAY_MS = 600;
@@ -109,6 +117,8 @@ type DataAwareForm = FC<{
   onSaved?: (netexId: string) => void;
   onError?: (generalErrors: string[]) => void;
   onDirtyChange?: (dirty: boolean) => void;
+  activeSection?: string;
+  onActiveSectionChange?: (section: string) => void;
 }>;
 
 /** Minimal record shape the lists need from either entity. */
@@ -119,6 +129,7 @@ const ENTITY: Record<
   entity,
   {
     Form: DataAwareForm;
+    fields: Record<string, FieldSpec>;
     layout: Layout;
     seed: Record<string, Rec>;
     heading: string;
@@ -127,6 +138,7 @@ const ENTITY: Record<
 > = {
   vehicleType: {
     Form: VehicleTypeForm,
+    fields: vehicleTypeFields,
     layout: vehicleTypeLayout,
     seed: vehicleTypeSeed,
     heading: "Vehicle types",
@@ -134,6 +146,7 @@ const ENTITY: Record<
   },
   vehicle: {
     Form: VehicleForm,
+    fields: vehicleFields,
     layout: vehicleLayout,
     seed: vehicleSeed,
     heading: "Vehicles",
@@ -174,15 +187,25 @@ const GqlHostPage = ({ tabStyle = "one-line" }: GqlHostPageProps) => {
   // Reported by the form itself — the host no longer diffs anything to know
   // whether leaving edit mode would lose work.
   const [dirty, setDirty] = useState(false);
+  // One piece of state for both directions: the form reports the section being
+  // read, the TOC requests one, and the form ignores its own reports coming back.
+  const [section, setSection] = useState<string>();
 
   const selectRecord = (entity: entity, netexId?: string) => {
     setSelection({ entity, netexId });
+    setSection(undefined); // sections belong to a record's form, not to the page
     setDirty(false); // the new record's form reports its own state on mount
     setMode(netexId ? "view" : "edit"); // existing → view; new → straight to edit
   };
 
   const active = selection ? ENTITY[selection.entity] : null;
   const Form = active?.Form;
+  // Same call the form makes, so the list is what the form renders — and only
+  // a stacked form with several sections has anything to navigate.
+  const tocSections = useMemo(() => {
+    const labels = active ? resolveSections(active.fields, active.layout).map((s) => s.label) : [];
+    return variant === "stacked" && labels.length > 1 ? labels : [];
+  }, [active, variant]);
 
   return (
     <Paper
@@ -252,6 +275,32 @@ const GqlHostPage = ({ tabStyle = "one-line" }: GqlHostPageProps) => {
         })}
       </Box>
 
+      {/* Middle: table of contents for the stacked form, when there is one. */}
+      {tocSections.length > 0 && (
+        <Box
+          sx={{
+            width: TOC_WIDTH,
+            flexShrink: 0,
+            borderRight: 1,
+            borderColor: "divider",
+            bgcolor: "background.paper",
+          }}
+        >
+          {/* The page scrolls, not the column, so the list is pinned inside it. */}
+          <Box sx={{ position: "sticky", top: 0, p: 2 }}>
+            <Typography variant="overline" color="text.secondary">
+              On this page
+            </Typography>
+            <SectionToc
+              sections={tocSections}
+              active={section ?? tocSections[0]}
+              onSelect={setSection}
+              label="On this page"
+            />
+          </Box>
+        </Box>
+      )}
+
       {/* Right: the selected entity's data-aware form + host chrome. */}
       <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, sm: 4 } }}>
         {selection && active && Form ? (
@@ -304,6 +353,8 @@ const GqlHostPage = ({ tabStyle = "one-line" }: GqlHostPageProps) => {
                 slotProps={slotProps}
                 layout={active.layout}
                 onDirtyChange={setDirty}
+                activeSection={section}
+                onActiveSectionChange={setSection}
                 onSaved={(id) => {
                   setSelection({ entity: selection.entity, netexId: id });
                   setMode("view");
@@ -349,7 +400,7 @@ const meta: Meta<typeof GqlHostPage> = {
       control: "inline-radio",
       options: ["none", "one-line", "pills"],
       description:
-        "How multi-section forms (VehicleType) present sections: none = stacked (no tabs), one-line = scrollable tab row, pills = wrapping pill tabs. Vehicle is single-section, so unaffected.",
+        "How multi-section forms (VehicleType) present sections: none = stacked (no tabs) with a table-of-contents column beside the lists, one-line = scrollable tab row, pills = wrapping pill tabs. Vehicle is single-section, so unaffected.",
     },
     readDelayMs: {
       control: { type: "range", min: 0, max: 3000, step: 100 },
