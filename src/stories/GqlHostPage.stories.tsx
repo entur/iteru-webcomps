@@ -183,7 +183,7 @@ interface GqlHostPageProps {
  * data-aware form; the pane owns the four host concerns — stable auth headers,
  * new-vs-edit via `netexId`, discard via remount `key`, and reacting to saves.
  */
-const GqlHostPage = ({ tabStyle = "one-line" }: GqlHostPageProps) => {
+const GqlHostPage = ({ tabStyle = "none" }: GqlHostPageProps) => {
   const { variant, slotProps } = useMemo(() => deriveTabs(tabStyle), [tabStyle]);
   const [selection, setSelection] = useState<Selection | null>(DEFAULT_SELECTION);
   const [mode, setMode] = useState<"view" | "edit">("view");
@@ -403,7 +403,7 @@ const meta: Meta<typeof GqlHostPage> = {
   beforeEach: ({ args }) => {
     setMockLatency({ read: args.readDelayMs ?? DEFAULT_READ_DELAY_MS });
   },
-  args: { tabStyle: "one-line", readDelayMs: DEFAULT_READ_DELAY_MS },
+  args: { tabStyle: "none", readDelayMs: DEFAULT_READ_DELAY_MS },
   argTypes: {
     tabStyle: {
       control: "inline-radio",
