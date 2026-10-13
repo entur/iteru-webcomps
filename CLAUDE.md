@@ -211,6 +211,48 @@ own chrome from `onSaved`/`onError`) uses the same pieces.
   the label-shrink default); `enumMulti`→Autocomplete, `switch`→`SwitchProps`,
   `grid`→`{ dataGrid }`. Per-field override is a planned later addition.
 
+## Collection
+
+`createEntityCollection<E>(fields, { filterFields })` (`src/EntityCollection/`)
+— the list-side sibling of the form factory: presentational, rows in as a prop,
+no fetch. One `CollectionQuery` (`filters`, `search`, `sort`, `page`,
+`pageSize`) is owned by the component (or mirrored from `query` /
+`onQueryChange`), and **`applyQuery` is the only thing that decides what is
+visible**. Both views render its output: `GridView` runs the DataGrid with
+`sortingMode`/`paginationMode="server"` and `disableColumnFilter`, so the grid
+never filters, sorts or pages on its own — that is what keeps `view: 'grid' |
+'cards'` interchangeable. The toolbar is the collection's own for the same
+reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
+
+- `view` is a prop; the lib ships no toggle. The story
+  (`VehicleTypeCollection.stories.tsx`) renders the bare component and drives
+  `view` / `tools` / `filterMode` from Storybook controls — no wrapper chrome.
+- `tools` whitelists `search | filter | sort | columns | density`; the last two
+  render in grid view only. No CSV/Print.
+- **Filter reach is generated, not chosen.** `generateDocuments` emits
+  `<Entity>FilterFields` from the `filter` argument of the entity's list query
+  in the live schema (`dataOwnerRef` excluded — session context). Only those
+  fields get a control; every other column is listed disabled. A field sobek
+  adds becomes selectable on the next codegen. One condition per field, AND
+  across fields.
+- `filterMode: 'client'` (default) applies the filters to `rows`;
+  `'server'` skips that step and only emits them — `toSobekFilter(filters,
+  filterFields)` gives the host the list query's `filter` argument. Search and
+  sort are always client-side over the rows in memory, which is what the search
+  caption "(from cached filter)" says.
+- `patched` and `grid` fields are never columns, card lines or filter entries
+  (`resolveColumns`). A patched field is not on the wire, so a list fetched from
+  sobek cannot carry it.
+- Cards never statically import `@mui/x-data-grid` (lazy, as in `ObjectGrid`).
+- Any query change except an explicit page change returns to page 0, and
+  `applyQuery` clamps an out-of-range page — a controlled host can hold a stale
+  page without getting an empty view.
+
+Tests: `components/collection.test.tsx` is manifest-driven like
+`wrappers.test.tsx` (rows built from the registry, filterable fields from the
+generated map). The DataGrid renders rows under jsdom only with
+`slotProps.dataGrid.disableVirtualization`.
+
 ## GraphQL → TS pipeline
 
 Never hand-maintain entity shapes. Generate from live schema, distill to
