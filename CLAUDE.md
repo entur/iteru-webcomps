@@ -166,7 +166,10 @@ own chrome from `onSaved`/`onError`) uses the same pieces.
   never scrolls, and the observer is muted from a request until `scrollend` —
   otherwise every section passed on the way is reported back as the new target
   (and a last section too short to reach the band could never stay selected).
-  Sections are keyed by layout key (`data-section`). Flat and tabbed forms
+  At the scroller's end the *last* section is reported instead, band or not —
+  reaching the end changes no intersection, so that rule runs off a `scroll`
+  listener. Sections are keyed by layout key (`data-section`); the effect key is
+  the labels as JSON, never delimiter-joined (a key may hold any character). Flat and tabbed forms
   ignore both. The generated wrapper must destructure them out of `...rest`,
   which is spread into `useEntityForm`, not into the presentation.
   The other end is `SectionToc` (`src/SectionToc/`): a stateless `<nav>` list

@@ -305,6 +305,58 @@ describe('stacked sections ↔ host navigation', () => {
     expect(onActiveSectionChange).toHaveBeenLastCalledWith('B');
   });
 
+  it('keeps a section whose name contains a newline whole', () => {
+    // A layout key is any string; a delimiter-joined key would split this one
+    // into two labels and observe neither.
+    const odd = 'Overview\n(details)';
+    const onActiveSectionChange = vi.fn();
+    render(
+      <Host
+        layout={{ [odd]: ['name'], B: ['length'] }}
+        variant="stacked"
+        onActiveSectionChange={onActiveSectionChange}
+      />
+    );
+    const node = [...document.querySelectorAll<HTMLElement>('[data-section]')].find(
+      n => n.dataset.section === odd
+    )!;
+    expect(observers.at(-1)!.nodes).toContain(node);
+    act(() => {
+      const o = observers.at(-1)!;
+      o.cb(
+        [{ target: node, isIntersecting: true } as unknown as IntersectionObserverEntry],
+        o as unknown as IntersectionObserver
+      );
+    });
+    expect(onActiveSectionChange).toHaveBeenLastCalledWith(odd);
+  });
+
+  it('reports the last section at the end of the scroll, though it never reaches the band', () => {
+    const root = document.documentElement;
+    const at = (scrollTop: number) =>
+      act(() => {
+        Object.defineProperties(root, {
+          scrollTop: { value: scrollTop, configurable: true },
+          clientHeight: { value: 800, configurable: true },
+          scrollHeight: { value: 2000, configurable: true },
+        });
+        window.dispatchEvent(new Event('scroll'));
+      });
+    const onActiveSectionChange = vi.fn();
+    render(<Host layout={layout} variant="stacked" onActiveSectionChange={onActiveSectionChange} />);
+    try {
+      see({ B: true }); // C is short: on screen, but below the band for good
+      at(1200);
+      expect(onActiveSectionChange).toHaveBeenLastCalledWith('C');
+      at(1100); // back off the end → the band decides again
+      expect(onActiveSectionChange).toHaveBeenLastCalledWith('B');
+    } finally {
+      ['scrollTop', 'clientHeight', 'scrollHeight'].forEach(
+        k => delete (root as unknown as Record<string, unknown>)[k]
+      );
+    }
+  });
+
   it('leaves tabbed and flat forms alone', () => {
     const { rerender } = render(<Host layout={layout} activeSection="A" />);
     rerender(<Host layout={layout} activeSection="C" />);

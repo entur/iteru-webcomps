@@ -8,6 +8,17 @@ const SPY_ROOT_MARGIN = '0px 0px -60% 0px';
  *  scrolling at all (already in place), where that event never fires. */
 const SCROLL_SETTLE_MS = 1000;
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
+/** Sub-pixel scroll positions: "at the end" within this many pixels. */
+const END_SLACK_PX = 1;
+const SCROLLABLE = /auto|scroll|overlay/;
+
+/** Nearest ancestor that scrolls vertically, else the document's own scroller. */
+const scrollerOf = (el: Element | null): Element =>
+  !el || el === document.body || el === document.documentElement
+    ? (document.scrollingElement ?? document.documentElement)
+    : SCROLLABLE.test(getComputedStyle(el).overflowY)
+      ? el
+      : scrollerOf(el.parentElement);
 
 export interface SectionSpyOptions {
   /** Section labels, in document order. */
@@ -23,7 +34,9 @@ export interface SectionSpyOptions {
 /**
  * Two-way link between stacked sections and whatever navigates them (a table of
  * contents, typically). Out: an `IntersectionObserver` reports the first section
- * inside the reading band. In: a changed `active` scrolls that section into view.
+ * inside the reading band — or the last one once the scroller is at its end,
+ * since a short final section can never climb into the band. In: a changed
+ * `active` scrolls that section into view.
  *
  * The two would feed each other — a requested scroll passes every section on the
  * way, and each would be reported back as the new `active` — so the observer is
@@ -47,12 +60,29 @@ export function useSectionSpy({
   const onActiveChangeRef = useRef(onActiveChange);
   useEffect(() => { onActiveChangeRef.current = onActiveChange; }, [onActiveChange]);
 
-  const order = labels.join('\n');
+  // JSON, not a delimiter: a layout key is any string, so no character is free
+  // to separate them with.
+  const order = JSON.stringify(labels);
 
   useEffect(() => {
     if (!enabled || typeof IntersectionObserver === 'undefined') return;
-    const ordered = order.split('\n');
+    const ordered = JSON.parse(order) as string[];
     const inBand = new Set<string>();
+    const first = nodes.current.get(ordered[0]);
+    const scroller = first && scrollerOf(first.parentElement);
+    // `scrollTop > 0` keeps a view that does not scroll at all from counting as
+    // "at its end" — there the band alone decides.
+    const atEnd = (): boolean =>
+      !!scroller &&
+      scroller.scrollTop > 0 &&
+      scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - END_SLACK_PX;
+    const report = (): void => {
+      if (muted.current) return;
+      const next = atEnd() ? ordered.at(-1) : ordered.find(l => inBand.has(l));
+      if (next === undefined || next === reported.current) return;
+      reported.current = next;
+      onActiveChangeRef.current?.(next);
+    };
     const observer = new IntersectionObserver(
       entries => {
         entries.forEach(e => {
@@ -60,16 +90,18 @@ export function useSectionSpy({
           if (e.isIntersecting) inBand.add(label);
           else inBand.delete(label);
         });
-        if (muted.current) return;
-        const next = ordered.find(l => inBand.has(l));
-        if (next === undefined || next === reported.current) return;
-        reported.current = next;
-        onActiveChangeRef.current?.(next);
+        report();
       },
       { rootMargin: SPY_ROOT_MARGIN }
     );
     ordered.map(l => nodes.current.get(l)).forEach(n => n && observer.observe(n));
-    return () => observer.disconnect();
+    // Reaching the end changes no intersection, so the observer alone would
+    // never notice it. Capture: `scroll` does not bubble out of a nested scroller.
+    window.addEventListener('scroll', report, { capture: true, passive: true });
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('scroll', report, { capture: true });
+    };
   }, [enabled, order]);
 
   useEffect(() => {
