@@ -29,6 +29,13 @@ export type {
   FormSkeletonHostProps,
   FormArrivalProps,
 } from './EntityDetailsForm/components/FormSkeleton';
+// In-page navigation for a stacked form. `SectionToc` is standalone (no form
+// dependency); `resolveSections` yields the sections a given registry + layout
+// will actually render, so the list it is fed can't drift from the form.
+export { SectionToc } from './SectionToc';
+export type { SectionTocProps } from './SectionToc';
+export { resolveSections } from './EntityDetailsForm/utils/sections';
+export type { Section, ResolvedField } from './EntityDetailsForm/utils/sections';
 // Generated wrappers + their props types: VehicleTypeForm/VehicleTypeFormProps,
 // VehicleForm/VehicleFormProps. Re-exported wholesale rather than named, so a
 // new manifest entry reaches the public API the moment it is generated.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { distillModule } from './distillTypes';
+import { distillModule, parsePatch } from './distillTypes';
 
 // Minimal generated-like source exercising every rule.
 const SRC = `
@@ -149,5 +149,32 @@ describe('distillModule — reference divergence + date kinds', () => {
     expect(out2).toMatch(
       /dataOwnerRef:\s*\{ kind: 'reference', path: \['dataOwnerRef', 'netexId'\], locked: true \}/
     );
+  });
+});
+
+describe('patched fields', () => {
+  const PATCH = `
+    extend type Thing { length: Float cap: Cap }
+    extend input ThingInput { length: Float }
+    extend type Other { foo: String }
+  `;
+
+  it('reads read-type extensions per type, ignoring input extensions', () => {
+    const patch = parsePatch(PATCH);
+    expect([...patch.keys()]).toEqual(['Thing', 'Other']);
+    expect([...patch.get('Thing')!]).toEqual(['length', 'cap']);
+  });
+
+  it('marks a patched field, and every leaf hoisted out of a patched object', () => {
+    const out = distillModule(SRC, 'Thing', 'ThingInput', parsePatch(PATCH).get('Thing'));
+    expect(out).toMatch(/length: \{ kind: 'number', path: \['length'\], patched: true \}/);
+    expect(out).toMatch(/seating: \{[^}]*path: \['cap', 'seating'\], patched: true \}/);
+    expect(out).toMatch(/total: \{[^}]*patched: true \}/);
+    // Nothing else picks the flag up.
+    expect(out.match(/patched: true/g)).toHaveLength(3);
+  });
+
+  it('marks nothing when the entity has no overlay', () => {
+    expect(distillModule(SRC, 'Thing', 'ThingInput')).not.toMatch(/patched/);
   });
 });

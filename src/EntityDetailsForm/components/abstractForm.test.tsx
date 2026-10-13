@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { act, render, screen, fireEvent } from '@testing-library/react';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { createAbstractEntityDetailsForm } from './abstractForm';
 import type { FieldSpec, EntityDetailsFormProps } from '../types';
 
@@ -208,5 +208,201 @@ describe('createAbstractEntityDetailsForm', () => {
     expect(nameInput).toBeDisabled();
     expect(container.querySelector('.Mui-error')).not.toBeNull();
     expect(screen.getByText(/Already exists/)).toBeInTheDocument();
+  });
+});
+
+describe('stacked sections ↔ host navigation', () => {
+  // jsdom has neither API, so both are stood in: the observer records what it
+  // was asked to watch and lets the test decide what is "in view".
+  let observers: { cb: IntersectionObserverCallback; nodes: Element[] }[];
+  let scrolled: (string | undefined)[];
+
+  beforeEach(() => {
+    observers = [];
+    scrolled = [];
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        nodes: Element[] = [];
+        constructor(public cb: IntersectionObserverCallback) {
+          observers.push(this);
+        }
+        observe(n: Element) {
+          this.nodes.push(n);
+        }
+        disconnect() {}
+      }
+    );
+    Element.prototype.scrollIntoView = function (this: HTMLElement) {
+      scrolled.push(this.dataset.section);
+    };
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
+  });
+
+  const layout = { A: ['name'], B: ['length'], C: ['version'] };
+  const section = (label: string) => document.querySelector(`[data-section="${label}"]`)!;
+  /** Tell the observer which sections are (not) crossing the reading band. */
+  const see = (state: Record<string, boolean>) =>
+    act(() => {
+      const o = observers.at(-1)!;
+      o.cb(
+        Object.entries(state).map(
+          ([label, isIntersecting]) =>
+            ({ target: section(label), isIntersecting }) as unknown as IntersectionObserverEntry
+        ),
+        o as unknown as IntersectionObserver
+      );
+    });
+
+  it('watches every stacked section', () => {
+    render(<Host layout={layout} variant="stacked" />);
+    expect(observers.at(-1)!.nodes).toEqual(['A', 'B', 'C'].map(section));
+  });
+
+  it('reports the first section in view, in document order', () => {
+    const onActiveSectionChange = vi.fn();
+    render(<Host layout={layout} variant="stacked" onActiveSectionChange={onActiveSectionChange} />);
+    see({ C: true, B: true });
+    expect(onActiveSectionChange).toHaveBeenLastCalledWith('B');
+    see({ B: false });
+    expect(onActiveSectionChange).toHaveBeenLastCalledWith('C');
+    expect(onActiveSectionChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('scrolls to a section when activeSection changes, but not at mount', () => {
+    const { rerender } = render(<Host layout={layout} variant="stacked" activeSection="B" />);
+    expect(scrolled).toEqual([]);
+    rerender(<Host layout={layout} variant="stacked" activeSection="C" />);
+    expect(scrolled).toEqual(['C']);
+  });
+
+  it('does not scroll to a section it reported itself', () => {
+    // The pair is meant to be wired to one piece of host state, so the form's
+    // own report comes straight back in as `activeSection`.
+    const Wired = () => {
+      const [s, setS] = useState<string>();
+      return <Host layout={layout} variant="stacked" activeSection={s} onActiveSectionChange={setS} />;
+    };
+    render(<Wired />);
+    see({ B: true });
+    expect(scrolled).toEqual([]);
+  });
+
+  it('stays silent while a requested scroll passes other sections', () => {
+    const onActiveSectionChange = vi.fn();
+    const props = { layout, variant: 'stacked' as const, onActiveSectionChange };
+    const { rerender } = render(<Host {...props} />);
+    rerender(<Host {...props} activeSection="C" />);
+    see({ A: true, B: true }); // passed on the way down
+    expect(onActiveSectionChange).not.toHaveBeenCalled();
+    act(() => {
+      window.dispatchEvent(new Event('scrollend'));
+    });
+    see({ A: false }); // the reader scrolls on their own again
+    expect(onActiveSectionChange).toHaveBeenLastCalledWith('B');
+  });
+
+  it('keeps a section whose name contains a newline whole', () => {
+    // A layout key is any string; a delimiter-joined key would split this one
+    // into two labels and observe neither.
+    const odd = 'Overview\n(details)';
+    const onActiveSectionChange = vi.fn();
+    render(
+      <Host
+        layout={{ [odd]: ['name'], B: ['length'] }}
+        variant="stacked"
+        onActiveSectionChange={onActiveSectionChange}
+      />
+    );
+    const node = [...document.querySelectorAll<HTMLElement>('[data-section]')].find(
+      n => n.dataset.section === odd
+    )!;
+    expect(observers.at(-1)!.nodes).toContain(node);
+    act(() => {
+      const o = observers.at(-1)!;
+      o.cb(
+        [{ target: node, isIntersecting: true } as unknown as IntersectionObserverEntry],
+        o as unknown as IntersectionObserver
+      );
+    });
+    expect(onActiveSectionChange).toHaveBeenLastCalledWith(odd);
+  });
+
+  it('reports the last section at the end of the scroll, though it never reaches the band', () => {
+    const root = document.documentElement;
+    const at = (scrollTop: number) =>
+      act(() => {
+        Object.defineProperties(root, {
+          scrollTop: { value: scrollTop, configurable: true },
+          clientHeight: { value: 800, configurable: true },
+          scrollHeight: { value: 2000, configurable: true },
+        });
+        window.dispatchEvent(new Event('scroll'));
+      });
+    const onActiveSectionChange = vi.fn();
+    render(<Host layout={layout} variant="stacked" onActiveSectionChange={onActiveSectionChange} />);
+    try {
+      see({ B: true }); // C is short: on screen, but below the band for good
+      at(1200);
+      expect(onActiveSectionChange).toHaveBeenLastCalledWith('C');
+      at(1100); // back off the end → the band decides again
+      expect(onActiveSectionChange).toHaveBeenLastCalledWith('B');
+    } finally {
+      ['scrollTop', 'clientHeight', 'scrollHeight'].forEach(
+        k => delete (root as unknown as Record<string, unknown>)[k]
+      );
+    }
+  });
+
+  it('leaves tabbed and flat forms alone', () => {
+    const { rerender } = render(<Host layout={layout} activeSection="A" />);
+    rerender(<Host layout={layout} activeSection="C" />);
+    rerender(<Host activeSection="A" />);
+    // MUI's own `Tabs` observes its scroll buttons, so "no observer" is too
+    // strong — what must hold is that none of them is watching a section.
+    const watched = observers.flatMap(o => o.nodes).filter(n => n.hasAttribute('data-section'));
+    expect(watched).toEqual([]);
+    expect(scrolled).toEqual([]);
+  });
+});
+
+describe('patched fields', () => {
+  const PForm = createAbstractEntityDetailsForm<V>({
+    ...fields,
+    length: { ...fields.length, patched: true },
+  });
+  const mount = (layout?: EntityDetailsFormProps<V>['layout']) =>
+    render(<PForm value={{}} onChange={() => {}} mode="edit" layout={layout} />);
+  /** The row a labelled control sits in: control cell + mark cell. */
+  const rowOf = (label: string) => screen.getByLabelText(label).closest('.MuiFormControl-root')!
+    .parentElement!.parentElement!;
+
+  it('puts a * after a patched control, outside the input, and nowhere else', () => {
+    mount();
+    const marks = [...document.querySelectorAll('[data-patch-mark]')];
+    expect(marks).toHaveLength(1);
+    expect(marks[0]).toHaveTextContent('*');
+    expect(marks[0]).toHaveAccessibleName(/not saved/i);
+    const row = rowOf('Length');
+    expect(row).toContainElement(marks[0] as HTMLElement);
+    // After the control's cell, not inside it.
+    expect(row.lastElementChild).toContainElement(marks[0] as HTMLElement);
+    expect(row.firstElementChild).not.toContainElement(marks[0] as HTMLElement);
+  });
+
+  it('keeps the column on unmarked rows too, so every control is the same width', () => {
+    mount();
+    expect(rowOf('Name').children).toHaveLength(2);
+    expect(rowOf('Name').lastElementChild).toBeEmptyDOMElement();
+  });
+
+  it('adds no column when no rendered field is patched', () => {
+    mount({ Edit: ['name'] });
+    expect(rowOf('Name').children).toHaveLength(1);
+    render(<Host />);
+    expect(document.querySelector('[data-patch-mark]')).toBeNull();
   });
 });

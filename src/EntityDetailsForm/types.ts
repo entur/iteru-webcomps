@@ -51,6 +51,12 @@ export interface FieldSpec {
    *  `serverManaged`, which means backend-owned and is *derived* by distill from
    *  the Entity/Input diff — `locked` is assigned explicitly. */
   locked?: boolean;
+  /** Declared by the patch overlay (`schema/sobek.patch.graphqls`), not by the
+   *  live schema. Editable, and round-trips through `onChange`, but the wire edge
+   *  strips it — it is **not saved**. The form flags it with a trailing `*`.
+   *  *Derived* by distill from the overlay, so the mark goes away with the
+   *  `extend` line once sobek ships the field. */
+  patched?: boolean;
 }
 
 /** One field's placement within a section. `K` is the entity's flat field-key
@@ -128,6 +134,16 @@ export interface EntityDetailsFormProps<E> {
   errors?: Record<string, string>;
   /** Global disable (e.g. while loading or saving). */
   disabled?: boolean;
+  /** **`variant: 'stacked'` only** — the section (its layout key) the host wants
+   *  in view. A change scrolls that section to the top; the value at mount does
+   *  not, and neither does one the form reported itself through
+   *  `onActiveSectionChange`, so the pair can be wired straight to one piece of
+   *  host state (a table of contents, say). Ignored for flat and tabbed forms. */
+  activeSection?: string;
+  /** **`variant: 'stacked'` only** — fired with the section the reader has
+   *  scrolled to: the first one crossing the top of the viewport. Silent while a
+   *  scroll requested through `activeSection` is still under way. */
+  onActiveSectionChange?: (section: string) => void;
 }
 
 /** A factory-built form component. */

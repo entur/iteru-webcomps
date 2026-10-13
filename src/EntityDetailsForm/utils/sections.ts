@@ -26,6 +26,22 @@ export interface Section {
   fields: ResolvedField[];
 }
 
+/** Width of the column holding a patched field's `*`, to the right of the
+ *  control. Shared so the skeleton reserves exactly what the form will. */
+export const PATCH_MARK_COL_PX = 16;
+
+/**
+ * Whether any field these sections render is `patched`. The mark column is
+ * reserved for the whole form or not at all: per row, a marked control would be
+ * narrower than its neighbours; per section, a tab switch would resize them.
+ *
+ * @param fields generated `FIELDS` registry for the entity
+ * @param sections the sections being rendered
+ * @returns `true` when the form needs the trailing mark column
+ */
+export const hasPatched = (fields: Record<string, FieldSpec>, sections: Section[]): boolean =>
+  sections.some(s => s.fields.some(f => fields[f.key].patched));
+
 /** Normalize a `LayoutItem` to `{ field, label?, entries?, options? }`. */
 const norm = (
   item: LayoutItem

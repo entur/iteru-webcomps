@@ -18,7 +18,7 @@ re-run it.
 
 **Layout of `src/EntityDetailsForm/`** — root holds the contract only
 (`index.ts`, `types.ts`); `components/` everything that renders (`abstractForm`,
-`controls`, `EditFooter`, `SaveSnackbar`), `hooks/` the one hook, `utils/` the
+`controls`, `EditFooter`, `SaveSnackbar`), `hooks/` the hooks (`useEntityForm`, `useSectionSpy`), `utils/` the
 pure functions (`paths`, `toInput`, `reduceToSobekInput`, `normalizeErrors`,
 `dirty`), `formImpls/` the generated wrappers. Tests sit beside their subject.
 Two files outside the directory hardcode paths into it and must move with it:
@@ -157,6 +157,25 @@ own chrome from `onSaved`/`onError`) uses the same pieces.
 - `layout?` — whitelist of sections (`{ Section: [fields] }`). Omitted field not
   rendered but value round-trips via `onChange` (loss-free). Omit layout → flat.
 - `variant?` `'tabs' | 'stacked'` — for ≥2 sections. Default `tabs`.
+- `activeSection?` / `onActiveSectionChange?` — **stacked only**; the pair a
+  table of contents wires to one piece of host state (`hooks/useSectionSpy`).
+  Out: an `IntersectionObserver` reports the first section crossing the top 40%
+  of the viewport. In: a *changed* `activeSection` scrolls that section into
+  view (smooth, unless reduced motion). Three guards stop the two feeding each
+  other: the mount-time value never scrolls, a value the form reported itself
+  never scrolls, and the observer is muted from a request until `scrollend` —
+  otherwise every section passed on the way is reported back as the new target
+  (and a last section too short to reach the band could never stay selected).
+  At the scroller's end the *last* section is reported instead, band or not —
+  reaching the end changes no intersection, so that rule runs off a `scroll`
+  listener. Sections are keyed by layout key (`data-section`); the effect key is
+  the labels as JSON, never delimiter-joined (a key may hold any character). Flat and tabbed forms
+  ignore both. The generated wrapper must destructure them out of `...rest`,
+  which is spread into `useEntityForm`, not into the presentation.
+  The other end is `SectionToc` (`src/SectionToc/`): a stateless `<nav>` list
+  taking `sections` / `active` / `onSelect`, with **no import from the form** —
+  the host joins the two, feeding it `resolveSections(fields, layout)` labels
+  (exported for exactly this) so the list matches what the form renders.
 - `serverManaged` fields (`version`, `created`, `changed`, `changedBy`) hidden
   from editable model: locked even in edit, surfaced only to *see* meta/semantic
   context. Backend-owned — **not round-tripped**, never in write payload, don't
@@ -247,8 +266,20 @@ right after `toInputEntity`, before the `dataOwnerRef` stamp (a wire field, so
 unaffected). The `satisfies Record<keyof <Entity>Input, 1>` on each mask is a
 real guard, not decoration: keys come from `generateDocuments`' schema read, the
 type from graphql-codegen's — feed the patch to either and the build fails.
-`distillTypes.ts` and `toInput.ts` are deliberately untouched, so patched fields
-stay editable and round-trip through `onChange`; only the wire edge strips them.
+`toInput.ts` is deliberately untouched, and `distillTypes.ts` changes nothing
+about what a patched field *is* — they stay editable and round-trip through
+`onChange`; only the wire edge strips them.
+
+**The `*` marker.** Distill does read the overlay for one thing: `parsePatch`
+collects each `extend type <Entity>` and stamps `patched: true` on the derived
+`FIELDS` entries (hoisted leaves of a patched object included). Display
+metadata only — it never decides what is sent. The form draws a `*` in a column
+*after* the control, outside the input (`row()` in `abstractForm`), with a
+"not saved" hint as `title`/`aria-label`. The column is reserved for the whole
+form or not at all (`hasPatched` in `utils/sections`): per row a marked control
+would be narrower than its neighbours, per section a tab switch would resize
+them. `FormSkeleton` reserves the same `PATCH_MARK_COL_PX`. Derived, so the mark
+disappears with the `extend` line.
 Residue: `Types.<Entity>Input` in `sobekTypes.ts` stays patched, so the
 *variables type* still permits those keys at compile time — only the runtime
 mask stops them.

@@ -14,7 +14,7 @@ import type { ReactNode } from 'react';
 import { Box, Skeleton, Stack } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material/styles';
 import type { FieldKind, FieldSpec, Layout, LayoutVariant } from '../types';
-import { resolveSections } from '../utils/sections';
+import { hasPatched, PATCH_MARK_COL_PX, resolveSections } from '../utils/sections';
 
 // Placeholder geometry. Row heights track the controls they stand in for, so
 // the layout does not jump when the real inputs land.
@@ -79,6 +79,9 @@ export function FormSkeleton({
   // Mirror the form: a tab bar shows one panel at a time, stacked shows all.
   const tabbed = sections.length > 1 && variant === 'tabs';
   const shown = tabbed ? sections.slice(0, 1) : sections;
+  // The form keeps a column for patched-field marks; leave it empty here too,
+  // so the arriving controls are exactly as wide as their placeholders.
+  const markCol = hasPatched(fields, sections) ? PATCH_MARK_COL_PX : 0;
 
   return (
     <Box
@@ -132,7 +135,7 @@ export function FormSkeleton({
                 variant="rounded"
                 animation="wave"
                 height={KIND_H[fields[f.key].kind]}
-                sx={{ mb: ROW_GAP }}
+                sx={{ mb: ROW_GAP, mr: `${markCol}px` }}
               />
             ))}
           </Box>

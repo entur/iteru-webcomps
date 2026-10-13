@@ -86,6 +86,16 @@ describe('renderWrapperSource', () => {
     expect(src).toMatch(/<\/FormArrival>\s+\{\/\* Inert until/);
   });
 
+  it('hands the section-navigation pair to the presentation, not to the hook', () => {
+    // Both are plain `EntityDetailsFormProps`, so they arrive in the wrapper's
+    // props for free — but left in `...rest` they would be spread into
+    // `useEntityForm` and never reach the form that scrolls.
+    expect(src).toMatch(/\n    activeSection,\n    onActiveSectionChange,\n/);
+    expect(src).toMatch(
+      /activeSection=\{activeSection\}\s+onActiveSectionChange=\{onActiveSectionChange\}/
+    );
+  });
+
   it('gates not-found on the settled load phase, never on a loading flag', () => {
     // Both remaining branches are settled states. A pending record suspends, so
     // this component has not rendered — there is no first commit to flash on.

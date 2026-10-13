@@ -31,7 +31,7 @@ export const deckPlanRefs: RefOption[] = [
 // section. `deckPlan` (a distilled `reference`) sits under `transportMode`;
 // `vehicles` is a distilled `grid` (serverManaged) rendered as a read-only table.
 export const vehicleTypeLayout: VehicleTypeLayout = {
-  Edit: [
+  General: [
     "name",
     "transportMode",
     { field: "deckPlan", options: () => deckPlanRefs },
@@ -39,7 +39,7 @@ export const vehicleTypeLayout: VehicleTypeLayout = {
     "range",
     "fullCharge",
   ],
-  "Dim.": ["length", "width", "height", "weight"],
+  Dimensions: ["length", "width", "height", "weight"],
   Accessibility: ["lowFloor"],
   Environment: [
     "selfPropelled",
@@ -78,7 +78,7 @@ export const vehicleTypeLayout: VehicleTypeLayout = {
 // distilled `reference`; `buildDate` / `registrationDate` are `date` controls;
 // the meta timestamps are `datetime`.
 export const vehicleLayout: VehicleLayout = {
-  Edit: [
+  General: [
     "name",
     "registrationNumber",
     { field: "transportType", label: "VehicleType", options: () => vehicleTypeRefs },
