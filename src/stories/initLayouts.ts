@@ -39,7 +39,7 @@ export const vehicleTypeLayout: VehicleTypeLayout = {
     "range",
     "fullCharge",
   ],
-  "Dim.": ["length", "width", "height", "weight"],
+  Dimensions: ["length", "width", "height", "weight"],
   Accessibility: ["lowFloor"],
   Environment: [
     "selfPropelled",

@@ -156,6 +156,13 @@ const ENTITY: Record<
 
 const ENTITY_ORDER: entity[] = ["vehicleType", "vehicle"];
 
+/** What the page opens on: the first record of the first list, derived so it
+ *  follows a reordered `ENTITY_ORDER` or a reseeded dataset. */
+const DEFAULT_SELECTION: Selection = {
+  entity: ENTITY_ORDER[0],
+  netexId: Object.values(ENTITY[ENTITY_ORDER[0]].seed)[0]?.netexId,
+};
+
 /** Story-adjustable props, surfaced as Storybook Controls. */
 interface GqlHostPageProps {
   /** How multi-section forms (VehicleType) present sections. Single-section
@@ -178,10 +185,7 @@ interface GqlHostPageProps {
  */
 const GqlHostPage = ({ tabStyle = "one-line" }: GqlHostPageProps) => {
   const { variant, slotProps } = useMemo(() => deriveTabs(tabStyle), [tabStyle]);
-  const [selection, setSelection] = useState<Selection | null>({
-    entity: "vehicle",
-    netexId: "VEH:Vehicle:701",
-  });
+  const [selection, setSelection] = useState<Selection | null>(DEFAULT_SELECTION);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [toast, setToast] = useState<SaveToast | null>(null);
   // Reported by the form itself — the host no longer diffs anything to know
