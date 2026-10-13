@@ -1,8 +1,11 @@
 /**
- * The shared filter: a Filters button, a popover with one control per field
- * sobek can filter on, the remaining fields listed disabled, and the active
- * conditions as removable chips. Stateless — it edits `filters` through
- * `onChange` and works the same above either view.
+ * The shared filter: a Filters button with a popover (one control per field
+ * sobek can filter on, the remaining fields listed disabled), and — as a
+ * separate component — the active conditions as removable chips. Both are
+ * stateless: they edit `filters` through `onChange` and work the same above
+ * either view. The chips are split out so the toolbar can give them a row of
+ * their own; inline they pushed every other tool sideways as filters came and
+ * went.
  */
 import { useState } from 'react';
 import {
@@ -44,26 +47,32 @@ export interface FilterPopoverProps {
 }
 
 /**
- * Render the filter button, its popover and the active-filter chips.
+ * The columns carrying a non-empty condition, in column order.
  *
- * @param columns      resolved columns (the fields on offer)
+ * @param columns      resolved columns
+ * @param filterFields the entity's generated `<Entity>FilterFields`
+ * @param filters      current conditions
+ * @returns the filtered-on columns
+ */
+export const activeFilterColumns = (columns: readonly Column[], filterFields: FilterFields, filters: Filters): Column[] =>
+  columns.filter(c => filterFields[c.key] && chipText(filters[c.key] ?? '') !== '');
+
+/**
+ * Render the active conditions as removable chips. Renders nothing when no
+ * condition is active, so the caller's row collapses with it.
+ *
+ * @param columns      resolved columns
  * @param filterFields the entity's generated `<Entity>FilterFields`
  * @param filters      current conditions
  * @param onChange     receives the whole next `filters` object
- * @param labels       UI strings
- * @returns the filter controls
+ * @param labels       UI strings (`activeFilters` names the group)
+ * @returns the chip row, or `null`
  */
-export function FilterPopover({ columns, filterFields, filters, onChange, labels }: FilterPopoverProps): React.ReactNode {
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const open = columns.filter(c => filterFields[c.key]);
-  const blocked = columns.filter(c => !filterFields[c.key]);
-  const active = open.filter(c => chipText(filters[c.key] ?? '') !== '');
-
+export function FilterChips({ columns, filterFields, filters, onChange, labels }: FilterPopoverProps): React.ReactNode {
+  const active = activeFilterColumns(columns, filterFields, filters);
+  if (!active.length) return null;
   return (
-    <>
-      <Button size="small" startIcon={<FilterListIcon />} onClick={e => setAnchor(e.currentTarget)}>
-        {labels.filters}
-      </Button>
+    <Stack role="group" aria-label={labels.activeFilters} direction="row" useFlexGap sx={{ flexWrap: 'wrap', gap: 0.5 }}>
       {active.map(c => (
         <Chip
           key={c.key}
@@ -72,6 +81,30 @@ export function FilterPopover({ columns, filterFields, filters, onChange, labels
           onDelete={() => onChange(withFilter(filters, c.key, undefined))}
         />
       ))}
+    </Stack>
+  );
+}
+
+/**
+ * Render the filter button and its popover.
+ *
+ * @param columns      resolved columns (the fields on offer)
+ * @param filterFields the entity's generated `<Entity>FilterFields`
+ * @param filters      current conditions
+ * @param onChange     receives the whole next `filters` object
+ * @param labels       UI strings
+ * @returns the filter button and popover
+ */
+export function FilterPopover({ columns, filterFields, filters, onChange, labels }: FilterPopoverProps): React.ReactNode {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const open = columns.filter(c => filterFields[c.key]);
+  const blocked = columns.filter(c => !filterFields[c.key]);
+
+  return (
+    <>
+      <Button size="small" startIcon={<FilterListIcon />} onClick={e => setAnchor(e.currentTarget)}>
+        {labels.filters}
+      </Button>
       <Popover
         open={!!anchor}
         anchorEl={anchor}

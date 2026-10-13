@@ -229,6 +229,9 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   `view` / `tools` / `filterMode` from Storybook controls — no wrapper chrome.
 - `tools` whitelists `search | filter | sort | columns | density`; the last two
   render in grid view only. No CSV/Print.
+- The toolbar is one row, or two: active-filter chips (`FilterChips`) get a row
+  of their own below the tools, present only while a filter is set. Inline they
+  shifted every other tool as filters came and went.
 - **Filter reach is generated, not chosen.** `generateDocuments` emits
   `<Entity>FilterFields` from the `filter` argument of the entity's list query
   in the live schema (`dataOwnerRef` excluded — session context). Only those

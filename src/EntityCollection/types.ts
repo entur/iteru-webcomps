@@ -48,6 +48,7 @@ export interface CollectionLabels {
   search: string;
   searchCaption: string;
   filters: string;
+  activeFilters: string;
   notFilterable: string;
   sortBy: string;
   sortNone: string;
@@ -136,6 +137,7 @@ export const DEFAULT_LABELS: CollectionLabels = {
   search: 'Search',
   searchCaption: '(from cached filter)',
   filters: 'Filters',
+  activeFilters: 'Active filters',
   notFilterable: 'Not filterable in sobek yet',
   sortBy: 'Sort by',
   sortNone: 'None',

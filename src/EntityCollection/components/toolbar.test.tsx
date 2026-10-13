@@ -89,6 +89,27 @@ describe('CollectionToolbar', () => {
     expect(onQuery).toHaveBeenCalledWith({ filters: { transportMode: ['rail'] } });
   });
 
+  it('puts active filters on a row of their own, below the tools', () => {
+    mount({ query: { filters: { name: 'fli' } } });
+    const row = screen.getByRole('group', { name: 'Active filters' });
+    expect(within(row).getByText('Name: fli')).toBeTruthy();
+    expect(within(row).queryByRole('button', { name: 'Filters' })).toBeNull();
+    expect(within(row).queryByRole('textbox', { name: 'Search' })).toBeNull();
+    const tools = screen.getByRole('button', { name: 'Filters' }).parentElement as HTMLElement;
+    expect(within(tools).queryByText('Name: fli')).toBeNull();
+    expect(tools.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('keeps the toolbar to one row while no filter is active', () => {
+    mount({ query: { filters: { name: '  ' } } });
+    expect(screen.queryByRole('group', { name: 'Active filters' })).toBeNull();
+  });
+
+  it('shows no filter row when the filter tool is trimmed away', () => {
+    mount({ tools: ['search'], query: { filters: { name: 'fli' } } });
+    expect(screen.queryByRole('group', { name: 'Active filters' })).toBeNull();
+  });
+
   it('shows no chip for an empty condition', () => {
     mount({ query: { filters: { name: '  ', transportMode: [] } } });
     expect(document.querySelector('.MuiChip-root')).toBeNull();
