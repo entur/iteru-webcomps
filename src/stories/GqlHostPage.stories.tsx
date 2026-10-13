@@ -220,6 +220,12 @@ const GqlHostPage = ({ tabStyle = "one-line" }: GqlHostPageProps) => {
           borderRight: 1,
           borderColor: "divider",
           bgcolor: "background.paper",
+          // The page scrolls with the form, so the lists are pinned to the
+          // viewport and scroll on their own when they outgrow it.
+          position: "sticky",
+          top: 0,
+          alignSelf: "flex-start",
+          height: "100vh",
           overflowY: "auto",
         }}
       >
@@ -289,13 +295,12 @@ const GqlHostPage = ({ tabStyle = "one-line" }: GqlHostPageProps) => {
           {/* The page scrolls, not the column, so the list is pinned inside it. */}
           <Box sx={{ position: "sticky", top: 0, p: 2 }}>
             <Typography variant="overline" color="text.secondary">
-              On this page
+              Sections
             </Typography>
             <SectionToc
               sections={tocSections}
               active={section ?? tocSections[0]}
               onSelect={setSection}
-              label="On this page"
             />
           </Box>
         </Box>
