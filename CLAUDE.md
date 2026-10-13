@@ -169,6 +169,10 @@ own chrome from `onSaved`/`onError`) uses the same pieces.
   Sections are keyed by layout key (`data-section`). Flat and tabbed forms
   ignore both. The generated wrapper must destructure them out of `...rest`,
   which is spread into `useEntityForm`, not into the presentation.
+  The other end is `SectionToc` (`src/SectionToc/`): a stateless `<nav>` list
+  taking `sections` / `active` / `onSelect`, with **no import from the form** —
+  the host joins the two, feeding it `resolveSections(fields, layout)` labels
+  (exported for exactly this) so the list matches what the form renders.
 - `serverManaged` fields (`version`, `created`, `changed`, `changedBy`) hidden
   from editable model: locked even in edit, surfaced only to *see* meta/semantic
   context. Backend-owned — **not round-tripped**, never in write payload, don't
