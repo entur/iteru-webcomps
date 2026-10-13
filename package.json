@@ -1,6 +1,6 @@
 {
   "name": "@entur/mui-comps-nmr",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "MUI component library for Entur's hathor frontend — React, typed from the sobek GraphQL schema.",
   "license": "EUPL-1.2",
   "type": "module",
