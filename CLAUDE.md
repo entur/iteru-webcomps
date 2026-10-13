@@ -18,7 +18,7 @@ re-run it.
 
 **Layout of `src/EntityDetailsForm/`** — root holds the contract only
 (`index.ts`, `types.ts`); `components/` everything that renders (`abstractForm`,
-`controls`, `EditFooter`, `SaveSnackbar`), `hooks/` the one hook, `utils/` the
+`controls`, `EditFooter`, `SaveSnackbar`), `hooks/` the hooks (`useEntityForm`, `useSectionSpy`), `utils/` the
 pure functions (`paths`, `toInput`, `reduceToSobekInput`, `normalizeErrors`,
 `dirty`), `formImpls/` the generated wrappers. Tests sit beside their subject.
 Two files outside the directory hardcode paths into it and must move with it:
@@ -157,6 +157,18 @@ own chrome from `onSaved`/`onError`) uses the same pieces.
 - `layout?` — whitelist of sections (`{ Section: [fields] }`). Omitted field not
   rendered but value round-trips via `onChange` (loss-free). Omit layout → flat.
 - `variant?` `'tabs' | 'stacked'` — for ≥2 sections. Default `tabs`.
+- `activeSection?` / `onActiveSectionChange?` — **stacked only**; the pair a
+  table of contents wires to one piece of host state (`hooks/useSectionSpy`).
+  Out: an `IntersectionObserver` reports the first section crossing the top 40%
+  of the viewport. In: a *changed* `activeSection` scrolls that section into
+  view (smooth, unless reduced motion). Three guards stop the two feeding each
+  other: the mount-time value never scrolls, a value the form reported itself
+  never scrolls, and the observer is muted from a request until `scrollend` —
+  otherwise every section passed on the way is reported back as the new target
+  (and a last section too short to reach the band could never stay selected).
+  Sections are keyed by layout key (`data-section`). Flat and tabbed forms
+  ignore both. The generated wrapper must destructure them out of `...rest`,
+  which is spread into `useEntityForm`, not into the presentation.
 - `serverManaged` fields (`version`, `created`, `changed`, `changedBy`) hidden
   from editable model: locked even in edit, surfaced only to *see* meta/semantic
   context. Backend-owned — **not round-tripped**, never in write payload, don't

@@ -85,7 +85,18 @@ export function VehicleTypeForm({ skeletonProps, ...rest }: VehicleTypeFormProps
 function VehicleTypeFormRecord(
   props: Omit<VehicleTypeFormProps, 'skeletonProps'> & { resource: EntityResource<VehicleType> | null },
 ) {
-  const { mode = 'edit', layout, variant, slotProps, netexId, footerProps, resource, ...rest } = props;
+  const {
+    mode = 'edit',
+    layout,
+    variant,
+    slotProps,
+    activeSection,
+    onActiveSectionChange,
+    netexId,
+    footerProps,
+    resource,
+    ...rest
+  } = props;
   // Display-only: renders the locked dataOwnerRef control. Overlaid on every
   // render, not just while `value` is undefined — otherwise the control keeps
   // showing the org that was current when the user first typed. The write
@@ -120,6 +131,8 @@ function VehicleTypeFormRecord(
           layout={layout}
           variant={variant}
           slotProps={slotProps}
+          activeSection={activeSection}
+          onActiveSectionChange={onActiveSectionChange}
           errors={errors}
           disabled={saving}
         />

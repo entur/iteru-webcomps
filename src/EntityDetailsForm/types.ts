@@ -128,6 +128,16 @@ export interface EntityDetailsFormProps<E> {
   errors?: Record<string, string>;
   /** Global disable (e.g. while loading or saving). */
   disabled?: boolean;
+  /** **`variant: 'stacked'` only** — the section (its layout key) the host wants
+   *  in view. A change scrolls that section to the top; the value at mount does
+   *  not, and neither does one the form reported itself through
+   *  `onActiveSectionChange`, so the pair can be wired straight to one piece of
+   *  host state (a table of contents, say). Ignored for flat and tabbed forms. */
+  activeSection?: string;
+  /** **`variant: 'stacked'` only** — fired with the section the reader has
+   *  scrolled to: the first one crossing the top of the viewport. Silent while a
+   *  scroll requested through `activeSection` is still under way. */
+  onActiveSectionChange?: (section: string) => void;
 }
 
 /** A factory-built form component. */

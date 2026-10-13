@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { act, render, screen, fireEvent } from '@testing-library/react';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { createAbstractEntityDetailsForm } from './abstractForm';
 import type { FieldSpec, EntityDetailsFormProps } from '../types';
 
@@ -208,5 +208,111 @@ describe('createAbstractEntityDetailsForm', () => {
     expect(nameInput).toBeDisabled();
     expect(container.querySelector('.Mui-error')).not.toBeNull();
     expect(screen.getByText(/Already exists/)).toBeInTheDocument();
+  });
+});
+
+describe('stacked sections ↔ host navigation', () => {
+  // jsdom has neither API, so both are stood in: the observer records what it
+  // was asked to watch and lets the test decide what is "in view".
+  let observers: { cb: IntersectionObserverCallback; nodes: Element[] }[];
+  let scrolled: (string | undefined)[];
+
+  beforeEach(() => {
+    observers = [];
+    scrolled = [];
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        nodes: Element[] = [];
+        constructor(public cb: IntersectionObserverCallback) {
+          observers.push(this);
+        }
+        observe(n: Element) {
+          this.nodes.push(n);
+        }
+        disconnect() {}
+      }
+    );
+    Element.prototype.scrollIntoView = function (this: HTMLElement) {
+      scrolled.push(this.dataset.section);
+    };
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
+  });
+
+  const layout = { A: ['name'], B: ['length'], C: ['version'] };
+  const section = (label: string) => document.querySelector(`[data-section="${label}"]`)!;
+  /** Tell the observer which sections are (not) crossing the reading band. */
+  const see = (state: Record<string, boolean>) =>
+    act(() => {
+      const o = observers.at(-1)!;
+      o.cb(
+        Object.entries(state).map(
+          ([label, isIntersecting]) =>
+            ({ target: section(label), isIntersecting }) as unknown as IntersectionObserverEntry
+        ),
+        o as unknown as IntersectionObserver
+      );
+    });
+
+  it('watches every stacked section', () => {
+    render(<Host layout={layout} variant="stacked" />);
+    expect(observers.at(-1)!.nodes).toEqual(['A', 'B', 'C'].map(section));
+  });
+
+  it('reports the first section in view, in document order', () => {
+    const onActiveSectionChange = vi.fn();
+    render(<Host layout={layout} variant="stacked" onActiveSectionChange={onActiveSectionChange} />);
+    see({ C: true, B: true });
+    expect(onActiveSectionChange).toHaveBeenLastCalledWith('B');
+    see({ B: false });
+    expect(onActiveSectionChange).toHaveBeenLastCalledWith('C');
+    expect(onActiveSectionChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('scrolls to a section when activeSection changes, but not at mount', () => {
+    const { rerender } = render(<Host layout={layout} variant="stacked" activeSection="B" />);
+    expect(scrolled).toEqual([]);
+    rerender(<Host layout={layout} variant="stacked" activeSection="C" />);
+    expect(scrolled).toEqual(['C']);
+  });
+
+  it('does not scroll to a section it reported itself', () => {
+    // The pair is meant to be wired to one piece of host state, so the form's
+    // own report comes straight back in as `activeSection`.
+    const Wired = () => {
+      const [s, setS] = useState<string>();
+      return <Host layout={layout} variant="stacked" activeSection={s} onActiveSectionChange={setS} />;
+    };
+    render(<Wired />);
+    see({ B: true });
+    expect(scrolled).toEqual([]);
+  });
+
+  it('stays silent while a requested scroll passes other sections', () => {
+    const onActiveSectionChange = vi.fn();
+    const props = { layout, variant: 'stacked' as const, onActiveSectionChange };
+    const { rerender } = render(<Host {...props} />);
+    rerender(<Host {...props} activeSection="C" />);
+    see({ A: true, B: true }); // passed on the way down
+    expect(onActiveSectionChange).not.toHaveBeenCalled();
+    act(() => {
+      window.dispatchEvent(new Event('scrollend'));
+    });
+    see({ A: false }); // the reader scrolls on their own again
+    expect(onActiveSectionChange).toHaveBeenLastCalledWith('B');
+  });
+
+  it('leaves tabbed and flat forms alone', () => {
+    const { rerender } = render(<Host layout={layout} activeSection="A" />);
+    rerender(<Host layout={layout} activeSection="C" />);
+    rerender(<Host activeSection="A" />);
+    // MUI's own `Tabs` observes its scroll buttons, so "no observer" is too
+    // strong — what must hold is that none of them is watching a section.
+    const watched = observers.flatMap(o => o.nodes).filter(n => n.hasAttribute('data-section'));
+    expect(watched).toEqual([]);
+    expect(scrolled).toEqual([]);
   });
 });

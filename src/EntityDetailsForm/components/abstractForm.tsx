@@ -3,8 +3,12 @@ import { Box, Stack, Tab, Tabs, Typography } from '@mui/material';
 import type { EntityDetailsFormProps, FieldSpec } from '../types';
 import { getPath, setPath } from '../utils/paths';
 import { resolveSections, type ResolvedField } from '../utils/sections';
+import { useSectionSpy } from '../hooks/useSectionSpy';
 import { renderControl } from './controls';
 import { ObjectGrid } from '../../ObjectGrid';
+
+/** Theme spacing kept above a section scrolled into view by `activeSection`. */
+const SECTION_SCROLL_MARGIN = 2;
 
 /**
  * Build a presentational (dumb) entity form bound to a generated `FIELDS`
@@ -23,12 +27,22 @@ export function createAbstractEntityDetailsForm<E>(
     slotProps,
     errors,
     disabled: disabledProp,
+    activeSection,
+    onActiveSectionChange,
   }) => {
     const [active, setActive] = useState(0);
     // Empty sections are dropped by `resolveSections` itself, so the skeleton
     // and the form always agree on how many there are.
     const sections = resolveSections(fields, layout);
     const current = Math.min(active, Math.max(0, sections.length - 1));
+    // Only the stacked variant is a scroll surface; flat and tabs have no
+    // section to scroll to, so the spy stays off for them.
+    const sectionRef = useSectionSpy({
+      labels: sections.map(s => s.label),
+      enabled: variant === 'stacked' && sections.length > 1,
+      active: activeSection,
+      onActiveChange: onActiveSectionChange,
+    });
 
     const field = (
       { key, label, cols, options }: ResolvedField,
@@ -77,7 +91,12 @@ export function createAbstractEntityDetailsForm<E>(
       return (
         <Stack spacing={3} sx={{ minWidth: 0 }}>
           {sections.map(s => (
-            <Box key={s.label} sx={{ minWidth: 0 }}>
+            <Box
+              key={s.label}
+              ref={sectionRef(s.label)}
+              data-section={s.label}
+              sx={{ minWidth: 0, scrollMarginTop: t => t.spacing(SECTION_SCROLL_MARGIN) }}
+            >
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
                 {s.label}
               </Typography>
