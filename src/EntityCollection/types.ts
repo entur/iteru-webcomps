@@ -51,6 +51,8 @@ export interface CollectionLabels {
   id: string;
   filters: string;
   activeFilters: string;
+  /** Appended to a filter chip's accessible name: it is a remove button. */
+  removeFilter: string;
   /** Accessible name of the "+N" chip folding the filters not shown. */
   moreFilters: (count: number) => string;
   notFilterable: string;
@@ -143,6 +145,7 @@ export const DEFAULT_LABELS: CollectionLabels = {
   id: 'Id',
   filters: 'Filters',
   activeFilters: 'Active filters',
+  removeFilter: 'remove filter',
   moreFilters: count => `${count} more filter${count === 1 ? '' : 's'}`,
   notFilterable: 'Not filterable in sobek yet',
   sortBy: 'Sort by',

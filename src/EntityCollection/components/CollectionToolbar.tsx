@@ -135,15 +135,26 @@ export function CollectionToolbar({
           <Menu open={!!colAnchor} anchorEl={colAnchor} onClose={() => setColAnchor(null)}>
             {columns.map(c => {
               const shown = hidden[c.key] !== false;
+              // The last visible column stays: hiding it would leave an empty grid.
+              const last = shown && columns.filter(x => hidden[x.key] !== false).length === 1;
               return (
                 <MenuItem
                   key={c.key}
                   role="menuitemcheckbox"
                   aria-checked={shown}
+                  disabled={last}
                   dense
-                  onClick={() => onHidden({ ...hidden, [c.key]: !shown })}
+                  onClick={() => !last && onHidden({ ...hidden, [c.key]: !shown })}
                 >
-                  <Checkbox size="small" edge="start" checked={shown} tabIndex={-1} disableRipple />
+                  {/* Visual only: the item already is the checkbox for assistive tech. */}
+                  <Checkbox
+                    size="small"
+                    edge="start"
+                    checked={shown}
+                    tabIndex={-1}
+                    disableRipple
+                    slotProps={{ input: { 'aria-hidden': true } }}
+                  />
                   {c.label}
                 </MenuItem>
               );

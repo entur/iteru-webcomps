@@ -17,7 +17,14 @@ const FF = {
   transportMode: { arg: 'transportModes', op: 'anyOf' },
 } as const;
 
-const mount = (over: { tools?: readonly CollectionTool[]; view?: CollectionView; query?: Partial<CollectionQuery> } = {}) => {
+const mount = (
+  over: {
+    tools?: readonly CollectionTool[];
+    view?: CollectionView;
+    query?: Partial<CollectionQuery>;
+    hidden?: Record<string, boolean>;
+  } = {}
+) => {
   const onQuery = vi.fn(), onDensity = vi.fn(), onHidden = vi.fn();
   render(
     <CollectionToolbar
@@ -29,7 +36,7 @@ const mount = (over: { tools?: readonly CollectionTool[]; view?: CollectionView;
       onQuery={onQuery}
       density="standard"
       onDensity={onDensity}
-      hidden={{}}
+      hidden={over.hidden ?? {}}
       onHidden={onHidden}
       labels={DEFAULT_LABELS}
       actions={<button>Host action</button>}
@@ -69,10 +76,16 @@ describe('CollectionToolbar', () => {
     const pop = screen.getByRole('dialog');
     expect((within(pop).getByRole('textbox', { name: 'Name' }) as HTMLInputElement).disabled).toBe(false);
     expect(within(pop).getByRole('combobox', { name: 'Transport mode' })).toBeTruthy();
-    expect(within(pop).getByText('Not filterable in sobek yet')).toBeTruthy();
-    const blocked = within(pop).getByText('Length').closest('li');
-    expect(blocked?.getAttribute('aria-disabled')).toBe('true');
+    const blocked = within(pop).getByRole('list', { name: 'Not filterable in sobek yet' });
+    expect(within(blocked).getByText('Length')).toBeTruthy();
     expect(within(pop).queryByRole('textbox', { name: 'Length' })).toBeNull();
+  });
+
+  it('lists the unfilterable fields as plain text, not as disabled controls', () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const blocked = screen.getByRole('list', { name: 'Not filterable in sobek yet' });
+    expect(blocked.querySelector('[aria-disabled]')).toBeNull();
   });
 
   it('reports a filter edit as a whole filters patch', () => {
@@ -95,6 +108,30 @@ describe('CollectionToolbar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Columns' }));
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Length' }));
     expect(onHidden).toHaveBeenCalledWith({ length: false });
+  });
+
+  it('announces each column entry once, as a checkable menu item', () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    const entry = screen.getByRole('menuitemcheckbox', { name: 'Length' });
+    expect(entry.getAttribute('aria-checked')).toBe('true');
+    expect(within(entry).queryByRole('checkbox')).toBeNull();
+  });
+
+  it('will not hide the last visible column', () => {
+    const { onHidden } = mount({ hidden: { netexId: false, name: false, transportMode: false } });
+    fireEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    const last = screen.getByRole('menuitemcheckbox', { name: 'Length' });
+    expect(last.getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(last);
+    expect(onHidden).not.toHaveBeenCalled();
+  });
+
+  it('can show a hidden column again while only one is visible', () => {
+    const { onHidden } = mount({ hidden: { netexId: false, name: false, transportMode: false } });
+    fireEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Name' }));
+    expect(onHidden).toHaveBeenCalledWith({ netexId: false, name: true, transportMode: false });
   });
 
   it('sets a density from the density menu', () => {

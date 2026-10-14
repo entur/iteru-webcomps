@@ -4,6 +4,7 @@
  * stateless — the trigger (and the active-filter chips) live in `QueryField`;
  * this edits `filters` through `onChange` and works the same above either view.
  */
+import { useId } from 'react';
 import { Autocomplete, Divider, List, ListItem, ListItemText, ListSubheader, Popover, Stack, TextField } from '@mui/material';
 import type { CollectionLabels, CollectionQuery, Column, FilterFields, FilterValue } from '../types';
 import { asList, asText } from '../utils/filters';
@@ -79,6 +80,7 @@ export interface FilterPanelProps {
 export function FilterPanel({ anchor, onClose, columns, filterFields, filters, onChange, labels }: FilterPanelProps): React.ReactNode {
   const open = columns.filter(c => filterFields[c.key]);
   const blocked = columns.filter(c => !filterFields[c.key]);
+  const blockedHeading = useId();
 
   return (
     <Popover
@@ -120,10 +122,13 @@ export function FilterPanel({ anchor, onClose, columns, filterFields, filters, o
       {blocked.length ? (
         <>
           <Divider />
-          <List dense disablePadding sx={{ maxHeight: BLOCKED_MAX_H, overflowY: 'auto' }}>
-            <ListSubheader>{labels.notFilterable}</ListSubheader>
+          {/* Plain text under a heading that names the list: these are not
+              controls, so they carry no disabled state, and they use the
+              secondary text colour, which keeps readable contrast. */}
+          <List dense disablePadding aria-labelledby={blockedHeading} sx={{ maxHeight: BLOCKED_MAX_H, overflowY: 'auto' }}>
+            <ListSubheader id={blockedHeading}>{labels.notFilterable}</ListSubheader>
             {blocked.map(c => (
-              <ListItem key={c.key} aria-disabled="true" sx={{ color: 'text.disabled' }}>
+              <ListItem key={c.key} sx={{ color: 'text.secondary' }}>
                 <ListItemText primary={c.label} />
               </ListItem>
             ))}

@@ -8,7 +8,7 @@
  * At most `MAX_TOKENS` chips show; the rest fold into a "+N" chip that opens
  * the panel, so filters never push the rest of the toolbar onto a new line.
  */
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Badge, Box, Button, Chip, IconButton, InputAdornment, TextField, Tooltip } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import SearchIcon from '@mui/icons-material/Search';
@@ -23,6 +23,7 @@ const INPUT_MIN_CH = 10; // typed text keeps this much room beside the chips
 /** A compact count that stays inside the field's border. */
 const BADGE_SX = { '& .MuiBadge-badge': { fontSize: '0.65rem', height: 16, minWidth: 16, px: 0.5 } } as const;
 const ELLIPSIS = '…';
+const FIELD = '\u0000field'; // focus target: the input, never a column key
 
 const shorten = (text: string): string =>
   text.length > TOKEN_VALUE_MAX ? `${text.slice(0, TOKEN_VALUE_MAX - 1)}${ELLIPSIS}` : text;
@@ -55,27 +56,55 @@ export interface QueryFieldProps {
  */
 export function QueryField({ search, filter, columns, filterFields, query, onQuery, labels }: QueryFieldProps): React.ReactNode {
   const anchorRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const chipRefs = useRef(new Map<string, HTMLDivElement>());
+  // Where focus goes once a chip removal has re-rendered: a chip's key, or
+  // `FIELD` for the input (or the Filters button with search trimmed). Without
+  // it, focus falls to <body> with the removed chip.
+  const focusNext = useRef<string | null>(null);
   const [open, setOpen] = useState(false);
-  if (!search && !filter) return null;
 
   const active = filter ? activeFilterColumns(columns, filterFields, query.filters) : [];
+  const activeKeys = active.map(c => c.key).join('\u0000');
+
+  useEffect(() => {
+    const target = focusNext.current;
+    if (target === null) return;
+    focusNext.current = null;
+    (chipRefs.current.get(target) ?? inputRef.current ?? buttonRef.current)?.focus();
+  }, [activeKeys]);
+
+  if (!search && !filter) return null;
+
   const shown = active.slice(0, MAX_TOKENS);
   const folded = active.length - shown.length;
   const openPanel = (): void => setOpen(true);
   const remove = (key: string): void => onQuery({ filters: withFilter(query.filters, key, undefined) });
+  /** Remove from a chip, and keep focus on the chip row: next chip, else previous, else the field. */
+  const removeFromChip = (key: string): void => {
+    const at = shown.findIndex(c => c.key === key);
+    focusNext.current = shown[at + 1]?.key ?? shown[at - 1]?.key ?? FIELD;
+    remove(key);
+  };
 
   const tokens = active.length ? (
     <Box role="group" aria-label={labels.activeFilters} sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
       {shown.map(c => {
         const full = chipText(query.filters[c.key]);
-        const shown = chipText(query.filters[c.key], isIdSpec(c.spec));
+        const text = `${c.label}: ${shorten(chipText(query.filters[c.key], isIdSpec(c.spec)))}`;
         return (
           <Chip
             key={c.key}
+            ref={(el: HTMLDivElement | null) => {
+              if (el) chipRefs.current.set(c.key, el);
+              else chipRefs.current.delete(c.key);
+            }}
             size="small"
-            label={`${c.label}: ${shorten(shown)}`}
+            label={text}
             title={`${c.label}: ${full}`}
-            onDelete={() => remove(c.key)}
+            aria-label={`${text}, ${labels.removeFilter}`}
+            onDelete={() => removeFromChip(c.key)}
           />
         );
       })}
@@ -121,6 +150,7 @@ export function QueryField({ search, filter, columns, filterFields, query, onQue
     return (
       <Box data-query-field ref={anchorRef} sx={{ display: 'flex', alignItems: 'center', gap: 1, minHeight: 40 }}>
         <Button
+          ref={buttonRef}
           size="small"
           startIcon={
             <Badge badgeContent={active.length} color="primary">
@@ -144,6 +174,7 @@ export function QueryField({ search, filter, columns, filterFields, query, onQue
     <Box data-query-field sx={{ width: active.length ? FIELD_W_FILTERED : FIELD_W, maxWidth: '100%' }}>
       <TextField
         ref={anchorRef}
+        inputRef={inputRef}
         fullWidth
         size="small"
         placeholder={labels.searchPlaceholder}

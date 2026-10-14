@@ -241,6 +241,12 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   rejected: the button and its chips belong on the same line. `FilterPanel`
   (`FilterPopover.tsx`) is the controlled popover alone; `QueryField` owns its
   trigger. Not exported — it is built on the collection's own types.
+- Accessibility rules the toolbar keeps (each pinned by a test): a filter chip's
+  accessible name is its visible text plus `labels.removeFilter`, and removing
+  one moves focus to the next chip, else the previous, else the search field;
+  the unfilterable fields are a plain list named by its heading, never
+  `aria-disabled`; the Columns menu items *are* the checkboxes (the inner MUI
+  `Checkbox` is `aria-hidden`), and the last visible column cannot be hidden.
 - **Filter reach is generated, not chosen.** `generateDocuments` emits
   `<Entity>FilterFields` from the `filter` argument of the entity's list query
   in the live schema (`dataOwnerRef` excluded — session context). Only those

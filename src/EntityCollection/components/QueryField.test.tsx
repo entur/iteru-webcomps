@@ -109,6 +109,37 @@ describe('QueryField', () => {
     expect(chip.getAttribute('title')).toBe('Transport mode: bus, rail, tram');
   });
 
+  it('says on each chip that it removes the filter, keeping the visible text in the name', () => {
+    mount({ query: { filters: { name: 'fli' } } });
+    const chip = within(screen.getByRole('group', { name: 'Active filters' })).getByRole('button', { name: /Name: fli/ });
+    expect(chip.getAttribute('aria-label')).toBe('Name: fli, remove filter');
+  });
+
+  it('moves focus to the next chip after one is removed from the keyboard', () => {
+    const onQuery = vi.fn();
+    const props = { search: true, filter: true, columns: COLS, filterFields: FF, onQuery, labels: DEFAULT_LABELS } as const;
+    const { rerender } = render(
+      <QueryField {...props} query={{ ...defaultCollectionQuery, filters: { name: 'fli', transportMode: ['rail'] } }} />
+    );
+    const first = screen.getByRole('button', { name: 'Name: fli, remove filter' });
+    first.focus();
+    fireEvent.keyUp(first, { key: 'Backspace' });
+    expect(onQuery).toHaveBeenCalledWith({ filters: { transportMode: ['rail'] } });
+    rerender(<QueryField {...props} query={{ ...defaultCollectionQuery, filters: { transportMode: ['rail'] } }} />);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Transport mode: rail, remove filter' }));
+  });
+
+  it('moves focus to the search field when the last chip is removed', () => {
+    const onQuery = vi.fn();
+    const props = { search: true, filter: true, columns: COLS, filterFields: FF, onQuery, labels: DEFAULT_LABELS } as const;
+    const { rerender } = render(<QueryField {...props} query={{ ...defaultCollectionQuery, filters: { name: 'fli' } }} />);
+    const chip = screen.getByRole('button', { name: 'Name: fli, remove filter' });
+    chip.focus();
+    fireEvent.keyUp(chip, { key: 'Delete' });
+    rerender(<QueryField {...props} query={defaultCollectionQuery} />);
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Search' }));
+  });
+
   it('removes a filter from its chip', () => {
     const onQuery = mount({ query: { filters: { name: 'fli', transportMode: ['rail'] } } });
     const chip = screen.getByText('Name: fli').closest('.MuiChip-root') as HTMLElement;

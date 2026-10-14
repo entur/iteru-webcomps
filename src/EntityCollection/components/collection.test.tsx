@@ -129,11 +129,8 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
     const blocked = cols.filter(c => !filterFields[c.key]);
     expect(open.length).toBeGreaterThan(0);
     open.forEach(c => expect(within(pop).getAllByLabelText(c.label).length).toBeGreaterThan(0));
-    blocked.forEach(c =>
-      expect(
-        within(pop).getAllByText(c.label).some(el => el.closest('li')?.getAttribute('aria-disabled') === 'true')
-      ).toBe(true)
-    );
+    const blockedList = within(pop).getByRole('list', { name: 'Not filterable in sobek yet' });
+    blocked.forEach(c => expect(within(blockedList).getAllByText(c.label).length).toBeGreaterThan(0));
   });
 
   it('applies a filter in client mode and leaves the rows alone in server mode', async () => {
