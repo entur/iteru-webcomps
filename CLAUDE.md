@@ -229,9 +229,18 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   `view` / `tools` / `filterMode` from Storybook controls — no wrapper chrome.
 - `tools` whitelists `search | filter | sort | columns | density`; the last two
   render in grid view only. No CSV/Print.
-- The toolbar is one row, or two: active-filter chips (`FilterChips`) get a row
-  of their own below the tools, present only while a filter is set. Inline they
-  shifted every other tool as filters came and went.
+- The toolbar is one row. Search and filter are one internal subcomponent,
+  `QueryField` (`components/QueryField.tsx`): active filters sit as chips at
+  the start of the search box, the typed text follows, the filter button (with
+  a count) closes the field. The order *is* the semantics — filters first, then
+  a search within what they left — so no caption is needed (the old
+  "(from cached filter)" helper text is gone; the placeholder says "Search these
+  rows"). At most two chips show, values cut at 14 chars (full text in
+  `title`), the rest fold into a "+N" chip that opens the panel; Backspace in an
+  empty field removes the last filter. A separate chip row was tried and
+  rejected: the button and its chips belong on the same line. `FilterPanel`
+  (`FilterPopover.tsx`) is the controlled popover alone; `QueryField` owns its
+  trigger. Not exported — it is built on the collection's own types.
 - **Filter reach is generated, not chosen.** `generateDocuments` emits
   `<Entity>FilterFields` from the `filter` argument of the entity's list query
   in the live schema (`dataOwnerRef` excluded — session context). Only those
@@ -249,8 +258,8 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
 - `filterMode: 'client'` (default) applies the filters to `rows`;
   `'server'` skips that step and only emits them — `toSobekFilter(filters,
   filterFields)` gives the host the list query's `filter` argument. Search and
-  sort are always client-side over the rows in memory, which is what the search
-  caption "(from cached filter)" says.
+  sort are always client-side over the rows in memory, which is what putting the
+  text after the filter chips says.
 - `patched` and `grid` fields are never columns, card lines or filter entries
   (`resolveColumns`). A patched field is not on the wire, so a list fetched from
   sobek cannot carry it.

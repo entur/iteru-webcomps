@@ -46,9 +46,11 @@ export interface CardSpec<K extends string = string> {
 /** UI strings. English defaults; localisation is the host's job. */
 export interface CollectionLabels {
   search: string;
-  searchCaption: string;
+  searchPlaceholder: string;
   filters: string;
   activeFilters: string;
+  /** Accessible name of the "+N" chip folding the filters not shown. */
+  moreFilters: (count: number) => string;
   notFilterable: string;
   sortBy: string;
   sortNone: string;
@@ -135,9 +137,10 @@ export const ALL_TOOLS: readonly CollectionTool[] = ['search', 'filter', 'sort',
 
 export const DEFAULT_LABELS: CollectionLabels = {
   search: 'Search',
-  searchCaption: '(from cached filter)',
+  searchPlaceholder: 'Search these rows',
   filters: 'Filters',
   activeFilters: 'Active filters',
+  moreFilters: count => `${count} more filter${count === 1 ? '' : 's'}`,
   notFilterable: 'Not filterable in sobek yet',
   sortBy: 'Sort by',
   sortNone: 'None',

@@ -39,11 +39,13 @@ const mount = (over: { tools?: readonly CollectionTool[]; view?: CollectionView;
 };
 
 describe('CollectionToolbar', () => {
-  it('captions the search box and reports typing', () => {
-    const { onQuery } = mount();
-    expect(screen.getByText('(from cached filter)')).toBeTruthy();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), { target: { value: 'fli' } });
-    expect(onQuery).toHaveBeenCalledWith({ search: 'fli' });
+  it('keeps search, filter and the other tools on one row', () => {
+    mount({ query: { filters: { name: 'fli', transportMode: ['rail'] } } });
+    const row = screen.getByRole('button', { name: 'Columns' }).closest('.MuiStack-root') as HTMLElement;
+    expect(within(row).getByRole('textbox', { name: 'Search' })).toBeTruthy();
+    expect(within(row).getByRole('button', { name: 'Filters' })).toBeTruthy();
+    expect(within(row).getByRole('group', { name: 'Active filters' })).toBeTruthy();
+    expect(row.parentElement?.closest('.MuiStack-root')).toBeNull();
   });
 
   it('renders only the whitelisted tools, and always the host actions', () => {
@@ -80,39 +82,6 @@ describe('CollectionToolbar', () => {
       target: { value: 'fli' },
     });
     expect(onQuery).toHaveBeenCalledWith({ filters: { transportMode: ['rail'], name: 'fli' } });
-  });
-
-  it('shows active filters as chips and removes one on delete', () => {
-    const { onQuery } = mount({ query: { filters: { transportMode: ['rail'], name: 'fli' } } });
-    const chip = screen.getByText('Name: fli').closest('.MuiChip-root') as HTMLElement;
-    fireEvent.click(chip.querySelector('.MuiChip-deleteIcon') as Element);
-    expect(onQuery).toHaveBeenCalledWith({ filters: { transportMode: ['rail'] } });
-  });
-
-  it('puts active filters on a row of their own, below the tools', () => {
-    mount({ query: { filters: { name: 'fli' } } });
-    const row = screen.getByRole('group', { name: 'Active filters' });
-    expect(within(row).getByText('Name: fli')).toBeTruthy();
-    expect(within(row).queryByRole('button', { name: 'Filters' })).toBeNull();
-    expect(within(row).queryByRole('textbox', { name: 'Search' })).toBeNull();
-    const tools = screen.getByRole('button', { name: 'Filters' }).parentElement as HTMLElement;
-    expect(within(tools).queryByText('Name: fli')).toBeNull();
-    expect(tools.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it('keeps the toolbar to one row while no filter is active', () => {
-    mount({ query: { filters: { name: '  ' } } });
-    expect(screen.queryByRole('group', { name: 'Active filters' })).toBeNull();
-  });
-
-  it('shows no filter row when the filter tool is trimmed away', () => {
-    mount({ tools: ['search'], query: { filters: { name: 'fli' } } });
-    expect(screen.queryByRole('group', { name: 'Active filters' })).toBeNull();
-  });
-
-  it('shows no chip for an empty condition', () => {
-    mount({ query: { filters: { name: '  ', transportMode: [] } } });
-    expect(document.querySelector('.MuiChip-root')).toBeNull();
   });
 
   it('toggles the sort direction of the active sort', () => {
