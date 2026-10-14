@@ -20,6 +20,7 @@ import {
   type FilterFields,
 } from '../types';
 import { matchRows, pageRows, sortRows } from '../utils/applyQuery';
+import { norm } from '../../EntityDetailsForm/utils/sections';
 import { resolveCard, resolveColumns } from '../utils/columns';
 import { keyRows } from '../utils/values';
 import { CardsView } from './CardsView';
@@ -61,7 +62,11 @@ export function createEntityCollection<E>(
     const [hidden, setHidden] = useState<Record<string, boolean>>({});
 
     const L = useMemo(() => ({ ...DEFAULT_LABELS, ...labels }), [labels]);
-    const cols = useMemo(() => resolveColumns(fields, columns, L.id), [columns, L.id]);
+    // Keyed on content, not identity: a host writing `columns={[...]}` inline
+    // would otherwise rebuild every column, and the grid's column defs, each render.
+    const columnsKey = columns ? JSON.stringify(columns.map(norm).map(e => [e.field, e.label])) : '';
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `columnsKey` stands for `columns`
+    const cols = useMemo(() => resolveColumns(fields, columns, L.id), [columnsKey, L.id]);
     const resolvedCard = useMemo(() => resolveCard(fields, cols, card, L.id), [cols, card, L.id]);
 
     // The effective query, decided once for every reader (pipeline, toolbar,
@@ -85,7 +90,10 @@ export function createEntityCollection<E>(
     const keyed = useMemo(() => keyRows(result.rows, result.page * query.pageSize), [result, query.pageSize]);
 
     // Anything but an explicit page change returns to the first page: the page
-    // index is only meaningful for the result it was chosen in.
+    // index is only meaningful for the result it was chosen in. A page clamped
+    // for display (`pageRows`) is not emitted on its own — no emit happens
+    // without a user action — and never leaks: every later emit either sets the
+    // page explicitly (the grid reports the clamped one) or resets it to 0.
     const onQuery = (patch: Partial<CollectionQuery>): void => {
       const next: CollectionQuery = { ...query, ...patch, page: patch.page ?? 0 };
       if (controlled === undefined) setInner(next);

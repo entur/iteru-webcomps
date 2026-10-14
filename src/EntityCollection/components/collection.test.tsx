@@ -195,6 +195,19 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
     expect(firstCell()).toContain(`${textCol.key}-${ROW_COUNT - 1}`);
   });
 
+  it('emits a grid page-size change once, keeping the page the grid reports', async () => {
+    const onQueryChange = vi.fn();
+    const many = makeRows(fields, 30);
+    await mount({ view: 'grid', rows: many, onQueryChange, query: { ...defaultCollectionQuery, page: 1 } });
+    await gridRows();
+    // jsdom: the grid may still hold its footer hidden while it measures, so
+    // the pager's select is looked up including hidden elements. This test is
+    // about what is emitted, not about the select's accessibility.
+    fireEvent.mouseDown(await screen.findByRole('combobox', { name: /rows per page/i, hidden: true }));
+    fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: '10' }));
+    expect(onQueryChange.mock.calls.map(([q]) => [q.page, q.pageSize])).toEqual([[1, 10]]);
+  });
+
   it('trims the toolbar to the tools asked for', async () => {
     await mount({ view: 'grid', tools: ['search'] });
     expect(screen.getByRole('textbox', { name: 'Search' })).toBeTruthy();
