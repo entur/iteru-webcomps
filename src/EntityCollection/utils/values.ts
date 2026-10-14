@@ -6,7 +6,9 @@ import type { FieldSpec } from '../../EntityDetailsForm/types';
 import { getPath } from '../../EntityDetailsForm/utils/paths';
 import type { CollectionLabels } from '../types';
 
-const ID_KEYS = ['netexId', 'id'] as const; // first present → row id
+const ID_KEYS = ['netexId', 'id'] as const; // first present → row identity
+const VERSION_KEY = 'version', VERSION_SEP = '@';
+const POSITION_PREFIX = 'row:'; // id-less rows; a real id never starts with it
 const DATE_LEN = 10, MINUTE_LEN = 16; // 'YYYY-MM-DD', 'YYYY-MM-DDTHH:mm'
 const LIST_SEP = ', ';
 const PLAIN_BOOL = { yes: 'Yes', no: 'No' } as const;
@@ -48,14 +50,32 @@ export const formatValue = (
 };
 
 /**
- * A stable key for a row: its `netexId`, else `id`, else its index.
+ * A stable, unique key per row, for the grid's row ids and the cards' React
+ * keys. The NeTEx identity is `netexId` + `version`, so two versions of one
+ * entity are two rows: `id@version`, or the bare id when there is no version.
+ * A row with no id is keyed by its position across pages (`offset + index`),
+ * prefixed so it can never equal a real id.
  *
- * @param row   one entity
- * @param index position in the rendered list (fallback)
- * @returns the row key
+ * A repeated identity is a data error — the grid can show only one row per
+ * id — so it is reported with a console warning rather than papered over.
+ *
+ * @param rows   the rows being rendered
+ * @param offset position of `rows[0]` in the whole result (page × page size)
+ * @returns one key per row, in order
  */
-export const rowId = (row: unknown, index: number): string | number => {
-  const obj = (row ?? {}) as Record<string, unknown>;
-  const key = ID_KEYS.find(k => obj[k] != null);
-  return key ? (obj[key] as string | number) : index;
+export const rowKeys = (rows: readonly unknown[], offset = 0): string[] => {
+  const keys = rows.map((row, i) => {
+    const obj = (row ?? {}) as Record<string, unknown>;
+    const idKey = ID_KEYS.find(k => obj[k] != null);
+    if (!idKey) return `${POSITION_PREFIX}${offset + i}`;
+    const version = obj[VERSION_KEY];
+    return version == null || version === '' ? String(obj[idKey]) : `${String(obj[idKey])}${VERSION_SEP}${String(version)}`;
+  });
+  const repeated = [...new Set(keys.filter((k, i) => keys.indexOf(k) !== i))];
+  if (repeated.length) {
+    console.warn(
+      `[EntityCollection] rows share an identity (netexId + version): ${repeated.join(', ')} — only one of each can be shown in the grid.`
+    );
+  }
+  return keys;
 };

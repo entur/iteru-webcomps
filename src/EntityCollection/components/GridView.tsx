@@ -6,9 +6,9 @@
  */
 import { lazy, Suspense, useMemo } from 'react';
 import { Box, CircularProgress } from '@mui/material';
-import type { DataGridProps, GridColDef, GridDensity } from '@mui/x-data-grid';
+import type { DataGridProps, GridColDef, GridDensity, GridValidRowModel } from '@mui/x-data-grid';
 import { pageSizesFor, type CollectionLabels, type CollectionQuery, type Column } from '../types';
-import { formatValue, rawValue, rowId } from '../utils/values';
+import { formatValue, rawValue, rowKeys } from '../utils/values';
 
 const COL_MIN_W = 120;
 const FALLBACK_H = 240;
@@ -17,15 +17,25 @@ const FALLBACK_H = 240;
  *  host bundler to split, so a cards-only page never pays for it. */
 const DataGrid = lazy(() => import('@mui/x-data-grid').then(m => ({ default: m.DataGrid })));
 
+/** A grid row: the entity plus the unique key the grid identifies it by. The
+ *  grid needs a unique id per row and `netexId` alone is not one (versions). */
+interface KeyedRow {
+  key: string;
+  entity: unknown;
+}
+
+/** The lazily loaded grid is untyped in its rows, so the getters narrow here. */
+const entityOf = (row: GridValidRowModel): unknown => (row as KeyedRow).entity;
+
 const toColDef = (col: Column, labels: CollectionLabels): GridColDef => {
   const base = { field: col.key, headerName: col.label, flex: 1, minWidth: COL_MIN_W } as const;
   if (col.spec.kind === 'number') {
-    return { ...base, type: 'number', valueGetter: (_v, row) => (rawValue(row, col.spec) as number | null) ?? null };
+    return { ...base, type: 'number', valueGetter: (_v, row) => (rawValue(entityOf(row), col.spec) as number | null) ?? null };
   }
   if (col.spec.kind === 'switch') {
-    return { ...base, type: 'boolean', valueGetter: (_v, row) => Boolean(rawValue(row, col.spec)) };
+    return { ...base, type: 'boolean', valueGetter: (_v, row) => Boolean(rawValue(entityOf(row), col.spec)) };
   }
-  return { ...base, valueGetter: (_v, row) => formatValue(row, col.spec, labels) };
+  return { ...base, valueGetter: (_v, row) => formatValue(entityOf(row), col.spec, labels) };
 };
 
 export interface GridViewProps {
@@ -70,7 +80,10 @@ export function GridView({
   dataGrid,
 }: GridViewProps): React.ReactNode {
   const colDefs = useMemo(() => columns.map(c => toColDef(c, labels)), [columns, labels]);
-  const ids = useMemo(() => new Map(rows.map((r, i) => [r, rowId(r, i)])), [rows]);
+  const keyed = useMemo<KeyedRow[]>(() => {
+    const keys = rowKeys(rows, page * query.pageSize);
+    return rows.map((entity, i) => ({ key: keys[i], entity }));
+  }, [rows, page, query.pageSize]);
   // A sort on a field that is no column (stale host state) must not reach the
   // grid: it drops the unknown item and reports an empty model back, which
   // would rewrite the host's query — and its page — without anyone clicking.
@@ -92,9 +105,9 @@ export function GridView({
           disableRowSelectionOnClick
           pageSizeOptions={pageSizesFor(query.pageSize)}
           {...dataGrid}
-          rows={rows as object[]}
+          rows={keyed}
           columns={colDefs}
-          getRowId={row => ids.get(row) ?? 0}
+          getRowId={row => (row as KeyedRow).key}
           density={density}
           columnVisibilityModel={hidden}
           sortingMode="server"

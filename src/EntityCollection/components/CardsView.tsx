@@ -3,10 +3,10 @@
  * only — the rows it gets are already filtered, sorted and paged. Imports
  * nothing from `@mui/x-data-grid`, so a cards-only host never loads it.
  */
-import { Fragment } from 'react';
+import { Fragment, useMemo } from 'react';
 import { Box, Card, CardContent, Chip, Typography, type CardProps } from '@mui/material';
 import type { CollectionLabels, Column, ResolvedCard } from '../types';
-import { formatValue, rawValue, rowId } from '../utils/values';
+import { formatValue, rawValue, rowKeys } from '../utils/values';
 
 const CARD_MIN_PX = 260; // a card never gets narrower; the row wraps instead
 const EMPTY = '—';
@@ -48,13 +48,14 @@ export interface CardsViewProps {
  * @returns the card list
  */
 export function CardsView({ rows, card, labels, cardProps }: CardsViewProps): React.ReactNode {
+  const keys = useMemo(() => rowKeys(rows), [rows]);
   return (
     <Box
       role="list"
       sx={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN_PX}px, 1fr))`, gap: 2 }}
     >
       {rows.map((row, i) => (
-        <Card key={rowId(row, i)} role="listitem" variant="outlined" {...cardProps}>
+        <Card key={keys[i]} role="listitem" variant="outlined" {...cardProps}>
           <CardContent>
             <Typography variant="subtitle1" component="div" noWrap>
               {(card.title && formatValue(row, card.title.spec, labels)) || EMPTY}

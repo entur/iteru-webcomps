@@ -12,6 +12,10 @@ const POPOVER_W = 320, BLOCKED_MAX_H = 220;
 
 export type Filters = CollectionQuery['filters'];
 
+/** Typed entries trimmed, blanks and repeats dropped (a pasted id often
+ *  carries a stray space, which would otherwise match nothing). */
+const cleanList = (values: readonly string[]): string[] => [...new Set(values.map(v => v.trim()).filter(Boolean))];
+
 /**
  * `filters` with `key` set, or removed when the new value is `undefined`.
  *
@@ -96,9 +100,12 @@ export function FilterPanel({ anchor, onClose, columns, filterFields, filters, o
               multiple
               size="small"
               freeSolo={!c.spec.options}
+              // Free text (ids) commits on blur too: leaving the field or the
+              // panel must not silently drop what was typed.
+              autoSelect={!c.spec.options}
               options={[...(c.spec.options ?? [])]}
               value={asList(filters[c.key])}
-              onChange={(_e, next) => onChange(withFilter(filters, c.key, next))}
+              onChange={(_e, next) => onChange(withFilter(filters, c.key, cleanList(next)))}
               renderInput={params => <TextField {...params} label={c.label} />}
             />
           )

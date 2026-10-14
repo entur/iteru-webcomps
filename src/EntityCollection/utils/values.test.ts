@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { FieldSpec } from '../../EntityDetailsForm/types';
-import { formatValue, rawValue, rowId } from './values';
+import { formatValue, rawValue, rowKeys } from './values';
 
 const spec = (kind: FieldSpec['kind'], ...path: string[]): FieldSpec => ({ kind, path });
 
@@ -45,11 +45,39 @@ describe('formatValue', () => {
   });
 });
 
-describe('rowId', () => {
-  it('prefers netexId, then id, then the index', () => {
-    expect(rowId({ netexId: 'A', id: 1 }, 5)).toBe('A');
-    expect(rowId({ id: 1 }, 5)).toBe(1);
-    expect(rowId({}, 5)).toBe(5);
-    expect(rowId(null, 5)).toBe(5);
+describe('rowKeys', () => {
+  it('keys a row by netexId + version, the NeTEx identity', () => {
+    expect(rowKeys([{ netexId: 'A', version: '2' }])).toEqual(['A@2']);
+  });
+
+  it('falls back to the bare netexId, then id, when there is no version', () => {
+    expect(rowKeys([{ netexId: 'A' }, { id: 7 }, { netexId: 'B', version: '' }])).toEqual(['A', '7', 'B']);
+  });
+
+  it('keeps two versions of one entity apart', () => {
+    const keys = rowKeys([{ netexId: 'A', version: '1' }, { netexId: 'A', version: '2' }]);
+    expect(new Set(keys).size).toBe(2);
+  });
+
+  it('keys id-less rows by position across pages, never colliding with a real id', () => {
+    const keys = rowKeys([{ id: 21 }, {}, null], 20);
+    expect(new Set(keys).size).toBe(3);
+    expect(keys[1]).not.toBe('21');
+    expect(rowKeys([{}], 20)).not.toEqual(rowKeys([{}], 0));
+  });
+
+  it('warns about a repeated identity instead of hiding it', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    rowKeys([{ netexId: 'A', version: '1' }, { netexId: 'B' }, { netexId: 'A', version: '1' }]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain('A@1');
+    warn.mockRestore();
+  });
+
+  it('stays quiet when every identity is unique', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    rowKeys([{ netexId: 'A', version: '1' }, { netexId: 'A', version: '2' }]);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

@@ -47,6 +47,45 @@ describe('CardsView', () => {
   });
 });
 
+const VERSIONS = [
+  { netexId: 'T:1', version: '1', name: { value: 'First version' } },
+  { netexId: 'T:2', version: '1', name: { value: 'Other' } },
+  { netexId: 'T:1', version: '2', name: { value: 'Second version' } },
+];
+
+describe('versioned rows', () => {
+  it('shows two versions of one entity as two grid rows, each with its own data', async () => {
+    await act(async () => {
+      render(
+        <GridView
+          rows={VERSIONS}
+          columns={COLS}
+          total={VERSIONS.length}
+          page={0}
+          query={defaultCollectionQuery}
+          onQuery={vi.fn()}
+          density="standard"
+          hidden={{}}
+          labels={DEFAULT_LABELS}
+          dataGrid={{ disableVirtualization: true }}
+        />
+      );
+    });
+    await screen.findByText('Other');
+    expect(screen.getAllByRole('row')).toHaveLength(4);
+    expect(screen.getByText('First version')).toBeTruthy();
+    expect(screen.getByText('Second version')).toBeTruthy();
+  });
+
+  it('renders two versions as two cards without a React key warning', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<CardsView rows={VERSIONS} card={resolveCard(FIELDS, COLS)} labels={DEFAULT_LABELS} />);
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(error.mock.calls.map(c => String(c[0])).join('\n')).not.toMatch(/same key/);
+    error.mockRestore();
+  });
+});
+
 describe('GridView', () => {
   const mount = async (onQuery = vi.fn()) => {
     await act(async () => {

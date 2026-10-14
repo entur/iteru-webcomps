@@ -108,6 +108,24 @@ describe('QueryField', () => {
     expect(onQuery).not.toHaveBeenCalled();
   });
 
+  it('commits a typed id when the id field loses focus, not only on Enter', () => {
+    const onQuery = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const ids = within(screen.getByRole('dialog', { name: 'Filters' })).getByRole('combobox', { name: 'Netex id' });
+    fireEvent.change(ids, { target: { value: 'T:1' } });
+    fireEvent.blur(ids);
+    expect(onQuery).toHaveBeenCalledWith({ filters: { netexId: ['T:1'] } });
+  });
+
+  it('trims a typed id before it becomes a filter', () => {
+    const onQuery = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const ids = within(screen.getByRole('dialog', { name: 'Filters' })).getByRole('combobox', { name: 'Netex id' });
+    fireEvent.change(ids, { target: { value: '  T:1 ' } });
+    fireEvent.keyDown(ids, { key: 'Enter' });
+    expect(onQuery).toHaveBeenCalledWith({ filters: { netexId: ['T:1'] } });
+  });
+
   it('shows no chip for an empty condition', () => {
     mount({ query: { filters: { name: '  ', transportMode: [] } } });
     expect(screen.queryByRole('group', { name: 'Active filters' })).toBeNull();

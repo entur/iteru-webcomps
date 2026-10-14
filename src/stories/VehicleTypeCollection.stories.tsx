@@ -101,6 +101,7 @@ const genVehicleTypes = (n: number, seed: number): VehicleType[] => {
     const total = seating + standing;
     return {
       netexId: `VEH:VehicleType:${1000 + i}`,
+      version: "1",
       name: {
         lang: "en",
         value: `${pick(MAKERS)} ${pick(MODELS)} ${10 + (i % 90)}`,
