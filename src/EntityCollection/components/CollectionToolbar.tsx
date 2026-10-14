@@ -44,7 +44,13 @@ function ToolMenu({
   return (
     <>
       <Tooltip title={label}>
-        <IconButton size="small" aria-label={label} onClick={e => setAnchor(e.currentTarget)}>
+        <IconButton
+          size="small"
+          aria-label={label}
+          aria-haspopup="menu"
+          aria-expanded={!!anchor}
+          onClick={e => setAnchor(e.currentTarget)}
+        >
           {icon}
         </IconButton>
       </Tooltip>

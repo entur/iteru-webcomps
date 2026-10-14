@@ -111,6 +111,17 @@ describe('CollectionToolbar', () => {
     expect(onHidden).toHaveBeenCalledWith({ length: false });
   });
 
+  it('announces the Columns and Density buttons as menu openers, with their state', () => {
+    mount();
+    ['Columns', 'Density'].forEach(name => {
+      const button = screen.getByRole('button', { name });
+      expect(button.getAttribute('aria-haspopup')).toBe('menu');
+      expect(button.getAttribute('aria-expanded')).toBe('false');
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Density' }));
+    expect(screen.getByRole('button', { name: 'Density', hidden: true }).getAttribute('aria-expanded')).toBe('true');
+  });
+
   it('announces each column entry once, as a checkable menu item', () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'Columns' }));

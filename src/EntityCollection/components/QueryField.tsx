@@ -84,10 +84,12 @@ export function QueryField({ search, filter, columns, filterFields, query, onQue
   const folded = active.length - shown.length;
   const openPanel = (): void => setOpen(true);
   const remove = (key: string): void => onQuery({ filters: withFilter(query.filters, key, undefined) });
-  /** Remove from a chip, and keep focus on the chip row: next chip, else previous, else the field. */
+  /** Remove from a chip, and keep focus on the chip row: next filter, else
+   *  previous, else the field. Uses every active filter, not just the shown
+   *  chips — removing one unfolds the next, which is where focus should land. */
   const removeFromChip = (key: string): void => {
-    const at = shown.findIndex(c => c.key === key);
-    focusNext.current = shown[at + 1]?.key ?? shown[at - 1]?.key ?? FIELD;
+    const at = active.findIndex(c => c.key === key);
+    focusNext.current = active[at + 1]?.key ?? active[at - 1]?.key ?? FIELD;
     remove(key);
   };
 

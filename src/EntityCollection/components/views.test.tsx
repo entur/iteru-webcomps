@@ -32,7 +32,10 @@ const renderCards = (rows: unknown[]) =>
   render(<CardsView rows={keyRows(rows)} card={resolveCard(FIELDS, COLS)} labels={DEFAULT_LABELS} />);
 
 /** A grid for `rows` (rendered inside an awaited act: the grid loads lazily). */
-const renderGrid = async (rows: unknown[], over: { onQuery?: () => void; hidden?: Record<string, boolean>; total?: number } = {}) => {
+const renderGrid = async (
+  rows: unknown[],
+  over: { onQuery?: () => void; hidden?: Record<string, boolean>; total?: number; dataGrid?: Record<string, unknown> } = {}
+) => {
   const onQuery = over.onQuery ?? vi.fn();
   await act(async () => {
     render(
@@ -46,7 +49,7 @@ const renderGrid = async (rows: unknown[], over: { onQuery?: () => void; hidden?
         density="standard"
         hidden={over.hidden ?? {}}
         labels={DEFAULT_LABELS}
-        dataGrid={{ disableVirtualization: true }}
+        dataGrid={{ disableVirtualization: true, ...over.dataGrid }}
       />
     );
   });
@@ -115,6 +118,24 @@ describe('compact id', () => {
   });
 });
 
+describe('owned grid props', () => {
+  it('keeps its own page sizes and filtering off whatever the host passes', async () => {
+    await renderGrid(ROWS, {
+      total: 40,
+      dataGrid: {
+        pageSizeOptions: [500],
+        disableColumnFilter: false,
+        // A host filter model must not filter the page: the pipeline already did.
+        filterModel: { items: [{ field: 'transportMode', operator: 'contains', value: 'no-such-mode' }] },
+      },
+    });
+    await screen.findByText('Flirt');
+    expect(screen.getAllByRole('row', { hidden: true })).toHaveLength(ROWS.length + 1);
+    fireEvent.mouseDown(await screen.findByRole('combobox', { name: /rows per page/i, hidden: true }));
+    expect(within(screen.getByRole('listbox')).getAllByRole('option').map(o => o.textContent)).toEqual(['10', '25', '50', '100']);
+  });
+});
+
 describe('switch cells', () => {
   it('shows a missing switch as a dash in the grid, as cards do, and names yes/no', async () => {
     await renderGrid([
@@ -137,6 +158,17 @@ describe('versioned rows', () => {
     expect(screen.getAllByRole('row')).toHaveLength(4);
     expect(screen.getByText('First version')).toBeTruthy();
     expect(screen.getByText('Second version')).toBeTruthy();
+  });
+
+  it('renders a repeated identity as two grid rows, each with its own data', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await renderGrid([
+      { netexId: 'T:1', version: '1', name: { value: 'First copy' } },
+      { netexId: 'T:1', version: '1', name: { value: 'Second copy' } },
+    ]);
+    await screen.findByText('First copy');
+    expect(screen.getByText('Second copy')).toBeTruthy();
+    warn.mockRestore();
   });
 
   it('renders two versions as two cards without a React key warning', () => {

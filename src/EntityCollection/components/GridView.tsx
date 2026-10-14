@@ -112,11 +112,16 @@ export function GridView({
     <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
       <LazyDataGrid
         fallbackHeight={FALLBACK_H}
-        disableColumnFilter
         disableColumnMenu
         disableRowSelectionOnClick
-        pageSizeOptions={pageSizesFor(pageSize)}
         {...dataGrid}
+        // Owned, after the host's props: the grid's own filter would run a
+        // second filter over just this page (`filterMode="server"` stops a host
+        // `filterModel` too, not only the UI), and a page size the pager doesn't
+        // list (or above 100) breaks the community grid.
+        disableColumnFilter
+        filterMode="server"
+        pageSizeOptions={pageSizesFor(pageSize)}
         rows={rows as KeyedRow[]}
         columns={colDefs}
         getRowId={getRowId}

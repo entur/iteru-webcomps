@@ -158,6 +158,15 @@ describe('QueryField', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Transport mode: rail, remove filter' }));
   });
 
+  it('moves focus to a folded chip that becomes visible when a shown one is removed', () => {
+    const { rerender } = mountField({ query: { filters: { netexId: ['T:1'], name: 'fli', transportMode: ['rail'] } } });
+    const second = screen.getByRole('button', { name: 'Name: fli, remove filter' });
+    second.focus();
+    fireEvent.keyUp(second, { key: 'Backspace' });
+    rerender({ filters: { netexId: ['T:1'], transportMode: ['rail'] } });
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Transport mode: rail, remove filter' }));
+  });
+
   it('moves focus to the search field when the last chip is removed', () => {
     const { rerender } = mountField({ query: { filters: { name: 'fli' } } });
     const chip = screen.getByRole('button', { name: 'Name: fli, remove filter' });

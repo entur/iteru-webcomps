@@ -67,6 +67,15 @@ describe('rowKeys', () => {
     expect(rowKeys([{}], 20)).not.toEqual(rowKeys([{}], 0));
   });
 
+  it('still gives a repeated identity unique keys, after warning, so both rows render', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const keys = rowKeys([{ netexId: 'A', version: '1' }, { netexId: 'A', version: '1' }, { netexId: 'A', version: '1' }]);
+    expect(keys[0]).toBe('A@1');
+    expect(new Set(keys).size).toBe(3);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
   it('warns about a repeated identity instead of hiding it', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     rowKeys([{ netexId: 'A', version: '1' }, { netexId: 'B' }, { netexId: 'A', version: '1' }]);

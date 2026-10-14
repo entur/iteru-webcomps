@@ -11,6 +11,7 @@ export const ID_FIELD = 'netexId';
 const ID_KEYS = [ID_FIELD, 'id'] as const; // first present → row identity
 const VERSION_KEY = 'version', VERSION_SEP = '@';
 const POSITION_PREFIX = 'row:'; // id-less rows; a real id never starts with it
+const REPEAT_SEP = '#'; // a repeated identity's 2nd, 3rd… occurrence
 const ID_SEP = ':', COMPACT_MARK = '::';
 const VERSION_MARK = '/ver'; // `::1004/ver3` on a card
 const DATE_LEN = 10, MINUTE_LEN = 16; // 'YYYY-MM-DD', 'YYYY-MM-DDTHH:mm'
@@ -75,27 +76,36 @@ export const formatValue = (
  * A row with no id is keyed by its position across pages (`offset + index`),
  * prefixed so it can never equal a real id.
  *
- * A repeated identity is a data error — the grid can show only one row per
- * id — so it is reported with a console warning rather than papered over.
+ * A repeated identity is a data error, so it is reported with a console
+ * warning. Its repeats still get unique keys (`A@1#2`), because React and the
+ * grid both need one key per row; otherwise a row would show twice or vanish.
  *
  * @param rows   the rows being rendered
  * @param offset position of `rows[0]` in the whole result (page × page size)
  * @returns one key per row, in order
  */
 export const rowKeys = (rows: readonly unknown[], offset = 0): string[] => {
-  const keys = rows.map((row, i) => {
+  const base = rows.map((row, i) => {
     const obj = (row ?? {}) as Record<string, unknown>;
     const idKey = ID_KEYS.find(k => obj[k] != null);
     if (!idKey) return `${POSITION_PREFIX}${offset + i}`;
     const version = obj[VERSION_KEY];
     return version == null || version === '' ? String(obj[idKey]) : `${String(obj[idKey])}${VERSION_SEP}${String(version)}`;
   });
+  const taken = new Set(base);
   const seen = new Set<string>();
-  const repeated = new Set(keys.filter(k => seen.has(k) || !seen.add(k)));
+  const repeated = new Set<string>();
+  const keys = base.map(k => {
+    if (!seen.has(k)) return seen.add(k), k;
+    repeated.add(k);
+    let n = 2;
+    while (taken.has(`${k}${REPEAT_SEP}${n}`)) n++;
+    const unique = `${k}${REPEAT_SEP}${n}`;
+    taken.add(unique);
+    return unique;
+  });
   if (repeated.size) {
-    console.warn(
-      `[EntityCollection] rows share an identity (netexId + version): ${[...repeated].join(', ')} — only one of each can be shown in the grid.`
-    );
+    console.warn(`[EntityCollection] rows share an identity (netexId + version): ${[...repeated].join(', ')}`);
   }
   return keys;
 };
