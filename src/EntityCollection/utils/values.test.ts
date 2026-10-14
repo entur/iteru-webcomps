@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FieldSpec } from '../../EntityDetailsForm/types';
-import { compactId, displayValue, formatValue, rawValue, rowKeys } from './values';
+import { resolveColumns } from './columns';
+import { compactId, displayValue, formatValue, fullTitle, keyRows, rawValue, rowKeys, valueList } from './values';
 
 const spec = (kind: FieldSpec['kind'], ...path: string[]): FieldSpec => ({ kind, path });
 
@@ -95,12 +96,45 @@ describe('compactId', () => {
 });
 
 describe('displayValue', () => {
-  const ID = { key: 'netexId', label: 'Id', spec: { kind: 'text', path: ['netexId'] } } as const;
-  const NAME = { key: 'name', label: 'Name', spec: { kind: 'name', path: ['name'] } } as const;
+  const [ID, NAME] = resolveColumns({
+    netexId: { kind: 'text', path: ['netexId'] },
+    name: { kind: 'name', path: ['name'] },
+  });
   const row = { netexId: 'VEH:VehicleType:1004', name: { value: 'A:B:C' } };
 
   it('compacts the id column only', () => {
     expect(displayValue(row, ID)).toBe('::1004');
     expect(displayValue(row, NAME)).toBe('A:B:C');
+  });
+});
+
+describe('valueList', () => {
+  const LIST: FieldSpec = { kind: 'enumMulti', path: ['xs'] };
+  it('drops null members, wraps a single value, and is empty for nothing', () => {
+    expect(valueList({ xs: ['a', null, 'b'] }, LIST)).toEqual(['a', 'b']);
+    expect(valueList({ xs: 'a' }, LIST)).toEqual(['a']);
+    expect(valueList({}, LIST)).toEqual([]);
+  });
+});
+
+describe('fullTitle', () => {
+  const [ID, NAME] = resolveColumns({
+    netexId: { kind: 'text', path: ['netexId'] },
+    name: { kind: 'name', path: ['name'] },
+  });
+  it('gives the full text only where the shown text is shortened', () => {
+    const row = { netexId: 'VEH:VehicleType:1004', name: { value: 'Flirt' } };
+    expect(fullTitle(row, ID)).toBe('VEH:VehicleType:1004');
+    expect(fullTitle(row, NAME)).toBeUndefined();
+  });
+});
+
+describe('keyRows', () => {
+  it('pairs each row with its key, positions counted from the offset', () => {
+    const a = { netexId: 'A' };
+    expect(keyRows([a, {}], 50)).toEqual([
+      { key: 'A', entity: a },
+      { key: 'row:51', entity: {} },
+    ]);
   });
 });

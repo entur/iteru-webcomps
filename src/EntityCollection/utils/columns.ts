@@ -5,7 +5,8 @@
 import type { FieldEntry, FieldSpec } from '../../EntityDetailsForm/types';
 import { humanize } from '../../shared/humanize';
 import { DEFAULT_LABELS, type CardSpec, type Column, type ResolvedCard } from '../types';
-import { ID_FIELD } from './values';
+import { norm } from '../../EntityDetailsForm/utils/sections';
+import { compactId, compactIdEntry, idMatches, isIdSpec } from './values';
 
 const TITLE_KEY = 'name'; // default card title when the entity has one
 const CARD_DEFAULT_FIELDS = 6;
@@ -15,7 +16,12 @@ const CARD_DEFAULT_FIELDS = 6;
 const eligible = (spec: FieldSpec | undefined): spec is FieldSpec =>
   !!spec && spec.kind !== 'grid' && !spec.patched;
 
-const toEntry = (item: string | FieldEntry): FieldEntry => (typeof item === 'string' ? { field: item } : item);
+type Rules = Pick<Column, 'display' | 'matches' | 'entryLabel'>;
+const same = (text: string): string => text;
+/** Every field but the identity shows and matches its text as is. */
+const PLAIN: Rules = { display: same, matches: (have, typed) => have === typed, entryLabel: same };
+/** The identity shows compact and matches on its last segment, full id as a fallback. */
+const IDENTITY: Rules = { display: compactId, matches: idMatches, entryLabel: compactIdEntry };
 
 /**
  * Resolve the columns a collection shows.
@@ -31,10 +37,12 @@ export const resolveColumns = (
   columns?: readonly (string | FieldEntry)[],
   idLabel: string = DEFAULT_LABELS.id
 ): Column[] =>
-  (columns?.map(toEntry) ?? Object.keys(fields).map(field => ({ field }) as FieldEntry)).flatMap(entry => {
+  (columns ?? Object.keys(fields)).map(norm).flatMap(entry => {
     const spec = fields[entry.field];
-    const label = entry.label ?? (entry.field === ID_FIELD ? idLabel : humanize(entry.field));
-    return eligible(spec) ? [{ key: entry.field, label, spec }] : [];
+    if (!eligible(spec)) return [];
+    const identity = isIdSpec(spec);
+    const label = entry.label ?? (identity ? idLabel : humanize(entry.field));
+    return [{ key: entry.field, label, spec, ...(identity ? IDENTITY : PLAIN) }];
   });
 
 /**

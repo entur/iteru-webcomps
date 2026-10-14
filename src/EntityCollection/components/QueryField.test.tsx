@@ -18,21 +18,25 @@ const FF = {
   transportMode: { arg: 'transportModes', op: 'anyOf' },
 } as const;
 
-const mount = (over: { search?: boolean; filter?: boolean; query?: Partial<CollectionQuery> } = {}) => {
+/** Render a query field; `rerender` swaps in a new query, as a host echoing `onQuery` would. */
+const mountField = (over: { search?: boolean; filter?: boolean; query?: Partial<CollectionQuery> } = {}) => {
   const onQuery = vi.fn();
-  render(
+  const field = (query: Partial<CollectionQuery>) => (
     <QueryField
       search={over.search ?? true}
       filter={over.filter ?? true}
       columns={COLS}
       filterFields={FF}
-      query={{ ...defaultCollectionQuery, ...over.query }}
+      query={{ ...defaultCollectionQuery, ...query }}
       onQuery={onQuery}
       labels={DEFAULT_LABELS}
     />
   );
-  return onQuery;
+  const { rerender } = render(field(over.query ?? {}));
+  return { onQuery, rerender: (query: Partial<CollectionQuery>) => rerender(field(query)) };
 };
+
+const mount = (over: Parameters<typeof mountField>[0] = {}) => mountField(over).onQuery;
 
 const field = (): HTMLElement => screen.getByRole('textbox', { name: 'Search' }).closest('.MuiInputBase-root') as HTMLElement;
 
@@ -116,27 +120,21 @@ describe('QueryField', () => {
   });
 
   it('moves focus to the next chip after one is removed from the keyboard', () => {
-    const onQuery = vi.fn();
-    const props = { search: true, filter: true, columns: COLS, filterFields: FF, onQuery, labels: DEFAULT_LABELS } as const;
-    const { rerender } = render(
-      <QueryField {...props} query={{ ...defaultCollectionQuery, filters: { name: 'fli', transportMode: ['rail'] } }} />
-    );
+    const { onQuery, rerender } = mountField({ query: { filters: { name: 'fli', transportMode: ['rail'] } } });
     const first = screen.getByRole('button', { name: 'Name: fli, remove filter' });
     first.focus();
     fireEvent.keyUp(first, { key: 'Backspace' });
     expect(onQuery).toHaveBeenCalledWith({ filters: { transportMode: ['rail'] } });
-    rerender(<QueryField {...props} query={{ ...defaultCollectionQuery, filters: { transportMode: ['rail'] } }} />);
+    rerender({ filters: { transportMode: ['rail'] } });
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Transport mode: rail, remove filter' }));
   });
 
   it('moves focus to the search field when the last chip is removed', () => {
-    const onQuery = vi.fn();
-    const props = { search: true, filter: true, columns: COLS, filterFields: FF, onQuery, labels: DEFAULT_LABELS } as const;
-    const { rerender } = render(<QueryField {...props} query={{ ...defaultCollectionQuery, filters: { name: 'fli' } }} />);
+    const { rerender } = mountField({ query: { filters: { name: 'fli' } } });
     const chip = screen.getByRole('button', { name: 'Name: fli, remove filter' });
     chip.focus();
     fireEvent.keyUp(chip, { key: 'Delete' });
-    rerender(<QueryField {...props} query={defaultCollectionQuery} />);
+    rerender({});
     expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Search' }));
   });
 

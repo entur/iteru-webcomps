@@ -29,6 +29,32 @@ const GRID_ONLY: readonly CollectionTool[] = ['columns', 'density'];
 const SORT_W = 180;
 const NO_SORT = ''; // select value for "unsorted"
 
+/** An icon button that opens a menu; owns its anchor. `children` gets `close`. */
+function ToolMenu({
+  label,
+  icon,
+  children,
+}: {
+  label: string;
+  icon: ReactNode;
+  children: (close: () => void) => ReactNode;
+}): React.ReactNode {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const close = (): void => setAnchor(null);
+  return (
+    <>
+      <Tooltip title={label}>
+        <IconButton size="small" aria-label={label} onClick={e => setAnchor(e.currentTarget)}>
+          {icon}
+        </IconButton>
+      </Tooltip>
+      <Menu open={!!anchor} anchorEl={anchor} onClose={close}>
+        {children(close)}
+      </Menu>
+    </>
+  );
+}
+
 export interface CollectionToolbarProps {
   tools: readonly CollectionTool[];
   view: CollectionView;
@@ -51,7 +77,7 @@ export interface CollectionToolbarProps {
  * @param view         active view; grid-only tools drop out in `'cards'`
  * @param columns      resolved columns
  * @param filterFields the entity's generated `<Entity>FilterFields`
- * @param query        current query
+ * @param query        effective query (its sort names a real column)
  * @param onQuery      receives search / filters / sort patches
  * @param density      grid density
  * @param onDensity    density setter
@@ -75,11 +101,11 @@ export function CollectionToolbar({
   labels,
   actions,
 }: CollectionToolbarProps): React.ReactNode {
-  const [colAnchor, setColAnchor] = useState<HTMLElement | null>(null);
-  const [denAnchor, setDenAnchor] = useState<HTMLElement | null>(null);
   const has = (tool: CollectionTool): boolean =>
     tools.includes(tool) && (view === 'grid' || !GRID_ONLY.includes(tool));
-  const sorted = query.sort && columns.some(c => c.key === query.sort?.field) ? query.sort : null;
+  // The effective query already drops a sort on a field that is not a column.
+  const sorted = query.sort;
+  const visible = columns.filter(c => hidden[c.key] !== false).length;
 
   return (
     <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
@@ -126,17 +152,12 @@ export function CollectionToolbar({
         </>
       ) : null}
       {has('columns') ? (
-        <>
-          <Tooltip title={labels.columns}>
-            <IconButton size="small" aria-label={labels.columns} onClick={e => setColAnchor(e.currentTarget)}>
-              <ViewColumnIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Menu open={!!colAnchor} anchorEl={colAnchor} onClose={() => setColAnchor(null)}>
-            {columns.map(c => {
+        <ToolMenu label={labels.columns} icon={<ViewColumnIcon fontSize="small" />}>
+          {() =>
+            columns.map(c => {
               const shown = hidden[c.key] !== false;
               // The last visible column stays: hiding it would leave an empty grid.
-              const last = shown && columns.filter(x => hidden[x.key] !== false).length === 1;
+              const last = shown && visible === 1;
               return (
                 <MenuItem
                   key={c.key}
@@ -158,32 +179,27 @@ export function CollectionToolbar({
                   {c.label}
                 </MenuItem>
               );
-            })}
-          </Menu>
-        </>
+            })
+          }
+        </ToolMenu>
       ) : null}
       {has('density') ? (
-        <>
-          <Tooltip title={labels.density}>
-            <IconButton size="small" aria-label={labels.density} onClick={e => setDenAnchor(e.currentTarget)}>
-              <DensityMediumIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Menu open={!!denAnchor} anchorEl={denAnchor} onClose={() => setDenAnchor(null)}>
-            {DENSITIES.map(d => (
+        <ToolMenu label={labels.density} icon={<DensityMediumIcon fontSize="small" />}>
+          {close =>
+            DENSITIES.map(d => (
               <MenuItem
                 key={d}
                 selected={d === density}
                 onClick={() => {
                   onDensity(d);
-                  setDenAnchor(null);
+                  close();
                 }}
               >
                 {d}
               </MenuItem>
-            ))}
-          </Menu>
-        </>
+            ))
+          }
+        </ToolMenu>
       ) : null}
       <Box sx={{ flex: 1 }} />
       {actions}

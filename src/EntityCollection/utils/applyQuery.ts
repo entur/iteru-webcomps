@@ -1,11 +1,14 @@
 /**
- * The one pipeline both views render from: filter → search → sort → page.
- * Pure, so the grid and the cards cannot disagree about what is visible.
+ * The pipeline both views render from: filter → search, then sort, then page.
+ * Pure, so the grid and the cards cannot disagree about what is visible. The
+ * stages are separate so `collection.tsx` can memoise each on what it reads —
+ * a page change re-slices without re-searching, a sort click re-sorts without
+ * re-filtering.
  */
 import type { FieldSpec } from '../../EntityDetailsForm/types';
-import type { CollectionQuery, Column, FilterFields } from '../types';
+import { usablePageSize, type CollectionQuery, type CollectionSort, type Column, type FilterFields } from '../types';
 import { matchesFilter } from './filters';
-import { displayValue, formatValue, rawValue } from './values';
+import { formatValue, rawValue } from './values';
 
 /** Kinds the free-text search looks into. */
 const SEARCHABLE: readonly FieldSpec['kind'][] = ['text', 'name', 'enum', 'enumMulti', 'reference'];
@@ -33,14 +36,96 @@ const sortKey = (row: unknown, spec: FieldSpec): SortKey => {
 const compare = (a: SortKey, b: SortKey): number =>
   typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b));
 
+/** Does the search needle appear in the cell, as stored or as shown (a compact id)? */
+const cellHas = (row: unknown, col: Column, needle: string): boolean => {
+  const text = formatValue(row, col.spec);
+  if (text.toLowerCase().includes(needle)) return true;
+  const shown = col.display(text);
+  return shown !== text && shown.toLowerCase().includes(needle);
+};
+
 /**
- * Apply a query to the rows in memory.
+ * Filter and search: the rows the query keeps, in input order.
  *
  * @param rows         the collection (never mutated)
- * @param columns      the resolved columns; filters, search and sort only see these
+ * @param columns      the resolved columns; filters and search only see these
+ * @param filterFields the entity's generated `<Entity>FilterFields`
+ * @param filters      `CollectionQuery.filters`
+ * @param search       `CollectionQuery.search`
+ * @param filterMode   `'server'` skips the filter step (the host applied it)
+ * @returns the kept rows
+ */
+export function matchRows<E>(
+  rows: readonly E[],
+  columns: readonly Column[],
+  filterFields: FilterFields,
+  filters: CollectionQuery['filters'],
+  search: string,
+  filterMode: 'client' | 'server' = 'client'
+): E[] {
+  const byKey = new Map(columns.map(c => [c.key, c]));
+  const conditions =
+    filterMode === 'server'
+      ? []
+      : Object.entries(filters).flatMap(([key, value]) => {
+          const col = byKey.get(key);
+          const target = filterFields[key];
+          return col && target ? [{ col, op: target.op, value }] : [];
+        });
+  const needle = search.trim().toLowerCase();
+  const searchable = columns.filter(c => SEARCHABLE.includes(c.spec.kind));
+
+  return rows.filter(
+    row =>
+      conditions.every(c => matchesFilter(row, c.col, c.op, c.value)) &&
+      (!needle || searchable.some(c => cellHas(row, c, needle)))
+  );
+}
+
+/**
+ * Sort by one column; missing values last in either direction. A sort on a
+ * field that is not a column leaves the order as it is.
+ *
+ * @param rows    the kept rows (never mutated)
+ * @param columns the resolved columns
+ * @param sort    `CollectionQuery.sort`
+ * @returns the rows in order
+ */
+export function sortRows<E>(rows: readonly E[], columns: readonly Column[], sort: CollectionSort | null): E[] {
+  const col = sort ? columns.find(c => c.key === sort.field) : undefined;
+  if (!sort || !col) return [...rows];
+  const flip = sort.dir === 'desc' ? -1 : 1;
+  return rows
+    .map(row => ({ row, key: sortKey(row, col.spec) }))
+    .sort((x, y) =>
+      x.key === null || y.key === null ? Number(x.key === null) - Number(y.key === null) : flip * compare(x.key, y.key)
+    )
+    .map(x => x.row);
+}
+
+/**
+ * Slice one page; a page past the end is clamped to the last one.
+ *
+ * @param rows     the sorted rows
+ * @param page     requested page index
+ * @param pageSize requested page size (made usable, as everywhere)
+ * @returns the visible page, the unpaged total and the clamped page index
+ */
+export function pageRows<E>(rows: readonly E[], page: number, pageSize: number): QueryResult<E> {
+  const size = usablePageSize(pageSize);
+  const total = rows.length;
+  const at = Math.min(Math.max(page, 0), Math.max(Math.ceil(total / size) - 1, 0));
+  return { rows: rows.slice(at * size, at * size + size), total, page: at };
+}
+
+/**
+ * Apply a whole query to the rows in memory — the three stages in one call.
+ *
+ * @param rows         the collection (never mutated)
+ * @param columns      the resolved columns
  * @param filterFields the entity's generated `<Entity>FilterFields`
  * @param query        filters, search, sort and paging
- * @param filterMode   `'server'` skips the filter step (the host already applied it)
+ * @param filterMode   `'server'` skips the filter step
  * @returns the visible page, the unpaged total and the clamped page index
  */
 export function applyQuery<E>(
@@ -50,45 +135,6 @@ export function applyQuery<E>(
   query: CollectionQuery,
   filterMode: 'client' | 'server' = 'client'
 ): QueryResult<E> {
-  const byKey = new Map(columns.map(c => [c.key, c]));
-
-  const conditions =
-    filterMode === 'server'
-      ? []
-      : Object.entries(query.filters).flatMap(([key, value]) => {
-          const col = byKey.get(key);
-          const target = filterFields[key];
-          return col && target ? [{ spec: col.spec, op: target.op, value }] : [];
-        });
-
-  const needle = query.search.trim().toLowerCase();
-  const searchable = columns.filter(c => SEARCHABLE.includes(c.spec.kind));
-
-  const matched = rows
-    .filter(row => conditions.every(c => matchesFilter(row, c.spec, c.op, c.value)))
-    // The shown text counts too, so a compact id (`::1004`) is findable as displayed.
-    .filter(
-      row =>
-        !needle ||
-        searchable.some(c => [formatValue(row, c.spec), displayValue(row, c)].some(t => t.toLowerCase().includes(needle)))
-    );
-
-  const sortCol = query.sort ? byKey.get(query.sort.field) : undefined;
-  const flip = query.sort?.dir === 'desc' ? -1 : 1;
-  const sorted = sortCol
-    ? matched
-        .map(row => ({ row, key: sortKey(row, sortCol.spec) }))
-        .sort((x, y) =>
-          x.key === null || y.key === null
-            ? Number(x.key === null) - Number(y.key === null)
-            : flip * compare(x.key, y.key)
-        )
-        .map(x => x.row)
-    : matched;
-
-  const total = sorted.length;
-  const size = query.pageSize > 0 ? query.pageSize : Math.max(total, 1);
-  const page = Math.min(Math.max(query.page, 0), Math.max(Math.ceil(total / size) - 1, 0));
-
-  return { rows: sorted.slice(page * size, page * size + size), total, page };
+  const kept = matchRows(rows, columns, filterFields, query.filters, query.search, filterMode);
+  return pageRows(sortRows(kept, columns, query.sort), query.page, query.pageSize);
 }

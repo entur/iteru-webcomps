@@ -2,7 +2,7 @@
  * `createEntityCollection` — builds a typed, presentational list component for
  * one entity from its `FIELDS` registry: a toolbar, and the rows as a DataGrid
  * or as cards. It owns the query (or mirrors a controlled one), runs the shared
- * pipeline once, and hands the same page to whichever view is active.
+ * pipeline once, and hands the same keyed page to whichever view is active.
  */
 import { useMemo, useState, type FC } from 'react';
 import { Box, TablePagination, Typography } from '@mui/material';
@@ -19,8 +19,9 @@ import {
   type EntityCollectionProps,
   type FilterFields,
 } from '../types';
-import { applyQuery } from '../utils/applyQuery';
+import { matchRows, pageRows, sortRows } from '../utils/applyQuery';
 import { resolveCard, resolveColumns } from '../utils/columns';
+import { keyRows } from '../utils/values';
 import { CardsView } from './CardsView';
 import { CollectionToolbar } from './CollectionToolbar';
 import { GridView } from './GridView';
@@ -59,16 +60,29 @@ export function createEntityCollection<E>(
     const [density, setDensity] = useState<GridDensity>(DEFAULT_DENSITY);
     const [hidden, setHidden] = useState<Record<string, boolean>>({});
 
-    // Normalised once, so the pipeline and both pagers agree on the page size.
-    const raw = controlled ?? inner;
-    const query = useMemo<CollectionQuery>(() => ({ ...raw, pageSize: usablePageSize(raw.pageSize) }), [raw]);
     const L = useMemo(() => ({ ...DEFAULT_LABELS, ...labels }), [labels]);
     const cols = useMemo(() => resolveColumns(fields, columns, L.id), [columns, L.id]);
     const resolvedCard = useMemo(() => resolveCard(fields, cols, card, L.id), [cols, card, L.id]);
-    const result = useMemo(
-      () => applyQuery(rows, cols, filterFields, query, filterMode),
-      [rows, cols, query, filterMode]
+
+    // The effective query, decided once for every reader (pipeline, toolbar,
+    // grid, pager, and the next emit): a usable page size, and no sort on a
+    // field that is not a column — the grid would report that one back as an
+    // empty sort and rewrite the host's query.
+    const raw = controlled ?? inner;
+    const query = useMemo<CollectionQuery>(() => {
+      const sort = raw.sort && cols.some(c => c.key === raw.sort?.field) ? raw.sort : null;
+      return { ...raw, sort, pageSize: usablePageSize(raw.pageSize) };
+    }, [raw, cols]);
+
+    // One memo per stage, keyed on what that stage reads: paging re-slices
+    // without re-searching, a sort click re-sorts without re-filtering.
+    const matched = useMemo(
+      () => matchRows(rows, cols, filterFields, query.filters, query.search, filterMode),
+      [rows, cols, query.filters, query.search, filterMode]
     );
+    const sorted = useMemo(() => sortRows(matched, cols, query.sort), [matched, cols, query.sort]);
+    const result = useMemo(() => pageRows(sorted, query.page, query.pageSize), [sorted, query.page, query.pageSize]);
+    const keyed = useMemo(() => keyRows(result.rows, result.page * query.pageSize), [result, query.pageSize]);
 
     // Anything but an explicit page change returns to the first page: the page
     // index is only meaningful for the result it was chosen in.
@@ -100,7 +114,7 @@ export function createEntityCollection<E>(
         ) : null}
         {view === 'grid' ? (
           <GridView
-            rows={result.rows}
+            rows={keyed}
             columns={cols}
             total={result.total}
             page={result.page}
@@ -118,7 +132,7 @@ export function createEntityCollection<E>(
                 {L.empty}
               </Typography>
             ) : (
-              <CardsView rows={result.rows} card={resolvedCard} labels={L} cardProps={slotProps?.card} />
+              <CardsView rows={keyed} card={resolvedCard} labels={L} cardProps={slotProps?.card} />
             )}
             <TablePagination
               component="div"

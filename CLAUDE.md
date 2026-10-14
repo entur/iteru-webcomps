@@ -239,8 +239,15 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   `title`), the rest fold into a "+N" chip that opens the panel; Backspace in an
   empty field removes the last filter. A separate chip row was tried and
   rejected: the button and its chips belong on the same line. `FilterPanel`
-  (`FilterPopover.tsx`) is the controlled popover alone; `QueryField` owns its
+  (`FilterPanel.tsx`) is the controlled popover alone; `QueryField` owns its
   trigger. Not exported — it is built on the collection's own types.
+- **Per-column rules, decided once.** `resolveColumns` gives every `Column`
+  its own `display` / `matches` / `entryLabel` (identity: `compactId` /
+  `idMatches` / `compactIdEntry`; everything else: as is), so no view, filter or
+  chip branches on which field it holds. `collection.tsx` also decides the
+  *effective query* once (usable page size, no sort on a non-column), keys the
+  visible page once (`keyRows`) for both views, and memoises the pipeline per
+  stage (`matchRows` → `sortRows` → `pageRows`).
 - Accessibility rules the toolbar keeps (each pinned by a test): a filter chip's
   accessible name is its visible text plus `labels.removeFilter`, and removing
   one moves focus to the next chip, else the previous, else the search field;

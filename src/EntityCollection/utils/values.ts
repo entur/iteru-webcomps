@@ -4,18 +4,17 @@
  */
 import type { FieldSpec } from '../../EntityDetailsForm/types';
 import { getPath } from '../../EntityDetailsForm/utils/paths';
-import type { CollectionLabels, Column } from '../types';
-
-const ID_KEYS = ['netexId', 'id'] as const; // first present → row identity
-const VERSION_KEY = 'version', VERSION_SEP = '@';
-const POSITION_PREFIX = 'row:'; // id-less rows; a real id never starts with it
-const ID_SEP = ':', COMPACT_MARK = '::';
+import { DEFAULT_LABELS, type CollectionLabels, type Column, type KeyedRow } from '../types';
 
 /** The identity field: captioned "Id" and shown compact (`::1004`). */
 export const ID_FIELD = 'netexId';
+const ID_KEYS = [ID_FIELD, 'id'] as const; // first present → row identity
+const VERSION_KEY = 'version', VERSION_SEP = '@';
+const POSITION_PREFIX = 'row:'; // id-less rows; a real id never starts with it
+const ID_SEP = ':', COMPACT_MARK = '::';
 const DATE_LEN = 10, MINUTE_LEN = 16; // 'YYYY-MM-DD', 'YYYY-MM-DDTHH:mm'
-const LIST_SEP = ', ';
-const PLAIN_BOOL = { yes: 'Yes', no: 'No' } as const;
+/** Joins a list value for display (multi-enums, filter chips). */
+export const LIST_SEP = ', ';
 
 /**
  * The field's value in `row`, with a `name` (MultilingualString) unwrapped to
@@ -31,6 +30,19 @@ export const rawValue = (row: unknown, spec: FieldSpec): unknown => {
 };
 
 /**
+ * The field's value as a list of strings: a list value without its null
+ * members, a single value as a one-item list, nothing as an empty list.
+ *
+ * @param row  one entity
+ * @param spec the field's registry entry
+ * @returns the values
+ */
+export const valueList = (row: unknown, spec: FieldSpec): string[] => {
+  const v = rawValue(row, spec);
+  return Array.isArray(v) ? v.filter(x => x != null).map(String) : v == null ? [] : [String(v)];
+};
+
+/**
  * The field's display text. Empty string for a missing value; `0` and `false`
  * stay visible.
  *
@@ -42,10 +54,10 @@ export const rawValue = (row: unknown, spec: FieldSpec): unknown => {
 export const formatValue = (
   row: unknown,
   spec: FieldSpec,
-  labels: Pick<CollectionLabels, 'yes' | 'no'> = PLAIN_BOOL
+  labels: Pick<CollectionLabels, 'yes' | 'no'> = DEFAULT_LABELS
 ): string => {
+  if (spec.kind === 'enumMulti') return valueList(row, spec).join(LIST_SEP);
   const v = rawValue(row, spec);
-  if (spec.kind === 'enumMulti') return Array.isArray(v) ? v.filter(x => x != null).join(LIST_SEP) : '';
   if (v == null) return '';
   if (spec.kind === 'switch') return v ? labels.yes : labels.no;
   if (spec.kind === 'date') return String(v).slice(0, DATE_LEN);
@@ -75,13 +87,26 @@ export const rowKeys = (rows: readonly unknown[], offset = 0): string[] => {
     const version = obj[VERSION_KEY];
     return version == null || version === '' ? String(obj[idKey]) : `${String(obj[idKey])}${VERSION_SEP}${String(version)}`;
   });
-  const repeated = [...new Set(keys.filter((k, i) => keys.indexOf(k) !== i))];
-  if (repeated.length) {
+  const seen = new Set<string>();
+  const repeated = new Set(keys.filter(k => seen.has(k) || !seen.add(k)));
+  if (repeated.size) {
     console.warn(
-      `[EntityCollection] rows share an identity (netexId + version): ${repeated.join(', ')} — only one of each can be shown in the grid.`
+      `[EntityCollection] rows share an identity (netexId + version): ${[...repeated].join(', ')} — only one of each can be shown in the grid.`
     );
   }
   return keys;
+};
+
+/**
+ * The visible page as keyed rows — what both views render.
+ *
+ * @param rows   the visible page
+ * @param offset position of `rows[0]` in the whole result
+ * @returns each row with its `rowKeys` key
+ */
+export const keyRows = (rows: readonly unknown[], offset = 0): KeyedRow[] => {
+  const keys = rowKeys(rows, offset);
+  return rows.map((entity, i) => ({ key: keys[i], entity }));
 };
 
 /**
@@ -125,20 +150,6 @@ export const idMatches = (full: string, typed: string): boolean => {
 };
 
 /**
- * The text a view shows for one cell: `formatValue`, with the identity field
- * compacted. Search, sort and filtering keep using the full value.
- *
- * @param row    one entity
- * @param col    the resolved column
- * @param labels yes/no wording for `switch` fields
- * @returns display text
- */
-export const displayValue = (row: unknown, col: Column, labels?: Pick<CollectionLabels, 'yes' | 'no'>): string => {
-  const text = formatValue(row, col.spec, labels);
-  return isIdSpec(col.spec) ? compactId(text) : text;
-};
-
-/**
  * A typed id filter entry in the compact form: a full id is compacted, and a
  * bare local part (`1004`) gains the `::` mark, so every entry reads alike.
  *
@@ -147,3 +158,27 @@ export const displayValue = (row: unknown, col: Column, labels?: Pick<Collection
  */
 export const compactIdEntry = (typed: string): string =>
   typed.includes(ID_SEP) ? compactId(typed) : `${COMPACT_MARK}${typed}`;
+
+/**
+ * The text a view shows for one cell: `formatValue` passed through the
+ * column's own `display` rule. Search, sort and filtering use the full value.
+ *
+ * @param row    one entity
+ * @param col    the resolved column
+ * @param labels yes/no wording for `switch` fields
+ * @returns display text
+ */
+export const displayValue = (row: unknown, col: Column, labels?: Pick<CollectionLabels, 'yes' | 'no'>): string =>
+  col.display(formatValue(row, col.spec, labels));
+
+/**
+ * The full text as a hover title, where the shown text is shortened.
+ *
+ * @param row one entity
+ * @param col the resolved column
+ * @returns the full text, or `undefined` when nothing is hidden
+ */
+export const fullTitle = (row: unknown, col: Column): string | undefined => {
+  const full = formatValue(row, col.spec);
+  return full !== col.display(full) ? full : undefined;
+};

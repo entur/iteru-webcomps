@@ -99,12 +99,33 @@ export interface EntityCollectionProps<E> {
   slotProps?: CollectionSlotProps;
 }
 
-/** A resolved, renderable field: registry key, display label, registry spec. */
+/**
+ * A resolved, renderable field: registry key, display label, registry spec,
+ * and the field's own display and match rules. `resolveColumns` decides those
+ * rules once (the identity field compacts and matches on its last segment;
+ * every other field shows and matches its text as is), so no view or filter
+ * branches on which field it holds.
+ */
 export interface Column {
   key: string;
   label: string;
   spec: FieldSpec;
+  /** The shown text, from the full formatted text. */
+  display: (text: string) => string;
+  /** Does one of a row's values match one typed filter entry? */
+  matches: (have: string, typed: string) => boolean;
+  /** A typed filter entry as a chip or tag shows it. */
+  entryLabel: (typed: string) => string;
 }
+
+/** A visible row with the unique key both views identify it by. */
+export interface KeyedRow {
+  key: string;
+  entity: unknown;
+}
+
+/** The filter conditions of a query, keyed by field. */
+export type CollectionFilters = CollectionQuery['filters'];
 
 export interface ResolvedCard {
   title?: Column;
@@ -112,7 +133,7 @@ export interface ResolvedCard {
   fields: Column[];
 }
 
-export const PAGE_SIZES = [10, 25, 50, 100];
+const PAGE_SIZES = [10, 25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
 /** The community DataGrid throws above this. */
 const MAX_PAGE_SIZE = 100;

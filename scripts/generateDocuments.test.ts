@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi, type MockInstance } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { buildSchema, parse, visit } from 'graphql';
@@ -139,28 +139,28 @@ describe('buildFilterFieldsModule', () => {
       type Thing { category: String, fareClass: Mode, lowFloor: Boolean, version: Int, mode: Mode, weight: Float }
     `;
     const emit2 = () => buildFilterFieldsModule([ENTRY], buildSchema(SDL2));
+    // Every case here makes the generator warn; keep the output quiet and inspectable.
+    let warn: MockInstance<typeof console.warn>;
+    beforeEach(() => {
+      warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+    afterEach(() => warn.mockRestore());
 
     it('singularises -ies and -es plurals', () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       expect(emit2()).toContain(`category: { arg: 'categories', op: 'anyOf' },`);
       expect(emit2()).toContain(`fareClass: { arg: 'fareClasses', op: 'anyOf' },`);
-      warn.mockRestore();
     });
 
     it('offers no text filter for a non-String scalar arg', () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const out = emit2();
       expect(out).not.toMatch(/lowFloor|version|mode:|weight/);
-      warn.mockRestore();
     });
 
     it('warns about every filter arg it could not offer', () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       emit2();
       const said = warn.mock.calls.map(c => String(c[0])).join('\n');
       ['lowFloor', 'version', 'mode', 'weights'].forEach(arg => expect(said).toContain(arg));
       expect(said).not.toContain('categories');
-      warn.mockRestore();
     });
   });
 

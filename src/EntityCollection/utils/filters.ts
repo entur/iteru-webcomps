@@ -1,10 +1,10 @@
 /**
- * Filter conditions: value coercion, client-side matching, and the translation
- * to sobek's `<Entity>Filter` argument shape.
+ * Filter conditions: value coercion, emptiness, client-side matching, the
+ * edits the toolbar makes to them, and the translation to sobek's
+ * `<Entity>Filter` argument shape.
  */
-import type { FieldSpec } from '../../EntityDetailsForm/types';
-import type { CollectionQuery, FilterFields, FilterOp, FilterValue } from '../types';
-import { formatValue, idMatches, isIdSpec, rawValue } from './values';
+import type { CollectionFilters, Column, FilterFields, FilterOp, FilterValue } from '../types';
+import { formatValue, LIST_SEP, valueList } from './values';
 
 /**
  * A filter value as a string list, whatever shape it arrived in.
@@ -25,27 +25,80 @@ export const asText = (value: FilterValue | undefined): string =>
   value == null ? '' : typeof value === 'string' ? value : value.join(' ');
 
 /**
+ * Does a condition restrict nothing? Blank text, or a list of only blank
+ * entries. The one rule for "is this filter active" — matching, chips and
+ * the sobek translation all use it.
+ *
+ * @param value the condition
+ * @returns whether it is empty
+ */
+export const isEmptyCondition = (value: FilterValue | undefined): boolean =>
+  asList(value).every(v => v.trim() === '');
+
+/**
  * Does `row` satisfy one condition? An empty condition matches every row.
- * Approximates sobek: `contains` is a case-insensitive substring.
+ * Approximates sobek: `contains` is a case-insensitive substring; `anyOf`
+ * uses the column's own `matches` rule (the identity matches on its last
+ * segment).
  *
  * @param row   one entity
- * @param spec  registry entry of the filtered field
+ * @param col   resolved column of the filtered field
  * @param op    the field's operator
  * @param value the condition's value
  * @returns whether the row passes
  */
-export const matchesFilter = (row: unknown, spec: FieldSpec, op: FilterOp, value: FilterValue): boolean => {
-  if (op === 'contains') {
-    const needle = asText(value).trim().toLowerCase();
-    return !needle || formatValue(row, spec).toLowerCase().includes(needle);
-  }
+export const matchesFilter = (row: unknown, col: Column, op: FilterOp, value: FilterValue): boolean => {
+  if (isEmptyCondition(value)) return true;
+  if (op === 'contains') return formatValue(row, col.spec).toLowerCase().includes(asText(value).trim().toLowerCase());
   const wanted = asList(value);
-  if (!wanted.length) return true;
-  const v = rawValue(row, spec);
-  const have = Array.isArray(v) ? v.filter(x => x != null).map(String) : v == null ? [] : [String(v)];
-  const same = isIdSpec(spec) ? idMatches : (h: string, w: string): boolean => h === w;
-  return have.some(h => wanted.some(w => same(h, w)));
+  return valueList(row, col.spec).some(have => wanted.some(typed => col.matches(have, typed)));
 };
+
+/**
+ * `filters` with `key` set, or removed when the new value is `undefined`.
+ *
+ * @param filters current conditions
+ * @param key     field key
+ * @param value   new condition; `undefined` removes it
+ * @returns the next conditions
+ */
+export const withFilter = (filters: CollectionFilters, key: string, value: FilterValue | undefined): CollectionFilters => {
+  const { [key]: _dropped, ...rest } = filters;
+  return value === undefined ? rest : { ...rest, [key]: value };
+};
+
+/**
+ * Typed list entries trimmed, blanks and repeats dropped (a pasted id often
+ * carries a stray space, which would otherwise match nothing).
+ *
+ * @param values entries as typed or picked
+ * @returns the clean entries
+ */
+export const cleanList = (values: readonly string[]): string[] => [...new Set(values.map(v => v.trim()).filter(Boolean))];
+
+/**
+ * A condition as display text: trimmed text, or the list joined.
+ *
+ * @param value      the condition
+ * @param entryLabel how one entry is shown (the column's rule)
+ * @returns display text; empty for an empty condition
+ */
+export const chipText = (value: FilterValue, entryLabel: (typed: string) => string = v => v): string =>
+  typeof value === 'string' ? entryLabel(value.trim()) : asList(value).map(entryLabel).join(LIST_SEP);
+
+/**
+ * The filterable columns carrying a non-empty condition, in column order.
+ *
+ * @param columns      resolved columns
+ * @param filterFields the entity's generated `<Entity>FilterFields`
+ * @param filters      current conditions
+ * @returns the filtered-on columns
+ */
+export const activeFilterColumns = (
+  columns: readonly Column[],
+  filterFields: FilterFields,
+  filters: CollectionFilters
+): Column[] => columns.filter(c => filterFields[c.key] && !isEmptyCondition(filters[c.key]));
 
 /**
  * Translate the query's filters into the object sobek's list query takes as
@@ -55,15 +108,11 @@ export const matchesFilter = (row: unknown, spec: FieldSpec, op: FilterOp, value
  * @param filterFields the entity's generated `<Entity>FilterFields`
  * @returns filter args; empty conditions and non-filterable fields are omitted
  */
-export const toSobekFilter = (
-  filters: CollectionQuery['filters'],
-  filterFields: FilterFields
-): Record<string, string | string[]> =>
+export const toSobekFilter = (filters: CollectionFilters, filterFields: FilterFields): Record<string, string | string[]> =>
   Object.fromEntries(
     Object.entries(filters).flatMap(([field, value]): [string, string | string[]][] => {
       const target = filterFields[field];
-      if (!target) return [];
-      const out = target.op === 'anyOf' ? asList(value) : asText(value).trim();
-      return out.length ? [[target.arg, out]] : [];
+      if (!target || isEmptyCondition(value)) return [];
+      return [[target.arg, target.op === 'anyOf' ? cleanList(asList(value)) : asText(value).trim()]];
     })
   );

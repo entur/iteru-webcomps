@@ -18,6 +18,7 @@ import {
   type CollectionView,
   type VehicleType,
 } from "../index";
+import { ALL_TOOLS } from "../EntityCollection/types";
 import {
   FareClass,
   PropulsionType,
@@ -138,13 +139,7 @@ const genVehicleTypes = (n: number, seed: number): VehicleType[] => {
 \* ------------------------------------------------------------------ */
 
 const VIEWS: CollectionView[] = ["grid", "cards"];
-const TOOLS: CollectionTool[] = [
-  "search",
-  "filter",
-  "sort",
-  "columns",
-  "density",
-];
+const TOOLS: CollectionTool[] = [...ALL_TOOLS];
 const FILTER_MODES = ["client", "server"] as const;
 
 const VehicleTypeCollection = createEntityCollection<VehicleType>(

@@ -42,8 +42,9 @@ export const PATCH_MARK_COL_PX = 16;
 export const hasPatched = (fields: Record<string, FieldSpec>, sections: Section[]): boolean =>
   sections.some(s => s.fields.some(f => fields[f.key].patched));
 
-/** Normalize a `LayoutItem` to `{ field, label?, entries?, options? }`. */
-const norm = (
+/** Normalize a `LayoutItem` to `{ field, label?, entries?, options? }`. Also
+ *  used by the collection's column whitelist, which takes the same items. */
+export const norm = (
   item: LayoutItem
 ): { field: string; label?: string; entries?: FieldEntry[]; options?: () => RefOption[] } =>
   typeof item === 'string'

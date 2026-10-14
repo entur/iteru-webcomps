@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { FieldSpec } from '../../EntityDetailsForm/types';
 import { DEFAULT_LABELS, defaultCollectionQuery } from '../types';
 import { resolveCard, resolveColumns } from '../utils/columns';
+import { keyRows } from '../utils/values';
 import { CardsView } from './CardsView';
 import { GridView } from './GridView';
 
@@ -19,9 +20,34 @@ const ROWS = [
   { netexId: 'T:2', name: null, transportMode: null, propulsionTypes: null, lowFloor: null },
 ];
 
+/** Cards for `rows`, keyed as the collection keys them. */
+const renderCards = (rows: unknown[]) =>
+  render(<CardsView rows={keyRows(rows)} card={resolveCard(FIELDS, COLS)} labels={DEFAULT_LABELS} />);
+
+/** A grid for `rows` (rendered inside an awaited act: the grid loads lazily). */
+const renderGrid = async (rows: unknown[], over: { onQuery?: () => void; hidden?: Record<string, boolean>; total?: number } = {}) => {
+  const onQuery = over.onQuery ?? vi.fn();
+  await act(async () => {
+    render(
+      <GridView
+        rows={keyRows(rows)}
+        columns={COLS}
+        total={over.total ?? rows.length}
+        page={0}
+        query={defaultCollectionQuery}
+        onQuery={onQuery}
+        density="standard"
+        hidden={over.hidden ?? {}}
+        labels={DEFAULT_LABELS}
+        dataGrid={{ disableVirtualization: true }}
+      />
+    );
+  });
+  return onQuery;
+};
+
 describe('CardsView', () => {
-  const mount = () =>
-    render(<CardsView rows={ROWS} card={resolveCard(FIELDS, COLS)} labels={DEFAULT_LABELS} />);
+  const mount = () => renderCards(ROWS);
 
   it('renders one list item per row with its title', () => {
     mount();
@@ -57,22 +83,7 @@ describe('compact id', () => {
   const ROWS_IDS = [{ netexId: 'VEH:VehicleType:1004', name: { value: 'Flirt' } }];
 
   it('heads the identity column "Id" and shows ::NUM, with the full id on hover', async () => {
-    await act(async () => {
-      render(
-        <GridView
-          rows={ROWS_IDS}
-          columns={COLS}
-          total={1}
-          page={0}
-          query={defaultCollectionQuery}
-          onQuery={vi.fn()}
-          density="standard"
-          hidden={{}}
-          labels={DEFAULT_LABELS}
-          dataGrid={{ disableVirtualization: true }}
-        />
-      );
-    });
+    await renderGrid(ROWS_IDS);
     await screen.findByText('Flirt');
     expect(screen.getByRole('columnheader', { name: 'Id' })).toBeTruthy();
     expect(screen.getByText('::1004').closest('[title]')?.getAttribute('title')).toBe('VEH:VehicleType:1004');
@@ -80,29 +91,14 @@ describe('compact id', () => {
   });
 
   it('shows ::NUM on a card, with the full id on hover', () => {
-    render(<CardsView rows={ROWS_IDS} card={resolveCard(FIELDS, COLS)} labels={DEFAULT_LABELS} />);
+    renderCards(ROWS_IDS);
     expect(screen.getByText('::1004').closest('[title]')?.getAttribute('title')).toBe('VEH:VehicleType:1004');
   });
 });
 
 describe('versioned rows', () => {
   it('shows two versions of one entity as two grid rows, each with its own data', async () => {
-    await act(async () => {
-      render(
-        <GridView
-          rows={VERSIONS}
-          columns={COLS}
-          total={VERSIONS.length}
-          page={0}
-          query={defaultCollectionQuery}
-          onQuery={vi.fn()}
-          density="standard"
-          hidden={{}}
-          labels={DEFAULT_LABELS}
-          dataGrid={{ disableVirtualization: true }}
-        />
-      );
-    });
+    await renderGrid(VERSIONS);
     await screen.findByText('Other');
     expect(screen.getAllByRole('row')).toHaveLength(4);
     expect(screen.getByText('First version')).toBeTruthy();
@@ -111,7 +107,7 @@ describe('versioned rows', () => {
 
   it('renders two versions as two cards without a React key warning', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    render(<CardsView rows={VERSIONS} card={resolveCard(FIELDS, COLS)} labels={DEFAULT_LABELS} />);
+    renderCards(VERSIONS);
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
     expect(error.mock.calls.map(c => String(c[0])).join('\n')).not.toMatch(/same key/);
     error.mockRestore();
@@ -119,23 +115,8 @@ describe('versioned rows', () => {
 });
 
 describe('GridView', () => {
-  const mount = async (onQuery = vi.fn()) => {
-    await act(async () => {
-      render(
-        <GridView
-          rows={ROWS}
-          columns={COLS}
-          total={40}
-          page={0}
-          query={defaultCollectionQuery}
-          onQuery={onQuery}
-          density="standard"
-          hidden={{ lowFloor: false }}
-          labels={DEFAULT_LABELS}
-          dataGrid={{ disableVirtualization: true }}
-        />
-      );
-    });
+  const mount = async () => {
+    const onQuery = await renderGrid(ROWS, { total: 40, hidden: { lowFloor: false } });
     await screen.findByText('Flirt');
     return onQuery;
   };

@@ -1,58 +1,15 @@
 /**
  * The shared filter panel: a popover with one control per field sobek can
- * filter on, and the remaining fields listed disabled. Controlled and
+ * filter on, and the remaining fields listed as plain text. Controlled and
  * stateless — the trigger (and the active-filter chips) live in `QueryField`;
  * this edits `filters` through `onChange` and works the same above either view.
  */
 import { useId } from 'react';
 import { Autocomplete, Divider, List, ListItem, ListItemText, ListSubheader, Popover, Stack, TextField } from '@mui/material';
-import type { CollectionLabels, CollectionQuery, Column, FilterFields, FilterValue } from '../types';
-import { asList, asText } from '../utils/filters';
-import { compactIdEntry, isIdSpec } from '../utils/values';
+import type { CollectionFilters, CollectionLabels, Column, FilterFields } from '../types';
+import { asList, asText, cleanList, withFilter } from '../utils/filters';
 
 const POPOVER_W = 320, BLOCKED_MAX_H = 220;
-
-export type Filters = CollectionQuery['filters'];
-
-/** Typed entries trimmed, blanks and repeats dropped (a pasted id often
- *  carries a stray space, which would otherwise match nothing). */
-const cleanList = (values: readonly string[]): string[] => [...new Set(values.map(v => v.trim()).filter(Boolean))];
-
-/**
- * `filters` with `key` set, or removed when the new value is `undefined`.
- *
- * @param filters current conditions
- * @param key     field key
- * @param value   new condition; `undefined` removes it
- * @returns the next conditions
- */
-export const withFilter = (filters: Filters, key: string, value: FilterValue | undefined): Filters => {
-  const { [key]: _dropped, ...rest } = filters;
-  return value === undefined ? rest : { ...rest, [key]: value };
-};
-
-/**
- * A condition as display text: trimmed text, or a comma-joined list.
- *
- * @param value   the condition
- * @param compact shorten each entry with `compactId` (identity field)
- * @returns display text; empty for an empty condition
- */
-export const chipText = (value: FilterValue, compact = false): string => {
-  const show = compact ? compactIdEntry : (v: string): string => v;
-  return typeof value === 'string' ? show(value.trim()) : asList(value).map(show).join(', ');
-};
-
-/**
- * The columns carrying a non-empty condition, in column order.
- *
- * @param columns      resolved columns
- * @param filterFields the entity's generated `<Entity>FilterFields`
- * @param filters      current conditions
- * @returns the filtered-on columns
- */
-export const activeFilterColumns = (columns: readonly Column[], filterFields: FilterFields, filters: Filters): Column[] =>
-  columns.filter(c => filterFields[c.key] && chipText(filters[c.key] ?? '') !== '');
 
 export interface FilterPanelProps {
   /** Element the panel opens from; `null` keeps it closed. */
@@ -60,8 +17,8 @@ export interface FilterPanelProps {
   onClose: () => void;
   columns: readonly Column[];
   filterFields: FilterFields;
-  filters: Filters;
-  onChange: (filters: Filters) => void;
+  filters: CollectionFilters;
+  onChange: (filters: CollectionFilters) => void;
   labels: CollectionLabels;
 }
 
@@ -109,8 +66,8 @@ export function FilterPanel({ anchor, onClose, columns, filterFields, filters, o
               // Free text (ids) commits on blur too: leaving the field or the
               // panel must not silently drop what was typed.
               autoSelect={!c.spec.options}
-              // Ids show compact (`::1004`) as tags; typing a full id still works.
-              {...(isIdSpec(c.spec) ? { getOptionLabel: (o: string) => compactIdEntry(o) } : {})}
+              // Tags read as the column shows its values (a compact `::1004` id).
+              getOptionLabel={c.entryLabel}
               options={[...(c.spec.options ?? [])]}
               value={asList(filters[c.key])}
               onChange={(_e, next) => onChange(withFilter(filters, c.key, cleanList(next)))}

@@ -13,8 +13,8 @@ import { Badge, Box, Button, Chip, IconButton, InputAdornment, TextField, Toolti
 import FilterListIcon from '@mui/icons-material/FilterList';
 import SearchIcon from '@mui/icons-material/Search';
 import type { CollectionLabels, CollectionQuery, Column, FilterFields } from '../types';
-import { activeFilterColumns, chipText, FilterPanel, withFilter } from './FilterPopover';
-import { isIdSpec } from '../utils/values';
+import { activeFilterColumns, chipText, withFilter } from '../utils/filters';
+import { FilterPanel } from './FilterPanel';
 
 const MAX_TOKENS = 2; // chips shown before the rest fold into "+N"
 const TOKEN_VALUE_MAX = 14; // characters of a chip's value before it is cut
@@ -92,7 +92,7 @@ export function QueryField({ search, filter, columns, filterFields, query, onQue
     <Box role="group" aria-label={labels.activeFilters} sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
       {shown.map(c => {
         const full = chipText(query.filters[c.key]);
-        const text = `${c.label}: ${shorten(chipText(query.filters[c.key], isIdSpec(c.spec)))}`;
+        const text = `${c.label}: ${shorten(chipText(query.filters[c.key], c.entryLabel))}`;
         return (
           <Chip
             key={c.key}
@@ -112,21 +112,19 @@ export function QueryField({ search, filter, columns, filterFields, query, onQue
     </Box>
   ) : null;
 
-  const trigger = filter ? (
-    <Tooltip title={labels.filters}>
-      <IconButton
-        size="small"
-        aria-label={labels.filters}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={openPanel}
-      >
-        <Badge badgeContent={active.length} color="primary" overlap="circular" sx={BADGE_SX}>
-          <FilterListIcon fontSize="small" />
-        </Badge>
-      </IconButton>
-    </Tooltip>
-  ) : null;
+  // One trigger, two shapes: an icon at the field's end, or a labelled button
+  // when search is trimmed. Same name, popup state, badge and action either way.
+  const badge = (
+    <Badge badgeContent={active.length} color="primary" overlap="circular" sx={BADGE_SX}>
+      <FilterListIcon fontSize="small" />
+    </Badge>
+  );
+  const triggerProps = {
+    'aria-label': labels.filters,
+    'aria-haspopup': 'dialog',
+    'aria-expanded': open,
+    onClick: openPanel,
+  } as const;
 
   const panel = filter ? (
     <FilterPanel
@@ -149,19 +147,7 @@ export function QueryField({ search, filter, columns, filterFields, query, onQue
   if (!search) {
     return (
       <Box data-query-field ref={anchorRef} sx={{ display: 'flex', alignItems: 'center', gap: 1, minHeight: 40 }}>
-        <Button
-          ref={buttonRef}
-          size="small"
-          startIcon={
-            <Badge badgeContent={active.length} color="primary">
-              <FilterListIcon />
-            </Badge>
-          }
-          aria-label={labels.filters}
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          onClick={openPanel}
-        >
+        <Button ref={buttonRef} size="small" startIcon={badge} {...triggerProps}>
           {labels.filters}
         </Button>
         {tokens}
@@ -190,7 +176,15 @@ export function QueryField({ search, filter, columns, filterFields, query, onQue
                 {tokens}
               </InputAdornment>
             ),
-            endAdornment: trigger ? <InputAdornment position="end">{trigger}</InputAdornment> : undefined,
+            endAdornment: filter ? (
+              <InputAdornment position="end">
+                <Tooltip title={labels.filters}>
+                  <IconButton size="small" {...triggerProps}>
+                    {badge}
+                  </IconButton>
+                </Tooltip>
+              </InputAdornment>
+            ) : undefined,
           },
         }}
       />

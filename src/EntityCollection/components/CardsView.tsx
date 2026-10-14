@@ -1,44 +1,45 @@
 /**
  * Card flow layout: one MUI `Card` per row in a CSS auto-fill grid. Display
- * only — the rows it gets are already filtered, sorted and paged. Imports
- * nothing from `@mui/x-data-grid`, so a cards-only host never loads it.
+ * only — the rows it gets are already filtered, sorted, paged and keyed.
+ * Imports nothing from `@mui/x-data-grid`, so a cards-only host never loads it.
  */
-import { Fragment, useMemo } from 'react';
-import { Box, Card, CardContent, Chip, Typography, type CardProps } from '@mui/material';
-import type { CollectionLabels, Column, ResolvedCard } from '../types';
-import { displayValue, formatValue, rawValue, rowKeys } from '../utils/values';
+import { Fragment } from 'react';
+import { Box, Card, CardContent, Chip, Typography, type CardProps, type TypographyProps } from '@mui/material';
+import type { CollectionLabels, Column, KeyedRow, ResolvedCard } from '../types';
+import { displayValue, fullTitle, valueList } from '../utils/values';
 
 const CARD_MIN_PX = 260; // a card never gets narrower; the row wraps instead
 const EMPTY = '—';
+const CHIP_KINDS: readonly Column['spec']['kind'][] = ['enum', 'enumMulti'];
 
-/** The full value as a hover title, where the shown one is shortened. */
-const fullTitle = (row: unknown, col: Column): string | undefined => {
-  const full = formatValue(row, col.spec);
-  return full !== displayValue(row, col) ? full : undefined;
-};
+/** One value as text: the shown form, the full one on hover, a dash when empty. */
+const ValueText = ({
+  row,
+  col,
+  labels,
+  ...typography
+}: { row: unknown; col: Column; labels: CollectionLabels } & TypographyProps) => (
+  <Typography noWrap title={fullTitle(row, col)} {...typography}>
+    {displayValue(row, col, labels) || EMPTY}
+  </Typography>
+);
 
 const CardValue = ({ row, col, labels }: { row: unknown; col: Column; labels: CollectionLabels }) => {
-  const { kind } = col.spec;
-  const raw = rawValue(row, col.spec);
-  const chips = kind === 'enumMulti' && Array.isArray(raw) ? raw.filter(x => x != null).map(String) : kind === 'enum' && raw != null ? [String(raw)] : [];
-  if (chips.length) {
-    return (
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-        {chips.map(c => (
-          <Chip key={c} size="small" variant="outlined" label={c} />
-        ))}
-      </Box>
-    );
-  }
-  return (
-    <Typography variant="body2" noWrap title={fullTitle(row, col)}>
-      {displayValue(row, col, labels) || EMPTY}
-    </Typography>
+  const chips = CHIP_KINDS.includes(col.spec.kind) ? valueList(row, col.spec) : [];
+  return chips.length ? (
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+      {chips.map(c => (
+        <Chip key={c} size="small" variant="outlined" label={c} />
+      ))}
+    </Box>
+  ) : (
+    <ValueText row={row} col={col} labels={labels} variant="body2" />
   );
 };
 
 export interface CardsViewProps {
-  rows: readonly unknown[];
+  /** The visible page, keyed (`keyRows`). */
+  rows: readonly KeyedRow[];
   card: ResolvedCard;
   labels: CollectionLabels;
   cardProps?: CardProps;
@@ -47,29 +48,30 @@ export interface CardsViewProps {
 /**
  * Render rows as a wrapping grid of cards.
  *
- * @param rows      the visible page
+ * @param rows      the visible page, keyed
  * @param card      resolved title, subtitle and body fields
  * @param labels    yes/no wording for switches
  * @param cardProps spread onto every `Card`
  * @returns the card list
  */
 export function CardsView({ rows, card, labels, cardProps }: CardsViewProps): React.ReactNode {
-  const keys = useMemo(() => rowKeys(rows), [rows]);
   return (
     <Box
       role="list"
       sx={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN_PX}px, 1fr))`, gap: 2 }}
     >
-      {rows.map((row, i) => (
-        <Card key={keys[i]} role="listitem" variant="outlined" {...cardProps}>
+      {rows.map(({ key, entity: row }) => (
+        <Card key={key} role="listitem" variant="outlined" {...cardProps}>
           <CardContent>
-            <Typography variant="subtitle1" component="div" noWrap title={card.title && fullTitle(row, card.title)}>
-              {(card.title && displayValue(row, card.title, labels)) || EMPTY}
-            </Typography>
-            {card.subtitle ? (
-              <Typography variant="body2" color="text.secondary" noWrap title={fullTitle(row, card.subtitle)}>
-                {displayValue(row, card.subtitle, labels) || EMPTY}
+            {card.title ? (
+              <ValueText row={row} col={card.title} labels={labels} variant="subtitle1" component="div" />
+            ) : (
+              <Typography variant="subtitle1" component="div">
+                {EMPTY}
               </Typography>
+            )}
+            {card.subtitle ? (
+              <ValueText row={row} col={card.subtitle} labels={labels} variant="body2" color="text.secondary" />
             ) : null}
             <Box
               component="dl"
