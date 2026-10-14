@@ -237,7 +237,10 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   "(from cached filter)" helper text is gone; the placeholder says "Search these
   rows"). At most two chips show, values cut at 14 chars (full text in
   `title`), the rest fold into a "+N" chip that opens the panel; Backspace in an
-  empty field removes the last filter. A separate chip row was tried and
+  empty field removes the last filter. Narrow widths: below `sm` only one chip
+  shows before "+N"; chips are the only part that shrinks (ellipsis, full text
+  in `title`) — the input has a zero flex basis with a `ch` minimum and the
+  filter button never shrinks, so nothing clips at 360px. A separate chip row was tried and
   rejected: the button and its chips belong on the same line. `FilterPanel`
   (`FilterPanel.tsx`) is the controlled popover alone; `QueryField` owns its
   trigger. Not exported — it is built on the collection's own types.
@@ -273,7 +276,7 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   filterFields)` gives the host the list query's `filter` argument. Search and
   sort are always client-side over the rows in memory, which is what putting the
   text after the filter chips says.
-- **Identity.** Rows are keyed by `netexId@version` (`rowKeys`): two versions
+- **Identity.** On a card the id reads `::1004/ver3` (the column's `cardText` rule; the grid has its own Version column). Rows are keyed by `netexId@version` (`rowKeys`): two versions
   of one entity are two rows; a repeated pair is a data error and is warned
   about, not hidden. The `netexId` field is captioned `labels.id` ("Id") and
   *shown* compact everywhere — cells, cards, filter tags, chips —

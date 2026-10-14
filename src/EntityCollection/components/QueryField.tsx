@@ -9,17 +9,17 @@
  * the panel, so filters never push the rest of the toolbar onto a new line.
  */
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Badge, Box, Button, Chip, IconButton, InputAdornment, TextField, Tooltip } from '@mui/material';
+import { Badge, Box, Button, Chip, IconButton, InputAdornment, TextField, Tooltip, useMediaQuery, useTheme } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import SearchIcon from '@mui/icons-material/Search';
 import type { CollectionLabels, CollectionQuery, Column, FilterFields } from '../types';
 import { activeFilterColumns, chipText, withFilter } from '../utils/filters';
 import { FilterPanel } from './FilterPanel';
 
-const MAX_TOKENS = 2; // chips shown before the rest fold into "+N"
+const MAX_TOKENS = 2, MAX_TOKENS_NARROW = 1; // chips shown before the rest fold into "+N"
 const TOKEN_VALUE_MAX = 14; // characters of a chip's value before it is cut
 const FIELD_W = 280, FIELD_W_FILTERED = 620; // the field widens while it carries chips
-const INPUT_MIN_CH = 10; // typed text keeps this much room beside the chips
+const INPUT_MIN_CH = 10, INPUT_MIN_CH_NARROW = 6; // typed text keeps this much room beside the chips
 /** A compact count that stays inside the field's border. */
 const BADGE_SX = { '& .MuiBadge-badge': { fontSize: '0.65rem', height: 16, minWidth: 16, px: 0.5 } } as const;
 const ELLIPSIS = '…';
@@ -64,6 +64,9 @@ export function QueryField({ search, filter, columns, filterFields, query, onQue
   // it, focus falls to <body> with the removed chip.
   const focusNext = useRef<string | null>(null);
   const [open, setOpen] = useState(false);
+  // Below `sm` the field is about as wide as the screen: one chip, then "+N".
+  // Material's useTheme falls back to the default theme when the host has no provider.
+  const narrow = useMediaQuery(useTheme().breakpoints.down('sm'));
 
   const active = filter ? activeFilterColumns(columns, filterFields, query.filters) : [];
   const activeKeys = active.map(c => c.key).join('\u0000');
@@ -77,7 +80,7 @@ export function QueryField({ search, filter, columns, filterFields, query, onQue
 
   if (!search && !filter) return null;
 
-  const shown = active.slice(0, MAX_TOKENS);
+  const shown = active.slice(0, narrow ? MAX_TOKENS_NARROW : MAX_TOKENS);
   const folded = active.length - shown.length;
   const openPanel = (): void => setOpen(true);
   const remove = (key: string): void => onQuery({ filters: withFilter(query.filters, key, undefined) });
@@ -89,7 +92,9 @@ export function QueryField({ search, filter, columns, filterFields, query, onQue
   };
 
   const tokens = active.length ? (
-    <Box role="group" aria-label={labels.activeFilters} sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
+    // Chips give way before anything else: they shrink to an ellipsis (full text
+    // in `title`), so the text area and the filter button always keep their room.
+    <Box role="group" aria-label={labels.activeFilters} sx={{ display: 'flex', gap: 0.5, minWidth: 0, flexShrink: 1 }}>
       {shown.map(c => {
         const full = chipText(query.filters[c.key]);
         const text = `${c.label}: ${shorten(chipText(query.filters[c.key], c.entryLabel))}`;
@@ -101,6 +106,7 @@ export function QueryField({ search, filter, columns, filterFields, query, onQue
               else chipRefs.current.delete(c.key);
             }}
             size="small"
+            sx={{ minWidth: 0, flexShrink: 1 }}
             label={text}
             title={`${c.label}: ${full}`}
             aria-label={`${text}, ${labels.removeFilter}`}
@@ -108,7 +114,16 @@ export function QueryField({ search, filter, columns, filterFields, query, onQue
           />
         );
       })}
-      {folded ? <Chip size="small" variant="outlined" label={`+${folded}`} aria-label={labels.moreFilters(folded)} onClick={openPanel} /> : null}
+      {folded ? (
+        <Chip
+          size="small"
+          variant="outlined"
+          sx={{ flexShrink: 0 }}
+          label={`+${folded}`}
+          aria-label={labels.moreFilters(folded)}
+          onClick={openPanel}
+        />
+      ) : null}
     </Box>
   ) : null;
 
@@ -168,16 +183,21 @@ export function QueryField({ search, filter, columns, filterFields, query, onQue
         onChange={e => onQuery({ search: e.target.value })}
         onKeyDown={onKeyDown}
         slotProps={{
-          htmlInput: { 'aria-label': labels.search, style: { minWidth: `${INPUT_MIN_CH}ch` } },
+          htmlInput: {
+            'aria-label': labels.search,
+            // Basis 0, growing into what is left: the chips keep their natural
+            // width until space runs out, and only then shrink.
+            style: { width: 0, flexGrow: 1, minWidth: `${narrow ? INPUT_MIN_CH_NARROW : INPUT_MIN_CH}ch` },
+          },
           input: {
             startAdornment: (
-              <InputAdornment position="start" sx={{ gap: 1, maxHeight: 'none', mr: 0.5 }}>
+              <InputAdornment position="start" sx={{ gap: 1, maxHeight: 'none', mr: 0.5, minWidth: 0, flexShrink: 1 }}>
                 <SearchIcon fontSize="small" color="action" />
                 {tokens}
               </InputAdornment>
             ),
             endAdornment: filter ? (
-              <InputAdornment position="end">
+              <InputAdornment position="end" sx={{ flexShrink: 0 }}>
                 <Tooltip title={labels.filters}>
                   <IconButton size="small" {...triggerProps}>
                     {badge}

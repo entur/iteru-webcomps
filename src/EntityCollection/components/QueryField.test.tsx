@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { FieldSpec } from '../../EntityDetailsForm/types';
 import { DEFAULT_LABELS, defaultCollectionQuery, type CollectionQuery } from '../types';
@@ -104,6 +104,35 @@ describe('QueryField', () => {
     const panel = screen.getByRole('dialog', { name: 'Filters' });
     expect(within(panel).getByRole('combobox', { name: 'Id' })).toBeTruthy();
     expect(within(panel).getByText('::1004')).toBeTruthy();
+  });
+
+  describe('on a narrow screen', () => {
+    // MUI's useMediaQuery reads window.matchMedia; jsdom has none, so stub a
+    // phone-width screen: every max-width query matches.
+    const real = window.matchMedia;
+    beforeEach(() => {
+      window.matchMedia = ((query: string) => ({
+        matches: query.includes('max-width'),
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      })) as typeof window.matchMedia;
+    });
+    afterEach(() => {
+      window.matchMedia = real;
+    });
+
+    it('shows one filter chip and folds the rest into +N', () => {
+      mount({ query: { filters: { name: 'fli', transportMode: ['rail'] } } });
+      const tokens = screen.getByRole('group', { name: 'Active filters' });
+      expect(within(tokens).getByText('Name: fli')).toBeTruthy();
+      expect(within(tokens).queryByText(/Transport mode/)).toBeNull();
+      expect(within(tokens).getByRole('button', { name: '1 more filter' })).toBeTruthy();
+    });
   });
 
   it('shortens a long filter value and keeps the full text on hover', () => {
