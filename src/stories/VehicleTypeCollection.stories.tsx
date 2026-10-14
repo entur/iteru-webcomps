@@ -165,6 +165,7 @@ const meta: Meta<typeof VehicleTypeCollection> = {
     columns: [
       "name",
       "netexId",
+      "version",
       "transportMode",
       "propulsionTypes",
       "length",
