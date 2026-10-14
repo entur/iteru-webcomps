@@ -4,7 +4,7 @@
  * generated. Rows, labels and filterable fields are all derived from the
  * distilled registry and the generated filter map; no entity literals.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { beforeAll, describe, it, expect, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import type { FC } from 'react';
@@ -15,6 +15,13 @@ import * as filterFieldMaps from '../../generated/operations/filterFields';
 import { defaultCollectionQuery, type EntityCollectionProps, type FilterFields } from '../types';
 import { resolveColumns } from '../utils/columns';
 import { createEntityCollection } from './collection';
+
+// The grid is lazily imported. Load its module once up front, so the first
+// grid test here doesn't spend its whole `findBy` wait importing it
+// (borderline when every test file runs in parallel).
+beforeAll(async () => {
+  await import('@mui/x-data-grid');
+});
 
 const MANIFEST = 'entities.manifest.json';
 const ROW_COUNT = 3;

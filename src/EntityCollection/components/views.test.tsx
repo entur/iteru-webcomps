@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeAll, describe, it, expect, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { FieldSpec } from '../../EntityDetailsForm/types';
 import { DEFAULT_LABELS, defaultCollectionQuery } from '../types';
@@ -6,6 +6,13 @@ import { resolveCard, resolveColumns } from '../utils/columns';
 import { keyRows } from '../utils/values';
 import { CardsView } from './CardsView';
 import { GridView } from './GridView';
+
+// The grid is lazily imported. Load its module once up front, so the first
+// grid test in this file doesn't spend its whole `findBy` wait importing it
+// (borderline when every test file runs in parallel).
+beforeAll(async () => {
+  await import('@mui/x-data-grid');
+});
 
 const FIELDS: Record<string, FieldSpec> = {
   netexId: { kind: 'text', path: ['netexId'] },
