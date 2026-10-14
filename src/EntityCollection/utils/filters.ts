@@ -6,17 +6,23 @@
 import type { CollectionFilters, Column, FilterFields, FilterOp, FilterValue } from '../types';
 import { formatValue, LIST_SEP, valueList } from './values';
 
+/** Separates entries in a string given where a list is expected ("1004, 1007"). */
+const ENTRY_SEP = /[\s,]+/;
+
 /**
- * A filter value as a string list, whatever shape it arrived in.
+ * A filter value as a string list, whatever shape it arrived in. A string is
+ * split on commas and whitespace — ids and enum values contain neither.
  *
  * @param value a `contains` string or an `anyOf` list
  * @returns the list; empty for an empty or missing value
  */
 export const asList = (value: FilterValue | undefined): string[] =>
-  value == null || value === '' ? [] : typeof value === 'string' ? [value] : [...value];
+  value == null ? [] : typeof value === 'string' ? value.split(ENTRY_SEP).filter(Boolean) : [...value];
 
 /**
- * A filter value as text, whatever shape it arrived in.
+ * A filter value as text, whatever shape it arrived in. A list becomes one
+ * space-joined phrase — the single string sobek's `contains` argument takes,
+ * so client and server match the same rows.
  *
  * @param value a `contains` string or an `anyOf` list
  * @returns the text; a list is space-joined
@@ -68,13 +74,14 @@ export const withFilter = (filters: CollectionFilters, key: string, value: Filte
 };
 
 /**
- * Typed list entries trimmed, blanks and repeats dropped (a pasted id often
- * carries a stray space, which would otherwise match nothing).
+ * Typed list entries split, trimmed, blanks and repeats dropped: a pasted
+ * "1004, 1007" becomes two entries, and a stray space can't make an id that
+ * matches nothing.
  *
  * @param values entries as typed or picked
  * @returns the clean entries
  */
-export const cleanList = (values: readonly string[]): string[] => [...new Set(values.map(v => v.trim()).filter(Boolean))];
+export const cleanList = (values: readonly string[]): string[] => [...new Set(values.flatMap(v => v.split(ENTRY_SEP)).filter(Boolean))];
 
 /**
  * A condition as display text: trimmed text, or the list joined.

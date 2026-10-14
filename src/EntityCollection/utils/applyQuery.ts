@@ -10,6 +10,10 @@ import { usablePageSize, type CollectionQuery, type CollectionSort, type Column,
 import { matchesFilter } from './filters';
 import { formatValue, rawValue } from './values';
 
+/** Text order follows Norwegian rules (æ, ø, å after z), not the runtime's locale. */
+const SORT_LOCALE = 'nb';
+const COLLATOR = new Intl.Collator(SORT_LOCALE);
+
 /** Kinds the free-text search looks into. */
 const SEARCHABLE: readonly FieldSpec['kind'][] = ['text', 'name', 'enum', 'enumMulti', 'reference'];
 
@@ -28,13 +32,16 @@ type SortKey = number | string | null;
 const sortKey = (row: unknown, spec: FieldSpec): SortKey => {
   const v = rawValue(row, spec);
   if (v == null) return null;
-  if (spec.kind === 'number') return Number(v);
+  if (spec.kind === 'number') {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null; // not a number: ordered like a missing value
+  }
   if (spec.kind === 'switch') return Number(Boolean(v));
   return formatValue(row, spec).toLowerCase() || null;
 };
 
 const compare = (a: SortKey, b: SortKey): number =>
-  typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b));
+  typeof a === 'number' && typeof b === 'number' ? a - b : COLLATOR.compare(String(a), String(b));
 
 /** Does the search needle appear in the cell, as stored or as shown (a compact id)? */
 const cellHas = (row: unknown, col: Column, needle: string): boolean => {

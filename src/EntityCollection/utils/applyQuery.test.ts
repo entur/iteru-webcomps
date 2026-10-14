@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { FieldSpec } from '../../EntityDetailsForm/types';
 import { defaultCollectionQuery, type CollectionQuery } from '../types';
-import { applyQuery, matchRows } from './applyQuery';
+import { applyQuery, matchRows, sortRows } from './applyQuery';
 import { resolveColumns } from './columns';
 
 const FIELDS: Record<string, FieldSpec> = {
@@ -81,6 +81,18 @@ describe('applyQuery', () => {
   it('keeps missing values last in both directions', () => {
     expect(ids({ sort: { field: 'length', dir: 'desc' } })).toEqual(['T:4', 'T:1', 'T:2', 'T:3']);
     expect(ids({ sort: { field: 'name', dir: 'desc' } })).toEqual(['T:2', 'T:1', 'T:4', 'T:3']);
+  });
+
+  it('sorts a non-numeric value in a number column as missing, last', () => {
+    const rows = [{ netexId: 'a', length: 'n/a' }, { netexId: 'b', length: 5 }, { netexId: 'c', length: 2 }];
+    const order = (dir: 'asc' | 'desc') => sortRows(rows, COLS, { field: 'length', dir }).map(r => r.netexId);
+    expect(order('asc')).toEqual(['c', 'b', 'a']);
+    expect(order('desc')).toEqual(['b', 'c', 'a']);
+  });
+
+  it('orders text by Norwegian rules whatever the runtime locale: æ, ø, å after z', () => {
+    const rows = ['Ål', 'Øst', 'Zeta', 'Ærø', 'alfa'].map(v => ({ netexId: v, name: { value: v } }));
+    expect(sortRows(rows, COLS, { field: 'name', dir: 'asc' }).map(r => r.netexId)).toEqual(['alfa', 'Zeta', 'Ærø', 'Øst', 'Ål']);
   });
 
   it('ignores a sort on an unknown field', () => {

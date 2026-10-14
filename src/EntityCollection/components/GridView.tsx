@@ -6,10 +6,12 @@
  */
 import { useMemo } from 'react';
 import { Box } from '@mui/material';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
 import type { DataGridProps, GridColDef, GridDensity, GridSortModel, GridValidRowModel } from '@mui/x-data-grid';
 import { LazyDataGrid } from '../../shared/LazyDataGrid';
 import { pageSizesFor, type CollectionLabels, type CollectionQuery, type Column, type KeyedRow } from '../types';
-import { displayValue, fullTitle, rawValue } from '../utils/values';
+import { displayValue, EMPTY_TEXT, fullTitle, rawValue } from '../utils/values';
 
 const COL_MIN_W = 120;
 const FALLBACK_H = 240;
@@ -20,13 +22,29 @@ const entityOf = (row: GridValidRowModel): unknown => (row as KeyedRow).entity;
 /** Module-level, so its identity never changes: the grid rebuilds its row cache when it does. */
 const getRowId = (row: GridValidRowModel): string => (row as KeyedRow).key;
 
-const toColDef = (col: Column): GridColDef => {
+const toColDef = (col: Column, labels: Pick<CollectionLabels, 'yes' | 'no'>): GridColDef => {
   const base = { field: col.key, headerName: col.label, flex: 1, minWidth: COL_MIN_W } as const;
   if (col.spec.kind === 'number') {
     return { ...base, type: 'number', valueGetter: (_v, row) => (rawValue(entityOf(row), col.spec) as number | null) ?? null };
   }
   if (col.spec.kind === 'switch') {
-    return { ...base, type: 'boolean', valueGetter: (_v, row) => Boolean(rawValue(entityOf(row), col.spec)) };
+    // Missing reads as a dash, as on a card — not as "no".
+    return {
+      ...base,
+      type: 'boolean',
+      valueGetter: (_v, row) => {
+        const v = rawValue(entityOf(row), col.spec);
+        return v == null ? null : Boolean(v);
+      },
+      renderCell: p =>
+        p.value == null ? (
+          EMPTY_TEXT
+        ) : p.value ? (
+          <CheckIcon fontSize="small" color="success" titleAccess={labels.yes} />
+        ) : (
+          <CloseIcon fontSize="small" sx={{ color: 'text.disabled' }} titleAccess={labels.no} />
+        ),
+    };
   }
   return {
     ...base,
@@ -79,7 +97,8 @@ export function GridView({
   labels,
   dataGrid,
 }: GridViewProps): React.ReactNode {
-  const colDefs = useMemo(() => columns.map(toColDef), [columns]);
+  const { yes, no } = labels;
+  const colDefs = useMemo(() => columns.map(c => toColDef(c, { yes, no })), [columns, yes, no]);
   const { sort, pageSize } = query;
   // Stable models: the grid re-applies sorting / paging whenever their identity changes.
   const sortModel = useMemo<GridSortModel>(

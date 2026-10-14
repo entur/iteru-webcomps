@@ -14,6 +14,8 @@ const POSITION_PREFIX = 'row:'; // id-less rows; a real id never starts with it
 const ID_SEP = ':', COMPACT_MARK = '::';
 const VERSION_MARK = '/ver'; // `::1004/ver3` on a card
 const DATE_LEN = 10, MINUTE_LEN = 16; // 'YYYY-MM-DD', 'YYYY-MM-DDTHH:mm'
+/** Shown for a missing value, in every view. */
+export const EMPTY_TEXT = '—';
 /** Joins a list value for display (multi-enums, filter chips). */
 export const LIST_SEP = ', ';
 

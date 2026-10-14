@@ -141,3 +141,22 @@ describe('editing helpers', () => {
     expect(active.map(c => c.key)).toEqual(['name']);
   });
 });
+
+describe('list entries', () => {
+  const MODE2 = col('transportMode', { kind: 'enum', path: ['transportMode'] });
+
+  it('splits a string given to an anyOf filter on commas and whitespace', () => {
+    expect(asList('bus, rail')).toEqual(['bus', 'rail']);
+    expect(matchesFilter({ transportMode: 'rail' }, MODE2, 'anyOf', 'bus, rail')).toBe(true);
+  });
+
+  it('splits a pasted list into separate entries', () => {
+    expect(cleanList(['1004, 1007 ', '1007'])).toEqual(['1004', '1007']);
+  });
+
+  it('keeps a list given to a contains filter as one phrase, as sobek receives it', () => {
+    const name = col('name', { kind: 'name', path: ['name'] });
+    expect(matchesFilter({ name: { value: 'Stadler FLIRT' } }, name, 'contains', ['stadler', 'flirt'])).toBe(true);
+    expect(matchesFilter({ name: { value: 'Stadler FLIRT' } }, name, 'contains', ['flirt', 'stadler'])).toBe(false);
+  });
+});

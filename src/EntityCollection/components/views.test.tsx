@@ -115,6 +115,21 @@ describe('compact id', () => {
   });
 });
 
+describe('switch cells', () => {
+  it('shows a missing switch as a dash in the grid, as cards do, and names yes/no', async () => {
+    await renderGrid([
+      { netexId: 'T:1', name: { value: 'On' }, lowFloor: true },
+      { netexId: 'T:2', name: { value: 'Off' }, lowFloor: false },
+      { netexId: 'T:3', name: { value: 'Unknown' }, lowFloor: null },
+    ]);
+    await screen.findByText('Unknown');
+    const cell = (name: string) => within(screen.getByText(name).closest('[role=row]') as HTMLElement).getAllByRole('gridcell').at(-1)!;
+    expect(within(cell('On')).getByTitle('Yes')).toBeTruthy();
+    expect(within(cell('Off')).getByTitle('No')).toBeTruthy();
+    expect(cell('Unknown').textContent).toBe('—');
+  });
+});
+
 describe('versioned rows', () => {
   it('shows two versions of one entity as two grid rows, each with its own data', async () => {
     await renderGrid(VERSIONS);

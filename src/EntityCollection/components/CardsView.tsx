@@ -6,10 +6,9 @@
 import { Fragment } from 'react';
 import { Box, Card, CardContent, Chip, Typography, type CardProps, type TypographyProps } from '@mui/material';
 import type { CollectionLabels, Column, KeyedRow, ResolvedCard } from '../types';
-import { displayValue, fullTitle, valueList } from '../utils/values';
+import { displayValue, EMPTY_TEXT, fullTitle, valueList } from '../utils/values';
 
 const CARD_MIN_PX = 260; // a card never gets narrower; the row wraps instead
-const EMPTY = '—';
 const CHIP_KINDS: readonly Column['spec']['kind'][] = ['enum', 'enumMulti'];
 
 /** One value as text: the shown form as a card reads it, the full one on hover, a dash when empty. */
@@ -20,7 +19,7 @@ const ValueText = ({
   ...typography
 }: { row: unknown; col: Column; labels: CollectionLabels } & TypographyProps) => (
   <Typography noWrap title={fullTitle(row, col)} {...typography}>
-    {col.cardText(displayValue(row, col, labels), row) || EMPTY}
+    {col.cardText(displayValue(row, col, labels), row) || EMPTY_TEXT}
   </Typography>
 );
 
@@ -67,7 +66,7 @@ export function CardsView({ rows, card, labels, cardProps }: CardsViewProps): Re
               <ValueText row={row} col={card.title} labels={labels} variant="subtitle1" component="div" />
             ) : (
               <Typography variant="subtitle1" component="div">
-                {EMPTY}
+                {EMPTY_TEXT}
               </Typography>
             )}
             {card.subtitle ? (
