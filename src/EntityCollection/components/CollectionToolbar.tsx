@@ -3,7 +3,9 @@
  * the DataGrid's toolbar primitives, which need a mounted grid). Which tools
  * show is the host's whitelist; `columns` and `density` exist in grid view only.
  *
- * One row. Search and filter share a single `QueryField`, which carries the
+ * One row when it fits; on narrower screens the tools after the query field
+ * (sort, columns, density, actions) wrap onto the next line. Filters never add
+ * a row: search and filter share a single `QueryField`, which carries the
  * active filters as chips inside the search box (capped, the rest folded into
  * "+N"), so a filter never pushes a tool onto a new line.
  */

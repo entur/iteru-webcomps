@@ -232,7 +232,10 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   `view` / `tools` / `filterMode` from Storybook controls — no wrapper chrome.
 - `tools` whitelists `search | filter | sort | columns | density`; the last two
   render in grid view only. No CSV/Print.
-- The toolbar is one row. Search and filter are one internal subcomponent,
+- The toolbar is one row when it fits; on narrower screens the tools after the
+  query field (sort, columns, density, actions) wrap onto the next line —
+  deliberate, chosen over folding them into a "More" menu. Filters never add a
+  row. Search and filter are one internal subcomponent,
   `QueryField` (`components/QueryField.tsx`): active filters sit as chips at
   the start of the search box, the typed text follows, the filter button (with
   a count) closes the field. The order *is* the semantics — filters first, then
