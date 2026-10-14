@@ -6,7 +6,7 @@ import type { FieldEntry, FieldSpec } from '../../EntityDetailsForm/types';
 import { humanize } from '../../shared/humanize';
 import { DEFAULT_LABELS, type CardSpec, type Column, type ResolvedCard } from '../types';
 import { norm } from '../../EntityDetailsForm/utils/sections';
-import { compactId, compactIdEntry, idMatches, isIdSpec } from './values';
+import { compactId, compactIdEntry, idMatches, isIdSpec, withVersion } from './values';
 
 const TITLE_KEY = 'name'; // default card title when the entity has one
 const CARD_DEFAULT_FIELDS = 6;
@@ -16,12 +16,12 @@ const CARD_DEFAULT_FIELDS = 6;
 const eligible = (spec: FieldSpec | undefined): spec is FieldSpec =>
   !!spec && spec.kind !== 'grid' && !spec.patched;
 
-type Rules = Pick<Column, 'display' | 'matches' | 'entryLabel'>;
+type Rules = Pick<Column, 'display' | 'matches' | 'entryLabel' | 'cardText'>;
 const same = (text: string): string => text;
 /** Every field but the identity shows and matches its text as is. */
-const PLAIN: Rules = { display: same, matches: (have, typed) => have === typed, entryLabel: same };
+const PLAIN: Rules = { display: same, matches: (have, typed) => have === typed, entryLabel: same, cardText: same };
 /** The identity shows compact and matches on its last segment, full id as a fallback. */
-const IDENTITY: Rules = { display: compactId, matches: idMatches, entryLabel: compactIdEntry };
+const IDENTITY: Rules = { display: compactId, matches: idMatches, entryLabel: compactIdEntry, cardText: withVersion };
 
 /**
  * Resolve the columns a collection shows.

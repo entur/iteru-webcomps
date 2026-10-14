@@ -90,6 +90,18 @@ describe('compact id', () => {
     expect(screen.queryByText('VEH:VehicleType:1004')).toBeNull();
   });
 
+  it('reads the id on a card as ::NUM/verNUM when the row has a version', () => {
+    renderCards([{ netexId: 'VEH:VehicleType:1004', version: '3', name: { value: 'Flirt' } }]);
+    expect(screen.getByText('::1004/ver3').closest('[title]')?.getAttribute('title')).toBe('VEH:VehicleType:1004');
+  });
+
+  it('leaves the version off the grid cell, which has its own Version column', async () => {
+    await renderGrid([{ netexId: 'VEH:VehicleType:1004', version: '3', name: { value: 'Flirt' } }]);
+    await screen.findByText('Flirt');
+    expect(screen.getByText('::1004')).toBeTruthy();
+    expect(screen.queryByText('::1004/ver3')).toBeNull();
+  });
+
   it('shows ::NUM on a card, with the full id on hover', () => {
     renderCards(ROWS_IDS);
     expect(screen.getByText('::1004').closest('[title]')?.getAttribute('title')).toBe('VEH:VehicleType:1004');

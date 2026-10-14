@@ -116,6 +116,9 @@ export interface Column {
   matches: (have: string, typed: string) => boolean;
   /** A typed filter entry as a chip or tag shows it. */
   entryLabel: (typed: string) => string;
+  /** The shown text as a card reads it: the identity adds the row's version
+   *  (`::1004/ver3`) — the grid has a Version column, a card does not. */
+  cardText: (shown: string, row: unknown) => string;
 }
 
 /** A visible row with the unique key both views identify it by. */

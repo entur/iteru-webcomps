@@ -12,6 +12,7 @@ const ID_KEYS = [ID_FIELD, 'id'] as const; // first present → row identity
 const VERSION_KEY = 'version', VERSION_SEP = '@';
 const POSITION_PREFIX = 'row:'; // id-less rows; a real id never starts with it
 const ID_SEP = ':', COMPACT_MARK = '::';
+const VERSION_MARK = '/ver'; // `::1004/ver3` on a card
 const DATE_LEN = 10, MINUTE_LEN = 16; // 'YYYY-MM-DD', 'YYYY-MM-DDTHH:mm'
 /** Joins a list value for display (multi-enums, filter chips). */
 export const LIST_SEP = ', ';
@@ -181,4 +182,17 @@ export const displayValue = (row: unknown, col: Column, labels?: Pick<Collection
 export const fullTitle = (row: unknown, col: Column): string | undefined => {
   const full = formatValue(row, col.spec);
   return full !== col.display(full) ? full : undefined;
+};
+
+/**
+ * An identity as a card reads it: the shown id plus the row's version,
+ * `::1004/ver3`. Without a version (or without an id) the text is unchanged.
+ *
+ * @param shown the shown id
+ * @param row   the entity
+ * @returns the id with its version
+ */
+export const withVersion = (shown: string, row: unknown): string => {
+  const version = (row as Record<string, unknown> | null | undefined)?.[VERSION_KEY];
+  return shown && version != null && version !== '' ? `${shown}${VERSION_MARK}${String(version)}` : shown;
 };

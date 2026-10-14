@@ -12,7 +12,7 @@ const CARD_MIN_PX = 260; // a card never gets narrower; the row wraps instead
 const EMPTY = '—';
 const CHIP_KINDS: readonly Column['spec']['kind'][] = ['enum', 'enumMulti'];
 
-/** One value as text: the shown form, the full one on hover, a dash when empty. */
+/** One value as text: the shown form as a card reads it, the full one on hover, a dash when empty. */
 const ValueText = ({
   row,
   col,
@@ -20,7 +20,7 @@ const ValueText = ({
   ...typography
 }: { row: unknown; col: Column; labels: CollectionLabels } & TypographyProps) => (
   <Typography noWrap title={fullTitle(row, col)} {...typography}>
-    {displayValue(row, col, labels) || EMPTY}
+    {col.cardText(displayValue(row, col, labels), row) || EMPTY}
   </Typography>
 );
 

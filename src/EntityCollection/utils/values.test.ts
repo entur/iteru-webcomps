@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FieldSpec } from '../../EntityDetailsForm/types';
 import { resolveColumns } from './columns';
-import { compactId, displayValue, formatValue, fullTitle, keyRows, rawValue, rowKeys, valueList } from './values';
+import { compactId, displayValue, formatValue, fullTitle, keyRows, rawValue, rowKeys, valueList, withVersion } from './values';
 
 const spec = (kind: FieldSpec['kind'], ...path: string[]): FieldSpec => ({ kind, path });
 
@@ -136,5 +136,14 @@ describe('keyRows', () => {
       { key: 'A', entity: a },
       { key: 'row:51', entity: {} },
     ]);
+  });
+});
+
+describe('withVersion', () => {
+  it('appends the version as /verNUM, and leaves text without one alone', () => {
+    expect(withVersion('::1004', { version: '3' })).toBe('::1004/ver3');
+    expect(withVersion('::1004', { version: '' })).toBe('::1004');
+    expect(withVersion('::1004', {})).toBe('::1004');
+    expect(withVersion('', { version: '3' })).toBe('');
   });
 });
