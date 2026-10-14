@@ -63,3 +63,28 @@ describe('toSobekFilter', () => {
     expect(toSobekFilter({ name: '', transportMode: [], length: '12' }, FF)).toEqual({});
   });
 });
+
+describe('matchesFilter on the identity field', () => {
+  const ID: FieldSpec = { kind: 'text', path: ['netexId'] };
+  const vt = { netexId: 'VEH:VehicleType:1004' };
+
+  it('matches the compact ::NUM form and the bare number', () => {
+    expect(matchesFilter(vt, ID, 'anyOf', ['::1004'])).toBe(true);
+    expect(matchesFilter(vt, ID, 'anyOf', ['1004'])).toBe(true);
+  });
+
+  it('still matches the full namespaced id, as a fallback', () => {
+    expect(matchesFilter(vt, ID, 'anyOf', ['VEH:VehicleType:1004'])).toBe(true);
+  });
+
+  it('does not match a different number, a prefix of it, or another namespace', () => {
+    expect(matchesFilter(vt, ID, 'anyOf', ['::100'])).toBe(false);
+    expect(matchesFilter(vt, ID, 'anyOf', ['04'])).toBe(false);
+    expect(matchesFilter(vt, ID, 'anyOf', ['VEH:DeckPlan:1004'])).toBe(false);
+  });
+
+  it('keeps last-segment matching to the identity field', () => {
+    const MODE_ANY: FieldSpec = { kind: 'text', path: ['code'] };
+    expect(matchesFilter({ code: 'A:B:1004' }, MODE_ANY, 'anyOf', ['1004'])).toBe(false);
+  });
+});

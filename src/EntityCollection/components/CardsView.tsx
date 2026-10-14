@@ -6,10 +6,16 @@
 import { Fragment, useMemo } from 'react';
 import { Box, Card, CardContent, Chip, Typography, type CardProps } from '@mui/material';
 import type { CollectionLabels, Column, ResolvedCard } from '../types';
-import { formatValue, rawValue, rowKeys } from '../utils/values';
+import { displayValue, formatValue, rawValue, rowKeys } from '../utils/values';
 
 const CARD_MIN_PX = 260; // a card never gets narrower; the row wraps instead
 const EMPTY = '—';
+
+/** The full value as a hover title, where the shown one is shortened. */
+const fullTitle = (row: unknown, col: Column): string | undefined => {
+  const full = formatValue(row, col.spec);
+  return full !== displayValue(row, col) ? full : undefined;
+};
 
 const CardValue = ({ row, col, labels }: { row: unknown; col: Column; labels: CollectionLabels }) => {
   const { kind } = col.spec;
@@ -25,8 +31,8 @@ const CardValue = ({ row, col, labels }: { row: unknown; col: Column; labels: Co
     );
   }
   return (
-    <Typography variant="body2" noWrap>
-      {formatValue(row, col.spec, labels) || EMPTY}
+    <Typography variant="body2" noWrap title={fullTitle(row, col)}>
+      {displayValue(row, col, labels) || EMPTY}
     </Typography>
   );
 };
@@ -57,12 +63,12 @@ export function CardsView({ rows, card, labels, cardProps }: CardsViewProps): Re
       {rows.map((row, i) => (
         <Card key={keys[i]} role="listitem" variant="outlined" {...cardProps}>
           <CardContent>
-            <Typography variant="subtitle1" component="div" noWrap>
-              {(card.title && formatValue(row, card.title.spec, labels)) || EMPTY}
+            <Typography variant="subtitle1" component="div" noWrap title={card.title && fullTitle(row, card.title)}>
+              {(card.title && displayValue(row, card.title, labels)) || EMPTY}
             </Typography>
             {card.subtitle ? (
-              <Typography variant="body2" color="text.secondary" noWrap>
-                {formatValue(row, card.subtitle.spec, labels) || EMPTY}
+              <Typography variant="body2" color="text.secondary" noWrap title={fullTitle(row, card.subtitle)}>
+                {displayValue(row, card.subtitle, labels) || EMPTY}
               </Typography>
             ) : null}
             <Box

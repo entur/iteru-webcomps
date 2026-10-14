@@ -5,7 +5,7 @@
 import type { FieldSpec } from '../../EntityDetailsForm/types';
 import type { CollectionQuery, Column, FilterFields } from '../types';
 import { matchesFilter } from './filters';
-import { formatValue, rawValue } from './values';
+import { displayValue, formatValue, rawValue } from './values';
 
 /** Kinds the free-text search looks into. */
 const SEARCHABLE: readonly FieldSpec['kind'][] = ['text', 'name', 'enum', 'enumMulti', 'reference'];
@@ -66,7 +66,12 @@ export function applyQuery<E>(
 
   const matched = rows
     .filter(row => conditions.every(c => matchesFilter(row, c.spec, c.op, c.value)))
-    .filter(row => !needle || searchable.some(c => formatValue(row, c.spec).toLowerCase().includes(needle)));
+    // The shown text counts too, so a compact id (`::1004`) is findable as displayed.
+    .filter(
+      row =>
+        !needle ||
+        searchable.some(c => [formatValue(row, c.spec), displayValue(row, c)].some(t => t.toLowerCase().includes(needle)))
+    );
 
   const sortCol = query.sort ? byKey.get(query.sort.field) : undefined;
   const flip = query.sort?.dir === 'desc' ? -1 : 1;

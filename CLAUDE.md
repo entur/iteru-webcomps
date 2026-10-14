@@ -260,6 +260,16 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   filterFields)` gives the host the list query's `filter` argument. Search and
   sort are always client-side over the rows in memory, which is what putting the
   text after the filter chips says.
+- **Identity.** Rows are keyed by `netexId@version` (`rowKeys`): two versions
+  of one entity are two rows; a repeated pair is a data error and is warned
+  about, not hidden. The `netexId` field is captioned `labels.id` ("Id") and
+  *shown* compact everywhere — cells, cards, filter tags, chips —
+  `VEH:VehicleType:1004` → `::1004` (`compactId`), full id as hover `title`.
+  Search, sort and filter values stay full. The Id filter accepts `::1004`,
+  `1004` (both match the last segment) or the full namespaced id as a fallback
+  (`idMatches`); free-text ids commit on blur and are trimmed. Caveat:
+  `toSobekFilter` sends typed entries as typed, so in server mode a compact
+  entry reaches sobek un-expanded.
 - `patched` and `grid` fields are never columns, card lines or filter entries
   (`resolveColumns`). A patched field is not on the wire, so a list fetched from
   sobek cannot carry it.

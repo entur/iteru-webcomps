@@ -14,7 +14,7 @@ const FIELDS: Record<string, FieldSpec> = {
 describe('resolveColumns', () => {
   it('defaults to every eligible field in registry order, humanized', () => {
     expect(resolveColumns(FIELDS).map(c => [c.key, c.label])).toEqual([
-      ['netexId', 'Netex id'],
+      ['netexId', 'Id'],
       ['name', 'Name'],
       ['transportMode', 'Transport mode'],
       ['length', 'Length'],
@@ -27,11 +27,23 @@ describe('resolveColumns', () => {
 
   it('honours whitelist order and per-entry labels', () => {
     const cols = resolveColumns(FIELDS, [{ field: 'length', label: 'Lengde' }, 'netexId']);
-    expect(cols.map(c => [c.key, c.label])).toEqual([['length', 'Lengde'], ['netexId', 'Netex id']]);
+    expect(cols.map(c => [c.key, c.label])).toEqual([['length', 'Lengde'], ['netexId', 'Id']]);
   });
 
   it('drops keys the registry does not know', () => {
     expect(resolveColumns(FIELDS, ['nope', 'name']).map(c => c.key)).toEqual(['name']);
+  });
+});
+
+describe('id caption', () => {
+  it('captions the identity field with the given id label, unless the entry names one', () => {
+    expect(resolveColumns(FIELDS, ['netexId'], 'Identifikator')[0].label).toBe('Identifikator');
+    expect(resolveColumns(FIELDS, [{ field: 'netexId', label: 'NeTEx' }], 'Identifikator')[0].label).toBe('NeTEx');
+  });
+
+  it('passes the id label through to an explicit card', () => {
+    const card = resolveCard(FIELDS, [], { title: 'name', fields: ['netexId'] }, 'Identifikator');
+    expect(card.fields[0].label).toBe('Identifikator');
   });
 });
 

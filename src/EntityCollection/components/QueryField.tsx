@@ -14,6 +14,7 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import SearchIcon from '@mui/icons-material/Search';
 import type { CollectionLabels, CollectionQuery, Column, FilterFields } from '../types';
 import { activeFilterColumns, chipText, FilterPanel, withFilter } from './FilterPopover';
+import { isIdSpec } from '../utils/values';
 
 const MAX_TOKENS = 2; // chips shown before the rest fold into "+N"
 const TOKEN_VALUE_MAX = 14; // characters of a chip's value before it is cut
@@ -66,13 +67,14 @@ export function QueryField({ search, filter, columns, filterFields, query, onQue
   const tokens = active.length ? (
     <Box role="group" aria-label={labels.activeFilters} sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
       {shown.map(c => {
-        const text = chipText(query.filters[c.key]);
+        const full = chipText(query.filters[c.key]);
+        const shown = chipText(query.filters[c.key], isIdSpec(c.spec));
         return (
           <Chip
             key={c.key}
             size="small"
-            label={`${c.label}: ${shorten(text)}`}
-            title={`${c.label}: ${text}`}
+            label={`${c.label}: ${shorten(shown)}`}
+            title={`${c.label}: ${full}`}
             onDelete={() => remove(c.key)}
           />
         );

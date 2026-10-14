@@ -4,7 +4,8 @@
  */
 import type { FieldEntry, FieldSpec } from '../../EntityDetailsForm/types';
 import { humanize } from '../../shared/humanize';
-import type { CardSpec, Column, ResolvedCard } from '../types';
+import { DEFAULT_LABELS, type CardSpec, type Column, type ResolvedCard } from '../types';
+import { ID_FIELD } from './values';
 
 const TITLE_KEY = 'name'; // default card title when the entity has one
 const CARD_DEFAULT_FIELDS = 6;
@@ -22,15 +23,18 @@ const toEntry = (item: string | FieldEntry): FieldEntry => (typeof item === 'str
  * @param fields  the entity's `FIELDS` registry
  * @param columns whitelist with order and optional labels; omit for every
  *                eligible field in registry order
+ * @param idLabel caption of the identity field, unless its entry names one
  * @returns columns in display order; ineligible or unknown keys are dropped
  */
 export const resolveColumns = (
   fields: Record<string, FieldSpec>,
-  columns?: readonly (string | FieldEntry)[]
+  columns?: readonly (string | FieldEntry)[],
+  idLabel: string = DEFAULT_LABELS.id
 ): Column[] =>
   (columns?.map(toEntry) ?? Object.keys(fields).map(field => ({ field }) as FieldEntry)).flatMap(entry => {
     const spec = fields[entry.field];
-    return eligible(spec) ? [{ key: entry.field, label: entry.label ?? humanize(entry.field), spec }] : [];
+    const label = entry.label ?? (entry.field === ID_FIELD ? idLabel : humanize(entry.field));
+    return eligible(spec) ? [{ key: entry.field, label, spec }] : [];
   });
 
 /**
@@ -40,16 +44,18 @@ export const resolveColumns = (
  *
  * @param fields the entity's `FIELDS` registry
  * @param cols   the resolved columns
- * @param card   explicit card spec; omit for the default
+ * @param card    explicit card spec; omit for the default
+ * @param idLabel caption of the identity field on an explicit card
  * @returns title, subtitle and body fields
  */
 export const resolveCard = (
   fields: Record<string, FieldSpec>,
   cols: readonly Column[],
-  card?: CardSpec
+  card?: CardSpec,
+  idLabel: string = DEFAULT_LABELS.id
 ): ResolvedCard => {
   if (card) {
-    const pick = (keys: readonly string[]): Column[] => resolveColumns(fields, keys);
+    const pick = (keys: readonly string[]): Column[] => resolveColumns(fields, keys, idLabel);
     return {
       title: pick([card.title])[0],
       subtitle: card.subtitle ? pick([card.subtitle])[0] : undefined,

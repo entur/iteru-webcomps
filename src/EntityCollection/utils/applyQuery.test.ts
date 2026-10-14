@@ -54,6 +54,13 @@ describe('applyQuery', () => {
     expect(ids({ search: '(' })).toEqual([]);
   });
 
+  it('finds a row by its compact id as shown, and by its full id', () => {
+    const rows = [{ netexId: 'VEH:VehicleType:1004' }, { netexId: 'VEH:VehicleType:7' }];
+    const hit = (search: string) => applyQuery(rows, COLS, FF, q({ search })).rows.map(r => r.netexId);
+    expect(hit('::1004')).toEqual(['VEH:VehicleType:1004']);
+    expect(hit('VEH:VehicleType:7')).toEqual(['VEH:VehicleType:7']);
+  });
+
   it('does not search numbers or switches', () => {
     expect(ids({ search: '74' })).toEqual([]);
     expect(ids({ search: 'yes' })).toEqual([]);

@@ -4,11 +4,15 @@
  */
 import type { FieldSpec } from '../../EntityDetailsForm/types';
 import { getPath } from '../../EntityDetailsForm/utils/paths';
-import type { CollectionLabels } from '../types';
+import type { CollectionLabels, Column } from '../types';
 
 const ID_KEYS = ['netexId', 'id'] as const; // first present → row identity
 const VERSION_KEY = 'version', VERSION_SEP = '@';
 const POSITION_PREFIX = 'row:'; // id-less rows; a real id never starts with it
+const ID_SEP = ':', COMPACT_MARK = '::';
+
+/** The identity field: captioned "Id" and shown compact (`::1004`). */
+export const ID_FIELD = 'netexId';
 const DATE_LEN = 10, MINUTE_LEN = 16; // 'YYYY-MM-DD', 'YYYY-MM-DDTHH:mm'
 const LIST_SEP = ', ';
 const PLAIN_BOOL = { yes: 'Yes', no: 'No' } as const;
@@ -79,3 +83,67 @@ export const rowKeys = (rows: readonly unknown[], offset = 0): string[] => {
   }
   return keys;
 };
+
+/**
+ * Is this the entity's identity field (top-level `netexId`)? Hoisted relation
+ * ids such as `deckPlan.netexId` are not — they name another entity.
+ *
+ * @param spec a registry entry
+ * @returns whether it is the identity field
+ */
+export const isIdSpec = (spec: FieldSpec): boolean => spec.path.length === 1 && spec.path[0] === ID_FIELD;
+
+const lastSegment = (id: string): string => id.slice(id.lastIndexOf(ID_SEP) + 1);
+
+/**
+ * A NeTEx id shortened to its local part: `VEH:VehicleType:1004` → `::1004`.
+ * Within one collection the codespace and type repeat on every row, so only
+ * the last segment tells rows apart. A value without segments (or with an
+ * empty last one) is returned unchanged.
+ *
+ * @param id a full id
+ * @returns the compact form
+ */
+export const compactId = (id: string): string => {
+  const tail = lastSegment(id);
+  return id.includes(ID_SEP) && tail ? `${COMPACT_MARK}${tail}` : id;
+};
+
+/**
+ * Does a typed id pick out a full one? The compact `::1004` and the bare
+ * `1004` match on the last segment; a value carrying a namespace must match
+ * whole — the full id stays a working fallback.
+ *
+ * @param full  the row's id
+ * @param typed what the user entered
+ * @returns whether they denote the same entity
+ */
+export const idMatches = (full: string, typed: string): boolean => {
+  if (typed === full) return true;
+  const local = typed.startsWith(COMPACT_MARK) ? typed.slice(COMPACT_MARK.length) : typed;
+  return local !== '' && !local.includes(ID_SEP) && local === lastSegment(full);
+};
+
+/**
+ * The text a view shows for one cell: `formatValue`, with the identity field
+ * compacted. Search, sort and filtering keep using the full value.
+ *
+ * @param row    one entity
+ * @param col    the resolved column
+ * @param labels yes/no wording for `switch` fields
+ * @returns display text
+ */
+export const displayValue = (row: unknown, col: Column, labels?: Pick<CollectionLabels, 'yes' | 'no'>): string => {
+  const text = formatValue(row, col.spec, labels);
+  return isIdSpec(col.spec) ? compactId(text) : text;
+};
+
+/**
+ * A typed id filter entry in the compact form: a full id is compacted, and a
+ * bare local part (`1004`) gains the `::` mark, so every entry reads alike.
+ *
+ * @param typed what the user entered
+ * @returns the entry as shown on a chip or tag
+ */
+export const compactIdEntry = (typed: string): string =>
+  typed.includes(ID_SEP) ? compactId(typed) : `${COMPACT_MARK}${typed}`;

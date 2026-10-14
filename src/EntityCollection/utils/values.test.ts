@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FieldSpec } from '../../EntityDetailsForm/types';
-import { formatValue, rawValue, rowKeys } from './values';
+import { compactId, displayValue, formatValue, rawValue, rowKeys } from './values';
 
 const spec = (kind: FieldSpec['kind'], ...path: string[]): FieldSpec => ({ kind, path });
 
@@ -79,5 +79,28 @@ describe('rowKeys', () => {
     rowKeys([{ netexId: 'A', version: '1' }, { netexId: 'A', version: '2' }]);
     expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
+  });
+});
+
+describe('compactId', () => {
+  it('keeps only the last segment of a NeTEx id, marked with ::', () => {
+    expect(compactId('VEH:VehicleType:1004')).toBe('::1004');
+  });
+
+  it('leaves a value that is not segmented, or ends in a colon, as it is', () => {
+    expect(compactId('1004')).toBe('1004');
+    expect(compactId('VEH:VehicleType:')).toBe('VEH:VehicleType:');
+    expect(compactId('')).toBe('');
+  });
+});
+
+describe('displayValue', () => {
+  const ID = { key: 'netexId', label: 'Id', spec: { kind: 'text', path: ['netexId'] } } as const;
+  const NAME = { key: 'name', label: 'Name', spec: { kind: 'name', path: ['name'] } } as const;
+  const row = { netexId: 'VEH:VehicleType:1004', name: { value: 'A:B:C' } };
+
+  it('compacts the id column only', () => {
+    expect(displayValue(row, ID)).toBe('::1004');
+    expect(displayValue(row, NAME)).toBe('A:B:C');
   });
 });

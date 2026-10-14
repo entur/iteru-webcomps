@@ -47,6 +47,8 @@ export interface CardSpec<K extends string = string> {
 export interface CollectionLabels {
   search: string;
   searchPlaceholder: string;
+  /** Caption of the identity field (`netexId`): column, card, filter, chip. */
+  id: string;
   filters: string;
   activeFilters: string;
   /** Accessible name of the "+N" chip folding the filters not shown. */
@@ -138,6 +140,7 @@ export const ALL_TOOLS: readonly CollectionTool[] = ['search', 'filter', 'sort',
 export const DEFAULT_LABELS: CollectionLabels = {
   search: 'Search',
   searchPlaceholder: 'Search these rows',
+  id: 'Id',
   filters: 'Filters',
   activeFilters: 'Active filters',
   moreFilters: count => `${count} more filter${count === 1 ? '' : 's'}`,

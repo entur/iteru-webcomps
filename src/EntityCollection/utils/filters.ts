@@ -4,7 +4,7 @@
  */
 import type { FieldSpec } from '../../EntityDetailsForm/types';
 import type { CollectionQuery, FilterFields, FilterOp, FilterValue } from '../types';
-import { formatValue, rawValue } from './values';
+import { formatValue, idMatches, isIdSpec, rawValue } from './values';
 
 /**
  * A filter value as a string list, whatever shape it arrived in.
@@ -43,7 +43,8 @@ export const matchesFilter = (row: unknown, spec: FieldSpec, op: FilterOp, value
   if (!wanted.length) return true;
   const v = rawValue(row, spec);
   const have = Array.isArray(v) ? v.filter(x => x != null).map(String) : v == null ? [] : [String(v)];
-  return have.some(h => wanted.includes(h));
+  const same = isIdSpec(spec) ? idMatches : (h: string, w: string): boolean => h === w;
+  return have.some(h => wanted.some(w => same(h, w)));
 };
 
 /**

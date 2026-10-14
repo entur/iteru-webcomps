@@ -53,6 +53,38 @@ const VERSIONS = [
   { netexId: 'T:1', version: '2', name: { value: 'Second version' } },
 ];
 
+describe('compact id', () => {
+  const ROWS_IDS = [{ netexId: 'VEH:VehicleType:1004', name: { value: 'Flirt' } }];
+
+  it('heads the identity column "Id" and shows ::NUM, with the full id on hover', async () => {
+    await act(async () => {
+      render(
+        <GridView
+          rows={ROWS_IDS}
+          columns={COLS}
+          total={1}
+          page={0}
+          query={defaultCollectionQuery}
+          onQuery={vi.fn()}
+          density="standard"
+          hidden={{}}
+          labels={DEFAULT_LABELS}
+          dataGrid={{ disableVirtualization: true }}
+        />
+      );
+    });
+    await screen.findByText('Flirt');
+    expect(screen.getByRole('columnheader', { name: 'Id' })).toBeTruthy();
+    expect(screen.getByText('::1004').closest('[title]')?.getAttribute('title')).toBe('VEH:VehicleType:1004');
+    expect(screen.queryByText('VEH:VehicleType:1004')).toBeNull();
+  });
+
+  it('shows ::NUM on a card, with the full id on hover', () => {
+    render(<CardsView rows={ROWS_IDS} card={resolveCard(FIELDS, COLS)} labels={DEFAULT_LABELS} />);
+    expect(screen.getByText('::1004').closest('[title]')?.getAttribute('title')).toBe('VEH:VehicleType:1004');
+  });
+});
+
 describe('versioned rows', () => {
   it('shows two versions of one entity as two grid rows, each with its own data', async () => {
     await act(async () => {

@@ -63,8 +63,8 @@ export function createEntityCollection<E>(
     const raw = controlled ?? inner;
     const query = useMemo<CollectionQuery>(() => ({ ...raw, pageSize: usablePageSize(raw.pageSize) }), [raw]);
     const L = useMemo(() => ({ ...DEFAULT_LABELS, ...labels }), [labels]);
-    const cols = useMemo(() => resolveColumns(fields, columns), [columns]);
-    const resolvedCard = useMemo(() => resolveCard(fields, cols, card), [cols, card]);
+    const cols = useMemo(() => resolveColumns(fields, columns, L.id), [columns, L.id]);
+    const resolvedCard = useMemo(() => resolveCard(fields, cols, card, L.id), [cols, card, L.id]);
     const result = useMemo(
       () => applyQuery(rows, cols, filterFields, query, filterMode),
       [rows, cols, query, filterMode]

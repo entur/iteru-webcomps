@@ -8,7 +8,7 @@ import { lazy, Suspense, useMemo } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import type { DataGridProps, GridColDef, GridDensity, GridValidRowModel } from '@mui/x-data-grid';
 import { pageSizesFor, type CollectionLabels, type CollectionQuery, type Column } from '../types';
-import { formatValue, rawValue, rowKeys } from '../utils/values';
+import { displayValue, formatValue, isIdSpec, rawValue, rowKeys } from '../utils/values';
 
 const COL_MIN_W = 120;
 const FALLBACK_H = 240;
@@ -35,7 +35,11 @@ const toColDef = (col: Column, labels: CollectionLabels): GridColDef => {
   if (col.spec.kind === 'switch') {
     return { ...base, type: 'boolean', valueGetter: (_v, row) => Boolean(rawValue(entityOf(row), col.spec)) };
   }
-  return { ...base, valueGetter: (_v, row) => formatValue(entityOf(row), col.spec, labels) };
+  const text = { ...base, valueGetter: (_v: unknown, row: GridValidRowModel) => displayValue(entityOf(row), col, labels) };
+  // A compact id keeps the full one on hover.
+  return isIdSpec(col.spec)
+    ? { ...text, renderCell: p => <span title={formatValue(entityOf(p.row), col.spec)}>{p.value}</span> }
+    : text;
 };
 
 export interface GridViewProps {

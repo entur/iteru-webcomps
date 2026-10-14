@@ -7,6 +7,7 @@
 import { Autocomplete, Divider, List, ListItem, ListItemText, ListSubheader, Popover, Stack, TextField } from '@mui/material';
 import type { CollectionLabels, CollectionQuery, Column, FilterFields, FilterValue } from '../types';
 import { asList, asText } from '../utils/filters';
+import { compactIdEntry, isIdSpec } from '../utils/values';
 
 const POPOVER_W = 320, BLOCKED_MAX_H = 220;
 
@@ -32,11 +33,14 @@ export const withFilter = (filters: Filters, key: string, value: FilterValue | u
 /**
  * A condition as display text: trimmed text, or a comma-joined list.
  *
- * @param value the condition
+ * @param value   the condition
+ * @param compact shorten each entry with `compactId` (identity field)
  * @returns display text; empty for an empty condition
  */
-export const chipText = (value: FilterValue): string =>
-  typeof value === 'string' ? value.trim() : asList(value).join(', ');
+export const chipText = (value: FilterValue, compact = false): string => {
+  const show = compact ? compactIdEntry : (v: string): string => v;
+  return typeof value === 'string' ? show(value.trim()) : asList(value).map(show).join(', ');
+};
 
 /**
  * The columns carrying a non-empty condition, in column order.
@@ -103,6 +107,8 @@ export function FilterPanel({ anchor, onClose, columns, filterFields, filters, o
               // Free text (ids) commits on blur too: leaving the field or the
               // panel must not silently drop what was typed.
               autoSelect={!c.spec.options}
+              // Ids show compact (`::1004`) as tags; typing a full id still works.
+              {...(isIdSpec(c.spec) ? { getOptionLabel: (o: string) => compactIdEntry(o) } : {})}
               options={[...(c.spec.options ?? [])]}
               value={asList(filters[c.key])}
               onChange={(_e, next) => onChange(withFilter(filters, c.key, cleanList(next)))}
