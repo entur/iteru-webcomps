@@ -4,8 +4,9 @@
  * and `MultilingualString` values are shown; nested objects/arrays are skipped.
  * Always presentational — relations are `serverManaged`, never edited here.
  */
-import { lazy, Suspense, useMemo } from "react";
-import { Box, CircularProgress, Typography } from "@mui/material";
+import { useMemo } from "react";
+import { Box, Typography } from "@mui/material";
+import { LazyDataGrid } from "../shared/LazyDataGrid";
 import type { DataGridProps, GridColDef } from "@mui/x-data-grid";
 import { humanize } from "../shared/humanize";
 
@@ -36,14 +37,6 @@ const GRID_SX = {
   backgroundColor: "transparent",
   "& .MuiDataGrid-cell": { backgroundColor: "transparent" },
 } as const;
-
-/** Defer the heavy DataGrid until a grid actually renders (often in an unselected
- *  tab). `@mui/x-data-grid` is an externalized peer dep, so this dynamic import
- *  stays in the output for the host bundler to code-split into its own chunk —
- *  forms whose entities have no grid field never pay for it. */
-const DataGrid = lazy(() =>
-  import("@mui/x-data-grid").then((m) => ({ default: m.DataGrid })),
-);
 
 /* ------------------------------------------------------------------ *\
    Cell helpers
@@ -185,39 +178,22 @@ export function ObjectGrid({
         </Typography>
       ) : (
         <Box sx={{ height, width: "100%", minWidth: 0 }}>
-          <Suspense
-            fallback={
-              <Box
-                sx={{
-                  height,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 1,
-                }}
-              >
-                <CircularProgress size={18} />
-                <Typography variant="body2" color="text.secondary">
-                  Init…
-                </Typography>
-              </Box>
-            }
-          >
-            <DataGrid
-              density="compact"
-              hideFooter
-              disableRowSelectionOnClick
-              disableColumnMenu
-              // Consumer overrides spread before the owned props so
-              // `rows`/`columns`/`aria-label` stay fixed; `sx` is merged so the
-              // transparent `GRID_SX` survives unless the caller's `sx` clobbers it.
-              {...dataGrid}
-              aria-label={label}
-              rows={gridRows}
-              columns={columns}
-              sx={[GRID_SX, ...(Array.isArray(dataGrid?.sx) ? dataGrid.sx : [dataGrid?.sx])]}
-            />
-          </Suspense>
+          <LazyDataGrid
+            fallbackHeight={height}
+            fallbackLabel="Init…"
+            density="compact"
+            hideFooter
+            disableRowSelectionOnClick
+            disableColumnMenu
+            // Consumer overrides spread before the owned props so
+            // `rows`/`columns`/`aria-label` stay fixed; `sx` is merged so the
+            // transparent `GRID_SX` survives unless the caller's `sx` clobbers it.
+            {...dataGrid}
+            aria-label={label}
+            rows={gridRows}
+            columns={columns}
+            sx={[GRID_SX, ...(Array.isArray(dataGrid?.sx) ? dataGrid.sx : [dataGrid?.sx])]}
+          />
         </Box>
       )}
     </Box>

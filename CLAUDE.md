@@ -211,6 +211,110 @@ own chrome from `onSaved`/`onError`) uses the same pieces.
   the label-shrink default); `enumMulti`→Autocomplete, `switch`→`SwitchProps`,
   `grid`→`{ dataGrid }`. Per-field override is a planned later addition.
 
+## Collection
+
+`createEntityCollection(fields, { filterFields })` (`src/EntityCollection/`)
+— the list-side sibling of the form factory: presentational, rows in as a prop,
+no fetch. The field keys are inferred from `fields`, so `columns` / `card` keys
+are checked at compile time; the returned component is generic over the row
+type, inferred from `rows` (no explicit `<Entity>` — TS can't infer one type
+parameter while another is given). One `CollectionQuery` (`filters`, `search`, `sort`, `page`,
+`pageSize`) is owned by the component (or mirrored from `query` /
+`onQueryChange`), and **`applyQuery` is the only thing that decides what is
+visible**. Both views render its output: `GridView` runs the DataGrid with
+`sortingMode`/`paginationMode="server"` and `disableColumnFilter`, so the grid
+never filters, sorts or pages on its own — that is what keeps `view: 'grid' |
+'cards'` interchangeable. The toolbar is the collection's own for the same
+reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
+
+- `view` is a prop; the lib ships no toggle. The story
+  (`VehicleTypeCollection.stories.tsx`) renders the bare component and drives
+  `view` / `tools` / `filterMode` from Storybook controls — no wrapper chrome.
+- `tools` whitelists `search | filter | sort | columns | density`; the last two
+  render in grid view only. No CSV/Print.
+- The toolbar is one row when it fits; on narrower screens the tools after the
+  query field (sort, columns, density, actions) wrap onto the next line —
+  deliberate, chosen over folding them into a "More" menu. Filters never add a
+  row. Search and filter are one internal subcomponent,
+  `QueryField` (`components/QueryField.tsx`): active filters sit as chips at
+  the start of the search box, the typed text follows, the filter button (with
+  a count) closes the field. The order *is* the semantics — filters first, then
+  a search within what they left — so no caption is needed (the old
+  "(from cached filter)" helper text is gone; the placeholder says "Search these
+  rows"). At most two chips show, values cut at 14 chars (full text in
+  `title`), the rest fold into a "+N" chip that opens the panel; Backspace in an
+  empty field removes the last filter. Narrow widths: below `sm` only one chip
+  shows before "+N"; chips are the only part that shrinks (ellipsis, full text
+  in `title`) — the input has a zero flex basis with a `ch` minimum and the
+  filter button never shrinks, so nothing clips at 360px. A separate chip row was tried and
+  rejected: the button and its chips belong on the same line. `FilterPanel`
+  (`FilterPanel.tsx`) is the controlled popover alone; `QueryField` owns its
+  trigger. Not exported — it is built on the collection's own types.
+- **Per-column rules, decided once.** `resolveColumns` gives every `Column`
+  its own `display` / `matches` / `entryLabel` (identity: `compactId` /
+  `idMatches` / `compactIdEntry`; everything else: as is), so no view, filter or
+  chip branches on which field it holds. `collection.tsx` also decides the
+  *effective query* once (usable page size, no sort on a non-column), keys the
+  visible page once (`keyRows`) for both views, and memoises the pipeline per
+  stage (`matchRows` → `sortRows` → `pageRows`).
+- Accessibility rules the toolbar keeps (each pinned by a test): a filter chip's
+  accessible name is its visible text plus `labels.removeFilter`, and removing
+  one moves focus to the next chip, else the previous, else the search field;
+  the unfilterable fields are a plain list named by its heading, never
+  `aria-disabled`; the Columns menu items *are* the checkboxes (the inner MUI
+  `Checkbox` is `aria-hidden`), and the last visible column cannot be hidden.
+- **Filter reach is generated, not chosen.** `generateDocuments` emits
+  `<Entity>FilterFields` from the `filter` argument of the entity's list query
+  in the live schema (`dataOwnerRef` excluded — session context). Only those
+  fields get a control; every other column is listed disabled. A `String` arg
+  becomes `contains`, a list of strings or enums `anyOf` (plural → singular
+  field: `transportModes` → `transportMode`); those turn selectable on the next
+  codegen. Any other arg (Boolean, Int, a lone enum, one with no matching
+  top-level field) is skipped with a `[docs] … is not offered` warning in the
+  generate output — no control here could feed it a value of the right type.
+  One condition per field, AND across fields.
+- `pageSize` is normalised to `1..100` (`usablePageSize`): the community
+  DataGrid throws above 100. A stale `sort` field is dropped before it reaches
+  the grid, which would otherwise report an empty sort model back and rewrite
+  the host's query.
+- **Scope.** Search looks only at what is on screen (the grid's visible
+  columns, or the fields a card shows). Filters reach every filterable field,
+  shown or not, so a host's condition on a field outside `columns` still
+  applies and gets a chip — matching what `toSobekFilter` sends. Sorting by a
+  hidden column is allowed (an explicit choice).
+- **Value rules.** A missing switch shows as a dash in both views. A string on
+  an `anyOf` filter (and a pasted entry) splits on commas/whitespace; a list on
+  `contains` stays one phrase, as sobek receives it. Text sorts with an `nb`
+  collator (æ, ø, å after z) whatever the runtime locale; a non-numeric value
+  in a number column sorts as missing. `defaultCollectionQuery` is frozen.
+- `filterMode: 'client'` (default) applies the filters to `rows`;
+  `'server'` skips that step and only emits them — `toSobekFilter(filters,
+  filterFields)` gives the host the list query's `filter` argument. Search and
+  sort are always client-side over the rows in memory, which is what putting the
+  text after the filter chips says.
+- **Identity.** On a card the id reads `::1004/ver3` (the column's `cardText` rule; the grid has its own Version column). Rows are keyed by `netexId@version` (`rowKeys`): two versions
+  of one entity are two rows; a repeated pair is a data error and is warned
+  about, not hidden. The `netexId` field is captioned `labels.id` ("Id") and
+  *shown* compact everywhere — cells, cards, filter tags, chips —
+  `VEH:VehicleType:1004` → `::1004` (`compactId`), full id as hover `title`.
+  Search, sort and filter values stay full. The Id filter accepts `::1004`,
+  `1004` (both match the last segment) or the full namespaced id as a fallback
+  (`idMatches`); free-text ids commit on blur and are trimmed. Caveat:
+  `toSobekFilter` sends typed entries as typed, so in server mode a compact
+  entry reaches sobek un-expanded.
+- `patched` and `grid` fields are never columns, card lines or filter entries
+  (`resolveColumns`). A patched field is not on the wire, so a list fetched from
+  sobek cannot carry it.
+- Cards never statically import `@mui/x-data-grid` (lazy, as in `ObjectGrid`).
+- Any query change except an explicit page change returns to page 0, and
+  `applyQuery` clamps an out-of-range page — a controlled host can hold a stale
+  page without getting an empty view.
+
+Tests: `components/collection.test.tsx` is manifest-driven like
+`wrappers.test.tsx` (rows built from the registry, filterable fields from the
+generated map). The DataGrid renders rows under jsdom only with
+`slotProps.dataGrid.disableVirtualization`.
+
 ## GraphQL → TS pipeline
 
 Never hand-maintain entity shapes. Generate from live schema, distill to

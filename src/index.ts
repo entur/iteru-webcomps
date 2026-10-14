@@ -56,3 +56,9 @@ export type {
 // Generated entity types + field registries: VehicleType, VehicleTypeLayout,
 // vehicleTypeFields, Vehicle, VehicleLayout, vehicleFields.
 export * from './entities';
+
+// Collection: a presentational list (DataGrid or cards) with a shared filter
+// limited to what sobek's list query accepts. `<Entity>FilterFields` is the
+// generated map of filterable fields; `toSobekFilter` turns the collection's
+// filters into the list query's `filter` argument for a host that delegates.
+export * from './EntityCollection';
