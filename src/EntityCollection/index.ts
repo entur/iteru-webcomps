@@ -2,6 +2,7 @@
  * Public surface of the entity collection (grid / cards list).
  */
 export { createEntityCollection } from './components/collection';
+export type { EntityCollection } from './components/collection';
 export { toSobekFilter } from './utils/filters';
 export { defaultCollectionQuery } from './types';
 export type {

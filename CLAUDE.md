@@ -213,9 +213,12 @@ own chrome from `onSaved`/`onError`) uses the same pieces.
 
 ## Collection
 
-`createEntityCollection<E>(fields, { filterFields })` (`src/EntityCollection/`)
+`createEntityCollection(fields, { filterFields })` (`src/EntityCollection/`)
 — the list-side sibling of the form factory: presentational, rows in as a prop,
-no fetch. One `CollectionQuery` (`filters`, `search`, `sort`, `page`,
+no fetch. The field keys are inferred from `fields`, so `columns` / `card` keys
+are checked at compile time; the returned component is generic over the row
+type, inferred from `rows` (no explicit `<Entity>` — TS can't infer one type
+parameter while another is given). One `CollectionQuery` (`filters`, `search`, `sort`, `page`,
 `pageSize`) is owned by the component (or mirrored from `query` /
 `onQueryChange`), and **`applyQuery` is the only thing that decides what is
 visible**. Both views render its output: `GridView` runs the DataGrid with
@@ -271,6 +274,16 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   DataGrid throws above 100. A stale `sort` field is dropped before it reaches
   the grid, which would otherwise report an empty sort model back and rewrite
   the host's query.
+- **Scope.** Search looks only at what is on screen (the grid's visible
+  columns, or the fields a card shows). Filters reach every filterable field,
+  shown or not, so a host's condition on a field outside `columns` still
+  applies and gets a chip — matching what `toSobekFilter` sends. Sorting by a
+  hidden column is allowed (an explicit choice).
+- **Value rules.** A missing switch shows as a dash in both views. A string on
+  an `anyOf` filter (and a pasted entry) splits on commas/whitespace; a list on
+  `contains` stays one phrase, as sobek receives it. Text sorts with an `nb`
+  collator (æ, ø, å after z) whatever the runtime locale; a non-numeric value
+  in a number column sorts as missing. `defaultCollectionQuery` is frozen.
 - `filterMode: 'client'` (default) applies the filters to `rows`;
   `'server'` skips that step and only emits them — `toSobekFilter(filters,
   filterFields)` gives the host the list query's `filter` argument. Search and

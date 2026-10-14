@@ -4,7 +4,7 @@
  */
 import type { ReactNode } from 'react';
 import type { CardProps } from '@mui/material';
-import type { DataGridProps } from '@mui/x-data-grid';
+import type { DataGridProps, GridDensity } from '@mui/x-data-grid';
 import type { FieldEntry, FieldSpec } from '../EntityDetailsForm/types';
 
 export type CollectionView = 'grid' | 'cards';
@@ -61,6 +61,8 @@ export interface CollectionLabels {
   sortDirection: string;
   columns: string;
   density: string;
+  /** Names of the grid densities in the density menu. */
+  densities: Record<GridDensity, string>;
   empty: string;
   yes: string;
   no: string;
@@ -78,14 +80,16 @@ export interface CollectionOptions {
   filterFields?: FilterFields;
 }
 
-export interface EntityCollectionProps<E> {
+/** `K` is the entity's field-key union, inferred from the registry by
+ *  `createEntityCollection`, so a misspelt column or card key fails to compile. */
+export interface EntityCollectionProps<E, K extends string = string> {
   rows: readonly E[];
   /** Default `'grid'`. */
   view?: CollectionView;
   /** Whitelist, order and labels. Omit → every eligible field. */
-  columns?: readonly (string | FieldEntry)[];
+  columns?: readonly (K | FieldEntry<K>)[];
   /** Omit → `name` as title plus the first columns. */
-  card?: CardSpec;
+  card?: CardSpec<K>;
   /** Toolbar whitelist; `false` hides the toolbar's tools. Default: all. */
   tools?: readonly CollectionTool[] | false;
   /** Host buttons at the end of the toolbar. */
@@ -177,16 +181,18 @@ export const DEFAULT_LABELS: CollectionLabels = {
   sortDirection: 'Sort direction',
   columns: 'Columns',
   density: 'Density',
+  densities: { compact: 'Compact', standard: 'Standard', comfortable: 'Comfortable' },
   empty: 'No rows',
   yes: 'Yes',
   no: 'No',
 };
 
-/** The query an uncontrolled collection starts from; also a seed for hosts. */
-export const defaultCollectionQuery: CollectionQuery = {
-  filters: {},
+/** The query an uncontrolled collection starts from; also a seed for hosts.
+ *  Frozen (filters too): it is shared by every instance and every host. */
+export const defaultCollectionQuery: CollectionQuery = Object.freeze({
+  filters: Object.freeze({}),
   search: '',
   sort: null,
   page: 0,
   pageSize: DEFAULT_PAGE_SIZE,
-};
+});

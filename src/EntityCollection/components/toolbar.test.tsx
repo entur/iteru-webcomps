@@ -138,7 +138,28 @@ describe('CollectionToolbar', () => {
   it('sets a density from the density menu', () => {
     const { onDensity } = mount();
     fireEvent.click(screen.getByRole('button', { name: 'Density' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'compact' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Compact' }));
     expect(onDensity).toHaveBeenCalledWith('compact');
+  });
+
+  it('names densities through labels', () => {
+    render(
+      <CollectionToolbar
+        tools={['density']}
+        view="grid"
+        columns={COLS}
+        filterColumns={COLS}
+        filterFields={FF}
+        query={defaultCollectionQuery}
+        onQuery={vi.fn()}
+        density="standard"
+        onDensity={vi.fn()}
+        hidden={{}}
+        onHidden={vi.fn()}
+        labels={{ ...DEFAULT_LABELS, densities: { compact: 'Tett', standard: 'Normal', comfortable: 'Luftig' } }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Density' }));
+    expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual(['Tett', 'Normal', 'Luftig']);
   });
 });

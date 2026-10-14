@@ -199,7 +199,7 @@ export function CollectionToolbar({
                   close();
                 }}
               >
-                {d}
+                {labels.densities[d]}
               </MenuItem>
             ))
           }

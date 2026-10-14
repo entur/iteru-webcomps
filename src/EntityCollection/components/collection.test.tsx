@@ -7,7 +7,6 @@
 import { beforeAll, describe, it, expect, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
-import type { FC } from 'react';
 import type { FieldSpec } from '../../EntityDetailsForm/types';
 import { humanize } from '../../shared/humanize';
 import * as entities from '../../entities';
@@ -50,15 +49,34 @@ const makeRows = (fields: Record<string, FieldSpec>, n: number): Record<string, 
     )
   );
 
+describe('typed keys', () => {
+  const TYPED = createEntityCollection({ a: { kind: 'text', path: ['a'] } as FieldSpec, b: { kind: 'text', path: ['b'] } as FieldSpec });
+  type Props = Parameters<typeof TYPED>[0];
+
+  it('checks column and card keys against the registry at compile time', () => {
+    const ok: Props = { rows: [], columns: ['a', { field: 'b', label: 'B' }], card: { title: 'a', fields: ['b'] } };
+    // @ts-expect-error — 'c' is not a field of the registry
+    const badColumn: Props = { rows: [], columns: ['c'] };
+    // @ts-expect-error — 'c' is not a field of the registry
+    const badCard: Props = { rows: [], card: { title: 'c', fields: [] } };
+    expect([ok, badColumn, badCard]).toHaveLength(3);
+  });
+});
+
+describe('defaultCollectionQuery', () => {
+  it('is frozen, filters included, so no host or instance can change the shared seed', () => {
+    expect(Object.isFrozen(defaultCollectionQuery)).toBe(true);
+    expect(Object.isFrozen(defaultCollectionQuery.filters)).toBe(true);
+  });
+});
+
 describe.each(manifest)('$entity collection', ({ entity }) => {
   const fields = (entities as Record<string, unknown>)[`${camel(entity)}Fields`] as Record<string, FieldSpec> | undefined;
   const filterFields = (filterFieldMaps as Record<string, unknown>)[`${entity}FilterFields`] as FilterFields | undefined;
   if (!fields) throw new Error(`No registry export for manifest entity ${entity}`);
   if (!filterFields) throw new Error(`No generated ${entity}FilterFields for manifest entity ${entity}`);
 
-  const Collection = createEntityCollection<Record<string, unknown>>(fields, { filterFields }) as FC<
-    EntityCollectionProps<Record<string, unknown>>
-  >;
+  const Collection = createEntityCollection(fields, { filterFields });
   const rows = makeRows(fields, ROW_COUNT);
   const cols = resolveColumns(fields);
   const textCol = cols.find(c => c.spec.kind === 'text' && c.spec.path.length === 1);

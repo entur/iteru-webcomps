@@ -4,7 +4,7 @@
  * or as cards. It owns the query (or mirrors a controlled one), runs the shared
  * pipeline once, and hands the same keyed page to whichever view is active.
  */
-import { useMemo, useState, type FC } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Box, TablePagination, Typography } from '@mui/material';
 import type { GridDensity } from '@mui/x-data-grid';
 import type { FieldSpec } from '../../EntityDetailsForm/types';
@@ -29,23 +29,32 @@ import { CollectionToolbar } from './CollectionToolbar';
 import { GridView } from './GridView';
 
 const NO_FILTER_FIELDS: FilterFields = {};
+
+/** The component `createEntityCollection` returns: generic over the row type
+ *  (inferred from `rows`), with column and card keys fixed to the registry's. */
+export type EntityCollection<K extends string> = (<E>(props: EntityCollectionProps<E, K>) => ReactNode) & {
+  displayName: string;
+};
 const DEFAULT_DENSITY: GridDensity = 'standard';
 
 /**
  * Build a collection component for one entity.
  *
- * @param fields  the entity's `FIELDS` registry (e.g. `vehicleTypeFields`)
+ * @param fields  the entity's `FIELDS` registry (e.g. `vehicleTypeFields`);
+ *                its keys become the only valid `columns` / `card` keys
  * @param options `filterFields`: the entity's generated `<Entity>FilterFields`;
  *                omit and no field is filterable
  * @returns a presentational component taking `rows` plus view / query props
  */
-export function createEntityCollection<E>(
-  fields: Record<string, FieldSpec>,
+export function createEntityCollection<F extends Record<string, FieldSpec>>(
+  fields: F,
   options: CollectionOptions = {}
-): FC<EntityCollectionProps<E>> {
+): EntityCollection<Extract<keyof F, string>> {
   const filterFields = options.filterFields ?? NO_FILTER_FIELDS;
 
-  const Collection: FC<EntityCollectionProps<E>> = ({
+  type K = Extract<keyof F, string>;
+
+  const Collection = <E,>({
     rows,
     view = 'grid',
     columns,
@@ -57,7 +66,7 @@ export function createEntityCollection<E>(
     filterMode = 'client',
     labels,
     slotProps,
-  }) => {
+  }: EntityCollectionProps<E, K>): ReactNode => {
     const [inner, setInner] = useState<CollectionQuery>(defaultCollectionQuery);
     const [density, setDensity] = useState<GridDensity>(DEFAULT_DENSITY);
     const [hidden, setHidden] = useState<Record<string, boolean>>({});
@@ -175,6 +184,5 @@ export function createEntityCollection<E>(
       </Box>
     );
   };
-  Collection.displayName = 'EntityCollection';
-  return Collection;
+  return Object.assign(Collection, { displayName: 'EntityCollection' });
 }

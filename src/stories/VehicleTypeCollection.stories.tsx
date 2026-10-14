@@ -142,10 +142,9 @@ const VIEWS: CollectionView[] = ["grid", "cards"];
 const TOOLS: CollectionTool[] = [...ALL_TOOLS];
 const FILTER_MODES = ["client", "server"] as const;
 
-const VehicleTypeCollection = createEntityCollection<VehicleType>(
-  vehicleTypeFields,
-  { filterFields: VehicleTypeFilterFields },
-);
+const VehicleTypeCollection = createEntityCollection(vehicleTypeFields, {
+  filterFields: VehicleTypeFilterFields,
+});
 
 const meta: Meta<typeof VehicleTypeCollection> = {
   title: "Collection/VehicleType",
