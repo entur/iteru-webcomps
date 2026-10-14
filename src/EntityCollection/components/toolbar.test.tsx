@@ -31,6 +31,7 @@ const mount = (
       tools={over.tools ?? ALL_TOOLS}
       view={over.view ?? 'grid'}
       columns={COLS}
+      filterColumns={COLS}
       filterFields={FF}
       query={{ ...defaultCollectionQuery, ...over.query }}
       onQuery={onQuery}

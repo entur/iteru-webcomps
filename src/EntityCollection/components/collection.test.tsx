@@ -64,6 +64,8 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
   const textCol = cols.find(c => c.spec.kind === 'text' && c.spec.path.length === 1);
   if (!textCol) throw new Error(`${entity} has no top-level text column to drive the tests with`);
   const needle = `${textCol.key}-1`;
+  const otherText = cols.find(c => c.spec.kind === 'text' && c.spec.path.length === 1 && c.key !== textCol.key);
+  if (!otherText) throw new Error(`${entity} has no second top-level text column to drive the tests with`);
 
   const mount = async (props: Partial<EntityCollectionProps<Record<string, unknown>>> = {}) => {
     await act(async () => {
@@ -206,6 +208,34 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
     fireEvent.mouseDown(await screen.findByRole('combobox', { name: /rows per page/i, hidden: true }));
     fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: '10' }));
     expect(onQueryChange.mock.calls.map(([q]) => [q.page, q.pageSize])).toEqual([[1, 10]]);
+  });
+
+  it('does not find a row by a field its card does not show', async () => {
+    await mount({ view: 'cards', card: { title: textCol.key, fields: [] }, query: { ...defaultCollectionQuery, search: `${otherText.key}-1` } });
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+  });
+
+  it('does not find a row by a grid column the user has hidden', async () => {
+    await mount({ view: 'grid' });
+    await gridRows();
+    fireEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: otherText.label }));
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), { target: { value: `${otherText.key}-1` } });
+    expect(await screen.findByText('No rows')).toBeTruthy();
+  });
+
+  it('applies and shows a filter on a filterable field the columns leave out', async () => {
+    const filterable = cols.find(c => filterFields[c.key]?.op === 'contains' && c.spec.path.length === 1);
+    if (!filterable) throw new Error(`${entity} has no top-level contains filter to drive this test with`);
+    const shownKey = [textCol, otherText].find(c => c.key !== filterable.key)!.key;
+    await mount({
+      view: 'cards',
+      columns: [shownKey],
+      query: { ...defaultCollectionQuery, filters: { [filterable.key]: `${filterable.key}-1` } },
+    });
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(within(screen.getByRole('group', { name: 'Active filters' })).getByText(new RegExp(`^${filterable.label}: `))).toBeTruthy();
   });
 
   it('trims the toolbar to the tools asked for', async () => {

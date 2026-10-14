@@ -16,6 +16,7 @@ import {
   defaultCollectionQuery,
   type CollectionOptions,
   type CollectionQuery,
+  type Column,
   type EntityCollectionProps,
   type FilterFields,
 } from '../types';
@@ -68,6 +69,13 @@ export function createEntityCollection<E>(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `columnsKey` stands for `columns`
     const cols = useMemo(() => resolveColumns(fields, columns, L.id), [columnsKey, L.id]);
     const resolvedCard = useMemo(() => resolveCard(fields, cols, card, L.id), [cols, card, L.id]);
+    // Filters reach every filterable field, shown or not: a condition the host
+    // set on a field outside `columns` is applied here, gets a chip, and matches
+    // what `toSobekFilter` sends in server mode.
+    const filterCols = useMemo(() => {
+      const extra = resolveColumns(fields, Object.keys(filterFields), L.id).filter(f => !cols.some(c => c.key === f.key));
+      return [...cols, ...extra];
+    }, [cols, L.id]);
 
     // The effective query, decided once for every reader (pipeline, toolbar,
     // grid, pager, and the next emit): a usable page size, and no sort on a
@@ -79,11 +87,21 @@ export function createEntityCollection<E>(
       return { ...raw, sort, pageSize: usablePageSize(raw.pageSize) };
     }, [raw, cols]);
 
+    // Search looks only at what is on screen: the grid's visible columns, or
+    // the fields a card shows. A row is never found by text it does not show.
+    const searchCols = useMemo(
+      () =>
+        view === 'grid'
+          ? cols.filter(c => hidden[c.key] !== false)
+          : [resolvedCard.title, resolvedCard.subtitle, ...resolvedCard.fields].filter((c): c is Column => !!c),
+      [view, cols, hidden, resolvedCard]
+    );
+
     // One memo per stage, keyed on what that stage reads: paging re-slices
     // without re-searching, a sort click re-sorts without re-filtering.
     const matched = useMemo(
-      () => matchRows(rows, cols, filterFields, query.filters, query.search, filterMode),
-      [rows, cols, query.filters, query.search, filterMode]
+      () => matchRows(rows, filterCols, filterFields, query.filters, query.search, filterMode, searchCols),
+      [rows, filterCols, query.filters, query.search, filterMode, searchCols]
     );
     const sorted = useMemo(() => sortRows(matched, cols, query.sort), [matched, cols, query.sort]);
     const result = useMemo(() => pageRows(sorted, query.page, query.pageSize), [sorted, query.page, query.pageSize]);
@@ -109,6 +127,7 @@ export function createEntityCollection<E>(
             tools={activeTools}
             view={view}
             columns={cols}
+            filterColumns={filterCols}
             filterFields={filterFields}
             query={query}
             onQuery={onQuery}

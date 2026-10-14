@@ -47,12 +47,14 @@ const cellHas = (row: unknown, col: Column, needle: string): boolean => {
 /**
  * Filter and search: the rows the query keeps, in input order.
  *
- * @param rows         the collection (never mutated)
- * @param columns      the resolved columns; filters and search only see these
- * @param filterFields the entity's generated `<Entity>FilterFields`
- * @param filters      `CollectionQuery.filters`
- * @param search       `CollectionQuery.search`
- * @param filterMode   `'server'` skips the filter step (the host applied it)
+ * @param rows          the collection (never mutated)
+ * @param columns       the columns filters may target (shown or not)
+ * @param filterFields  the entity's generated `<Entity>FilterFields`
+ * @param filters       `CollectionQuery.filters`
+ * @param search        `CollectionQuery.search`
+ * @param filterMode    `'server'` skips the filter step (the host applied it)
+ * @param searchColumns the columns the user can see; search looks only here,
+ *                      so a row is never found by text it does not show
  * @returns the kept rows
  */
 export function matchRows<E>(
@@ -61,7 +63,8 @@ export function matchRows<E>(
   filterFields: FilterFields,
   filters: CollectionQuery['filters'],
   search: string,
-  filterMode: 'client' | 'server' = 'client'
+  filterMode: 'client' | 'server' = 'client',
+  searchColumns: readonly Column[] = columns
 ): E[] {
   const byKey = new Map(columns.map(c => [c.key, c]));
   const conditions =
@@ -73,7 +76,7 @@ export function matchRows<E>(
           return col && target ? [{ col, op: target.op, value }] : [];
         });
   const needle = search.trim().toLowerCase();
-  const searchable = columns.filter(c => SEARCHABLE.includes(c.spec.kind));
+  const searchable = searchColumns.filter(c => SEARCHABLE.includes(c.spec.kind));
 
   return rows.filter(
     row =>

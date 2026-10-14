@@ -59,6 +59,8 @@ export interface CollectionToolbarProps {
   tools: readonly CollectionTool[];
   view: CollectionView;
   columns: readonly Column[];
+  /** What the filter reaches: `columns` plus filterable fields not shown. */
+  filterColumns: readonly Column[];
   filterFields: FilterFields;
   query: CollectionQuery;
   onQuery: (patch: Partial<CollectionQuery>) => void;
@@ -76,6 +78,7 @@ export interface CollectionToolbarProps {
  * @param tools        which tools to show
  * @param view         active view; grid-only tools drop out in `'cards'`
  * @param columns      resolved columns
+ * @param filterColumns what the filter reaches (shown columns + filterable others)
  * @param filterFields the entity's generated `<Entity>FilterFields`
  * @param query        effective query (its sort names a real column)
  * @param onQuery      receives search / filters / sort patches
@@ -91,6 +94,7 @@ export function CollectionToolbar({
   tools,
   view,
   columns,
+  filterColumns,
   filterFields,
   query,
   onQuery,
@@ -112,7 +116,7 @@ export function CollectionToolbar({
       <QueryField
         search={has('search')}
         filter={has('filter')}
-        columns={columns}
+        columns={filterColumns}
         filterFields={filterFields}
         query={query}
         onQuery={onQuery}

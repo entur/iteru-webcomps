@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { FieldSpec } from '../../EntityDetailsForm/types';
 import { defaultCollectionQuery, type CollectionQuery } from '../types';
-import { applyQuery } from './applyQuery';
+import { applyQuery, matchRows } from './applyQuery';
 import { resolveColumns } from './columns';
 
 const FIELDS: Record<string, FieldSpec> = {
@@ -59,6 +59,13 @@ describe('applyQuery', () => {
     const hit = (search: string) => applyQuery(rows, COLS, FF, q({ search })).rows.map(r => r.netexId);
     expect(hit('::1004')).toEqual(['VEH:VehicleType:1004']);
     expect(hit('VEH:VehicleType:7')).toEqual(['VEH:VehicleType:7']);
+  });
+
+  it('searches only the columns it is told are visible', () => {
+    const rows = [{ netexId: 'T:1', name: { value: 'Flirt' } }];
+    const visible = COLS.filter(c => c.key === 'name');
+    expect(matchRows(rows, COLS, FF, {}, 't:1', 'client', visible)).toEqual([]);
+    expect(matchRows(rows, COLS, FF, {}, 'flirt', 'client', visible)).toEqual(rows);
   });
 
   it('does not search numbers or switches', () => {
