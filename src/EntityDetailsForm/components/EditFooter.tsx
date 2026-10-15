@@ -67,15 +67,6 @@ export interface EditFooterProps {
 }
 
 /**
- * The half of {@link EditFooterProps} a host may set when the footer is rendered
- * for it — by a data-aware wrapper, which owns the rest from `useEntityForm`.
- */
-export type EditFooterHostProps = Omit<
-  EditFooterProps,
-  'dirty' | 'saving' | 'disabled' | 'onSave' | 'onCancel'
->;
-
-/**
  * Render the action footer for an edit session.
  *
  * @param props see {@link EditFooterProps}

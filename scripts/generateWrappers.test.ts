@@ -31,35 +31,29 @@ describe('renderWrapperSource', () => {
     expect(src).toMatch(/inputKeys: VehicleInputKeys,/);
   });
 
-  it('declares the host observation callbacks on the props interface', () => {
-    // Not passed to the presentation: they fall into `...rest` and reach
-    // `useEntityForm`, which owns both the value and the baseline.
+  it('declares onChange on the props interface, and no onDirtyChange', () => {
+    // onChange falls into `...rest` and reaches `useEntityForm`. Dirty now
+    // reaches the host through the session.
     expect(src).toMatch(/onChange\?: \(value: Vehicle \| undefined\) => void;/);
-    expect(src).toMatch(/onDirtyChange\?: \(dirty: boolean\) => void;/);
+    expect(src).not.toMatch(/onDirtyChange/);
   });
 
-  it('renders the dirty-gated action footer in place of the bare Save button', () => {
-    expect(src).toMatch(/import \{ EditFooter \} from '\.\.\/components\/EditFooter';/);
-    expect(src).not.toMatch(/<button onClick=\{handleSave\}/);
-    expect(src).toMatch(/dirty=\{dirty\}/);
-    expect(src).toMatch(/onSave=\{handleSave\}/);
-    // Cancel is the hook's in-place discard, not a remount — the wrapper owns
-    // no `key` of its own and cannot re-mount itself.
-    expect(src).toMatch(/onCancel=\{reset\}/);
+  it('renders no footer — its state goes to the host’s session instead', () => {
+    expect(src).not.toMatch(/EditFooter/);
+    expect(src).not.toMatch(/footerProps/);
+    expect(src).toMatch(/session\?: FormSession;/);
+    expect(src).toMatch(/import \{ useSessionConnection \} from '\.\.\/hooks\/useFormSession';/);
     expect(src).toMatch(/const \{ value, setValue, reset, saving, load, dirty, errors, handleSave \}/);
-    // No `loading`: the record is read with `use()`, so a pending load has not
-    // committed at all — Suspense holds the fallback and the hook never returns.
+    // Save is the hook's handleSave, Cancel its in-place reset — not a remount.
+    expect(src).toMatch(/save: handleSave,\s+cancel: reset,/);
+    // Only a record that renders as a form is editable; view mode never is.
+    expect(src).toMatch(/editable: shown && mode === 'edit',/);
     expect(src).not.toMatch(/[,{] loading\b|disabled=\{loading/);
   });
 
-  it('exposes the footer to the host for labels and styling', () => {
-    // The wrapper renders the footer itself, so without a passthrough a host
-    // can neither localize it (English defaults, no i18n runtime here) nor theme
-    // it. `EditFooterHostProps` omits the state the hook owns.
-    expect(src).toMatch(/footerProps\?: EditFooterHostProps;/);
-    // Spread before the controlled props: the type already forbids overriding
-    // them, but the order makes it true at runtime too.
-    expect(src).toMatch(/<EditFooter\s+\{\.\.\.footerProps\}\s+dirty=\{dirty\}/);
+  it('publishes the TOC sections the form will render, and none for a record it will not', () => {
+    expect(src).toMatch(/import \{ tocSections \} from '\.\.\/utils\/sections';/);
+    expect(src).toMatch(/sections: shown \? tocSections\(FIELDS, layout, variant, patched\) : \[\],/);
   });
 
   it('stands a shaped skeleton in for the record while it loads', () => {
@@ -83,7 +77,7 @@ describe('renderWrapperSource', () => {
     // becomes a containing block, which would break the footer's `position:
     // sticky` for the length of the fade.
     expect(src).toMatch(/<FormArrival>\s+<VehicleFormPresentation/);
-    expect(src).toMatch(/<\/FormArrival>\s+\{\/\* Inert until/);
+    expect(src).toMatch(/<\/FormArrival>\s+\);\n\}/);
   });
 
   it('hands the patched display to the presentation, not to the hook', () => {
@@ -93,14 +87,13 @@ describe('renderWrapperSource', () => {
     expect(src).toMatch(/slotProps=\{slotProps\}\s+patched=\{patched\}/);
   });
 
-  it('hands the section-navigation pair to the presentation, not to the hook', () => {
-    // Both are plain `EntityDetailsFormProps`, so they arrive in the wrapper's
-    // props for free — but left in `...rest` they would be spread into
-    // `useEntityForm` and never reach the form that scrolls.
-    expect(src).toMatch(/\n    activeSection,\n    onActiveSectionChange,\n/);
-    expect(src).toMatch(
-      /activeSection=\{activeSection\}\s+onActiveSectionChange=\{onActiveSectionChange\}/
-    );
+  it('takes the section pair from the session, not from props', () => {
+    // Omitted from the inherited form props, so a host can't pass them; the
+    // connection hands them to the presentation. Left in `...rest` they would
+    // be spread into `useEntityForm` and never reach the form that scrolls.
+    expect(src).toMatch(/'disabled' \| 'activeSection' \| 'onActiveSectionChange'>/);
+    expect(src).toMatch(/\n    session,\n/);
+    expect(src).toMatch(/\{\.\.\.sectionNav\}/);
   });
 
   it('gates not-found on the settled load phase, never on a loading flag', () => {

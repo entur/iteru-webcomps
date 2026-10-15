@@ -8,7 +8,7 @@ export type { FormSession, FormSessionToc, FormSessionFooter } from './hooks/use
 export { EditFooter } from './components/EditFooter';
 export { FormSkeleton, FormArrival } from './components/FormSkeleton';
 export { SaveSnackbar } from './components/SaveSnackbar';
-export type { EditFooterProps, EditFooterLabels, EditFooterSlotProps, EditFooterHostProps } from './components/EditFooter';
+export type { EditFooterProps, EditFooterLabels, EditFooterSlotProps } from './components/EditFooter';
 export type { SaveSnackbarProps, SaveToast } from './components/SaveSnackbar';
 export type { FormSkeletonProps, FormSkeletonHostProps, FormArrivalProps } from './components/FormSkeleton';
 export { toInputEntity } from './utils/toInput';

@@ -8,16 +8,15 @@
 export { createAbstractEntityDetailsForm } from './EntityDetailsForm/components/abstractForm';
 export { SobekProvider, useSobekCtx } from './context/SobekContext';
 export type { SobekCtx } from './context/SobekContext';
-// Edit-session chrome. The data-aware wrappers render `EditFooter` themselves;
-// both are exported for hosts driving the presentational form directly, and for
-// the save feedback the wrappers only report through `onSaved` / `onError`.
+// Presentational pieces holding no state. `EditFooter` is fed by a host from
+// `useFormSession()`'s `footer` (or by its own state when driving the
+// presentational form directly); `SaveSnackbar` from `onSaved` / `onError`.
 export { EditFooter } from './EntityDetailsForm/components/EditFooter';
 export { SaveSnackbar } from './EntityDetailsForm/components/SaveSnackbar';
 export type {
   EditFooterProps,
   EditFooterLabels,
   EditFooterSlotProps,
-  EditFooterHostProps,
 } from './EntityDetailsForm/components/EditFooter';
 export type { SaveSnackbarProps, SaveToast } from './EntityDetailsForm/components/SaveSnackbar';
 // The outlet for a data-aware form's chrome: the host creates it, hands it to
