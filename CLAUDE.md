@@ -392,7 +392,12 @@ which caps the bus at 9.5 m rigid) — entur/iteru-3dbus#39. Tests run the real
 The Fullpage story's preview (`src/stories/BusView.tsx`) is column 3 from `lg`
 (under the form below it): header toggle bitmap (`mkStageShot` → PNG) | 3D
 (`mkStage`), fed by the form's `onChange`, so unsaved edits redraw (settled
-250 ms, keyed on content). One live stage per mount, the bus swapped per input,
+250 ms, keyed on content). **Everything shown together settles together** —
+the input, the type's length and the loading flag go through one settle, or a
+flip of a Vehicle's type checks the new length against the old sections for a
+frame (pinned by `BusView.test.tsx`, 3dbus mocked). An existing record with no
+value from the form yet is loading: a wave skeleton the canvas's shape, not a
+missing-data note; its arrival skips the settle. One live stage per mount, the bus swapped per input,
 framed once per record (BusView is keyed by record). No WebGL (off, or out of
 contexts) → an alert in the column; it must never throw into the page.
 Camera (`src/stories/busMotion.ts`, unit-tested without WebGL): `orbit` | 

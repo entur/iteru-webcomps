@@ -9,6 +9,7 @@ import {
   Alert,
   Box,
   Paper,
+  Skeleton,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -49,6 +50,9 @@ const CONTROL_INSET = 8, CONTROL_OPACITY = 0.92;
 /** Shown in place of the bus when the browser gives no WebGL context (off, or
  *  out of contexts): the preview fails alone, never the page around it. */
 const NO_WEBGL = "No 3D here: the browser could not create a WebGL context.";
+const LOADING_LABEL = "Loading preview";
+// MUI's wave ships no reduced-motion guard of its own (as in FormSkeleton).
+const REDUCED = "@media (prefers-reduced-motion: reduce)";
 
 /** A value that only follows `v` once it has held still for `ms`. */
 const useSettled = <T,>(v: T, ms: number): T => {
@@ -242,6 +246,8 @@ export interface BusViewProps {
   result: BusInputResult | null;
   /** The type's own `length` in metres, checked against the sections' sum. */
   lengthM?: number | null;
+  /** The record is still loading: a skeleton stands in, not a missing-data note. */
+  loading?: boolean;
   /** Where the missing values live, when that is not the open form — a
    *  Vehicle is drawn over its type, so most of them are the type's. */
   missingWhere?: string;
@@ -262,6 +268,7 @@ export interface BusViewProps {
 export function BusView({
   result,
   lengthM,
+  loading = false,
   missingWhere,
   mode,
   onModeChange,
@@ -270,15 +277,29 @@ export function BusView({
 }: BusViewProps) {
   const bg = useTheme().palette.background.paper;
   // Keystrokes reach here through the form's onChange; let them settle, and
-  // key on content so an equal input never rebuilds the bus.
-  const key = useSettled(result ? JSON.stringify(result) : "", SETTLE_MS);
-  const settled = useMemo(() => (key ? (JSON.parse(key) as BusInputResult) : null), [key]);
-  const inp = settled?.ok ? settled.inp : null;
+  // key on content so an equal input never rebuilds the bus. Everything that
+  // is shown together settles together — the input, the type's length, the
+  // loading flag — or a flip of the type would check the new length against
+  // the old sections for a frame. A load that has just landed shows at once.
+  const [view, setView] = useState({ key: "", loading });
+  const settledKey = useSettled(
+    JSON.stringify({ result, lengthM: lengthM ?? null, loading }),
+    view.loading ? 0 : SETTLE_MS,
+  );
+  const settled = useMemo(
+    () =>
+      JSON.parse(settledKey) as { result: BusInputResult | null; lengthM: number | null; loading: boolean },
+    [settledKey],
+  );
+  if (view.key !== settledKey) setView({ key: settledKey, loading: settled.loading });
+  const res = settled.loading ? null : settled.result;
+  const inp = res?.ok ? res.inp : null;
   const errors = useMemo(() => (inp ? validate(inp) : []), [inp]);
   const [boxRef, size] = useSize();
 
+  const len = settled.lengthM;
   const sum = inp && !errors.length ? total(inp) : null;
-  const drift = sum !== null && lengthM != null && Math.abs(lengthM * 1000 - sum) > LENGTH_TOLERANCE_MM;
+  const drift = sum !== null && len !== null && Math.abs(len * 1000 - sum) > LENGTH_TOLERANCE_MM;
 
   return (
     <Paper variant="outlined" sx={{ minWidth: 0, overflow: "hidden" }}>
@@ -314,9 +335,24 @@ export function BusView({
         </ToggleButtonGroup>
       </Box>
 
-      {settled && !settled.ok && (
+      {settled.loading && (
+        <Box
+          role="status"
+          aria-busy="true"
+          aria-label={LOADING_LABEL}
+          sx={{ [REDUCED]: { "& .MuiSkeleton-root": { animation: "none" } } }}
+        >
+          <Skeleton
+            variant="rectangular"
+            animation="wave"
+            data-bus-view="loading"
+            sx={{ width: "100%", height: "auto", aspectRatio: ASPECT, transform: "none" }}
+          />
+        </Box>
+      )}
+      {res && !res.ok && (
         <Alert severity="info" sx={{ m: 2 }}>
-          Fill in to draw the bus: {settled.missing.map(labelOf).join(", ")}
+          Fill in to draw the bus: {res.missing.map(labelOf).join(", ")}
           {missingWhere ? ` (${missingWhere})` : ""}.
         </Alert>
       )}
@@ -332,10 +368,10 @@ export function BusView({
       )}
       {drift && (
         <Alert severity="warning" sx={{ mx: 2, mt: 2 }}>
-          Length is {lengthM} m, but the sections add up to {sum! / 1000} m.
+          Length is {len} m, but the sections add up to {sum! / 1000} m.
         </Alert>
       )}
-      {!settled && (
+      {!settled.loading && !res && (
         <Typography color="text.secondary" sx={{ m: 2 }}>
           Select a record to preview it.
         </Typography>

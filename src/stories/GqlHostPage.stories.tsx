@@ -418,6 +418,9 @@ const GqlHostPage = ({
       key={recordKey}
       result={busResult}
       lengthM={busType?.length}
+      // An existing record with nothing from the form yet is mid-load (the
+      // form shows its skeleton); a new one has nothing to load.
+      loading={!!selection?.netexId && !liveValue}
       missingWhere={
         selection?.entity === "vehicle" && busType
           ? `on this Vehicle or its VehicleType ${busType.netexId}`
