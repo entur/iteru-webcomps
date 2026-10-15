@@ -2,12 +2,15 @@ import { useMemo, useState, type FC } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   Box,
+  GlobalStyles,
   ListItemIcon,
   ListItemText,
   MenuItem,
   Paper,
   TextField,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import {
@@ -23,6 +26,7 @@ import {
   type LayoutVariant,
   type ControlSlotProps,
   type SaveToast,
+  type SectionTocVariant,
   type VehicleTypeFormProps,
 } from "../index";
 import { vehicleSeed, vehicleTypeSeed } from "./initDataSets";
@@ -40,8 +44,9 @@ import { installStoriesMock, setMockLatency } from "./mockEndpoint";
  * describes in prose: `SaveSnackbar` fed from onSaved/onError. The form's own
  * props (`mode`, `variant`, `patched`, `footerProps`, `skeletonProps`) are story args, so
  * they are driven from Storybook Controls rather than page chrome. A stacked
- * form with several sections gets a column beside it holding a `SectionToc`
- * wired to its `activeSection` / `onActiveSectionChange`.
+ * form with several sections gets a `SectionToc` wired to its `activeSection` /
+ * `onActiveSectionChange`: a column beside it on wide screens, a dropdown pinned
+ * above it below `md` (`tocVariant`), whose value then reads as "you are here".
  * Discard is not the page's job — the form renders its own `EditFooter`, whose
  * Cancel restores the loaded entity without a remount.
  */
@@ -50,7 +55,11 @@ import { installStoriesMock, setMockLatency } from "./mockEndpoint";
 installStoriesMock();
 
 const SELECT_WIDTH = 260,
-  TOC_WIDTH = 200;
+  TOC_WIDTH = 200,
+  FORM_MAX_WIDTH = 680;
+/** Height of the pinned TOC dropdown bar, and the page's `scroll-padding-top`
+ *  while it shows — otherwise a section scrolled into view lands under it. */
+const TOC_BAR_PX = 56;
 const NEW_KEY = "new";
 /** Slow enough that the skeleton and the arrival fade are actually watchable. */
 const DEFAULT_READ_DELAY_MS = 600;
@@ -169,11 +178,14 @@ const recordIds = (seed: Record<string, Rec>, current: string): string[] => {
 };
 
 /** Story-adjustable props, surfaced as Storybook Controls: the form's own props
- *  passed straight through, plus two the story owns. */
+ *  passed straight through, plus three the story owns. */
 interface GqlHostPageProps extends FormArgs {
   /** Tab bar style when `variant` is `tabs`. Single-section Vehicle renders
    *  flat regardless. */
   tabStyle?: TabStyle;
+  /** TOC presentation for a stacked form: `auto` picks the dropdown below the
+   *  `md` breakpoint and the list above it. */
+  tocVariant?: SectionTocVariant | "auto";
   /** Mock read latency. The forms render their own load states, so this is the
    *  only way to see the shaped skeleton and the arrival fade — at `0` the
    *  response resolves in the same tick and neither paints.
@@ -194,10 +206,15 @@ const GqlHostPage = ({
   mode = "edit",
   variant = "stacked",
   tabStyle = "one-line",
+  tocVariant = "auto",
   patched = "mark",
   footerProps,
   skeletonProps,
 }: GqlHostPageProps) => {
+  // The host picks the TOC's look — it knows the room it gives it; SectionToc
+  // measures nothing.
+  const narrow = useMediaQuery(useTheme().breakpoints.down("md"));
+  const toc = tocVariant === "auto" ? (narrow ? "dropdown" : "list") : tocVariant;
   const slotProps = useMemo(() => tabSlotProps(variant, tabStyle), [variant, tabStyle]);
   const [selection, setSelection] = useState<Selection | null>(DEFAULT_SELECTION);
   const [toast, setToast] = useState<SaveToast | null>(null);
@@ -284,7 +301,7 @@ const GqlHostPage = ({
 
       <Box sx={{ display: "flex", flex: 1 }}>
         {/* Left: only when the stacked form has sections to navigate. */}
-        {tocSections.length > 0 && (
+        {toc === "list" && tocSections.length > 0 && (
           <Box
             sx={{
               width: TOC_WIDTH,
@@ -310,6 +327,39 @@ const GqlHostPage = ({
 
         {/* Right: the selected entity's data-aware form + host chrome. */}
         <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, sm: 4 } }}>
+          {toc === "dropdown" && tocSections.length > 0 && (
+            <>
+              <GlobalStyles styles={{ html: { scrollPaddingTop: TOC_BAR_PX } }} />
+              {/* Pinned, so its value keeps saying which section is in view.
+                  Bleeds over the column padding so content scrolls under it. */}
+              <Box
+                sx={{
+                  position: "sticky",
+                  top: 0,
+                  zIndex: 2,
+                  height: TOC_BAR_PX,
+                  boxSizing: "border-box",
+                  display: "flex",
+                  alignItems: "center",
+                  mx: { xs: -2, sm: -4 },
+                  mt: { xs: -2, sm: -4 },
+                  mb: 2,
+                  px: { xs: 2, sm: 4 },
+                  bgcolor: "grey.100",
+                  borderBottom: 1,
+                  borderColor: "divider",
+                }}
+              >
+                <SectionToc
+                  variant="dropdown"
+                  sections={tocSections}
+                  active={section ?? tocSections[0]}
+                  onSelect={setSection}
+                  sx={{ flex: 1, maxWidth: FORM_MAX_WIDTH }}
+                />
+              </Box>
+            </>
+          )}
           {selection && active && Form ? (
             <>
               <Typography variant="h6" sx={{ mb: 2 }}>
@@ -318,7 +368,7 @@ const GqlHostPage = ({
 
               <Paper
                 variant="outlined"
-                sx={{ p: { xs: 2, sm: 3 }, maxWidth: 680 }}
+                sx={{ p: { xs: 2, sm: 3 }, maxWidth: FORM_MAX_WIDTH }}
               >
                 <Form
                   // New key ⇒ remount, for switching entity/record only. Discarding
@@ -378,6 +428,7 @@ const meta: Meta<typeof GqlHostPage> = {
     mode: "edit",
     variant: "stacked",
     tabStyle: "one-line",
+    tocVariant: "auto",
     patched: "mark",
     // The footer's English defaults, spelled out so the control shows what to edit.
     footerProps: {
@@ -410,6 +461,13 @@ const meta: Meta<typeof GqlHostPage> = {
       if: { arg: "variant", eq: "tabs" },
       description:
         "Story-only: the tab bar's `slotProps`. one-line = scrollable tab row, pills = wrapping pill tabs.",
+    },
+    tocVariant: {
+      control: "inline-radio",
+      options: ["auto", "list", "dropdown"],
+      if: { arg: "variant", eq: "stacked" },
+      description:
+        "Story-only: `SectionToc` `variant`. auto = dropdown pinned above the form below the md breakpoint, list column beside it above; list / dropdown force one.",
     },
     patched: {
       control: "inline-radio",

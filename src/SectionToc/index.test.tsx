@@ -43,3 +43,47 @@ describe('SectionToc', () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe("SectionToc variant='dropdown'", () => {
+  const open = () => fireEvent.mouseDown(screen.getByRole('combobox'));
+
+  it('is a select inside the same named landmark, showing the active section', () => {
+    render(<SectionToc variant="dropdown" sections={sections} active="Dim." onSelect={() => {}} />);
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    expect(nav).toContainElement(screen.getByRole('combobox'));
+    expect(screen.getByRole('combobox')).toHaveTextContent('Dim.');
+  });
+
+  it('offers the sections in order', () => {
+    render(<SectionToc variant="dropdown" sections={sections} active="Edit" onSelect={() => {}} />);
+    open();
+    expect(screen.getAllByRole('option').map(o => o.textContent)).toEqual(sections);
+  });
+
+  it('reports the picked section and changes nothing itself', () => {
+    const onSelect = vi.fn();
+    render(<SectionToc variant="dropdown" sections={sections} active="Edit" onSelect={onSelect} />);
+    open();
+    fireEvent.click(screen.getByRole('option', { name: 'Cargo' }));
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith('Cargo');
+    expect(screen.getByRole('combobox')).toHaveTextContent('Edit');
+  });
+
+  it('reports a pick of the active section too, as the list does', () => {
+    const onSelect = vi.fn();
+    render(<SectionToc variant="dropdown" sections={sections} active="Dim." onSelect={onSelect} />);
+    open();
+    fireEvent.click(screen.getByRole('option', { name: 'Dim.' }));
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith('Dim.');
+  });
+
+  it('shows nothing for an active section it does not list', () => {
+    render(<SectionToc variant="dropdown" sections={sections} active="Gone" onSelect={() => {}} />);
+    expect(screen.getByRole('combobox')).not.toHaveTextContent(/\w/);
+  });
+
+  it('renders nothing without sections', () => {
+    const { container } = render(<SectionToc variant="dropdown" sections={[]} onSelect={() => {}} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});

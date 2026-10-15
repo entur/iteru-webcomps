@@ -33,7 +33,7 @@ export type {
 // dependency); `resolveSections` yields the sections a given registry + layout
 // will actually render, so the list it is fed can't drift from the form.
 export { SectionToc } from './SectionToc';
-export type { SectionTocProps } from './SectionToc';
+export type { SectionTocProps, SectionTocVariant } from './SectionToc';
 export { resolveSections } from './EntityDetailsForm/utils/sections';
 export type { Section, ResolvedField } from './EntityDetailsForm/utils/sections';
 // Generated wrappers + their props types: VehicleTypeForm/VehicleTypeFormProps,
