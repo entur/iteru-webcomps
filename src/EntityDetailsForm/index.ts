@@ -3,6 +3,8 @@
  */
 export { createAbstractEntityDetailsForm } from './components/abstractForm';
 export { useEntityForm } from './hooks/useEntityForm';
+export { useFormSession } from './hooks/useFormSession';
+export type { FormSession, FormSessionToc, FormSessionFooter } from './hooks/useFormSession';
 export { EditFooter } from './components/EditFooter';
 export { FormSkeleton, FormArrival } from './components/FormSkeleton';
 export { SaveSnackbar } from './components/SaveSnackbar';

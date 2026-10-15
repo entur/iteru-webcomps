@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSections } from './sections';
+import { resolveSections, tocSections } from './sections';
 import type { FieldSpec } from '../types';
 
 const FIELDS: Record<string, FieldSpec> = {
@@ -29,5 +29,27 @@ describe('resolveSections — patched display', () => {
       ['General', ['name']],
       ['Size', ['count']],
     ]);
+  });
+});
+
+describe('tocSections — what a table of contents can navigate', () => {
+  const layout = { General: ['name'], Future: ['range'], Size: ['count'] };
+
+  it('lists a stacked form’s sections, in page order', () => {
+    expect(tocSections(FIELDS, layout, 'stacked')).toEqual(['General', 'Future', 'Size']);
+  });
+
+  it('lists nothing for a tabbed form, or when variant is omitted (the form defaults to tabs)', () => {
+    expect(tocSections(FIELDS, layout, 'tabs')).toEqual([]);
+    expect(tocSections(FIELDS, layout)).toEqual([]);
+  });
+
+  it('lists nothing for a single section — there is nothing to navigate between', () => {
+    expect(tocSections(FIELDS, { Only: ['name', 'count'] }, 'stacked')).toEqual([]);
+    expect(tocSections(FIELDS, undefined, 'stacked')).toEqual([]);
+  });
+
+  it('follows the patched display, so a hidden section is not listed', () => {
+    expect(tocSections(FIELDS, layout, 'stacked', 'hide')).toEqual(['General', 'Size']);
   });
 });

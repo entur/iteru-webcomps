@@ -20,6 +20,10 @@ export type {
   EditFooterHostProps,
 } from './EntityDetailsForm/components/EditFooter';
 export type { SaveSnackbarProps, SaveToast } from './EntityDetailsForm/components/SaveSnackbar';
+// The outlet for a data-aware form's chrome: the host creates it, hands it to
+// the form, and spreads `toc` / `footer` into `SectionToc` / `EditFooter`.
+export { useFormSession } from './EntityDetailsForm/hooks/useFormSession';
+export type { FormSession, FormSessionToc, FormSessionFooter } from './EntityDetailsForm/hooks/useFormSession';
 // Loading chrome. The wrappers render these themselves; exported for a host
 // driving the presentational form during its own fetch. The skeleton's shape is
 // derived from a `FIELDS` registry, so it never drifts from the form.

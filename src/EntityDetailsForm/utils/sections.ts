@@ -8,7 +8,7 @@
  * `layout` reshapes both at once with no hand-tuned row counts.
  */
 import { humanize } from '../../shared/humanize';
-import type { FieldEntry, FieldSpec, Layout, LayoutItem, PatchedDisplay, RefOption } from '../types';
+import type { FieldEntry, FieldSpec, Layout, LayoutItem, LayoutVariant, PatchedDisplay, RefOption } from '../types';
 
 /** A field resolved for rendering: its registry key, display label, the optional
  *  explicit grid column entries, and (for a `reference`) the option-dataset
@@ -93,3 +93,24 @@ export function resolveSections(
     }))
     .filter(s => s.fields.length > 0);
 }
+
+/**
+ * The section labels a table of contents can navigate. Only a stacked form with
+ * two or more sections is a scroll surface — flat and tabbed forms have nothing
+ * to scroll to — so anything else yields `[]`.
+ *
+ * @param fields generated `FIELDS` registry for the entity
+ * @param layout optional section whitelist
+ * @param variant presentation; omitted means the form's own default, `tabs`
+ * @param patched how patched fields are shown; only `hide` changes the shape
+ * @returns the labels in page order, or `[]`
+ */
+export const tocSections = (
+  fields: Record<string, FieldSpec>,
+  layout?: Layout,
+  variant: LayoutVariant = 'tabs',
+  patched: PatchedDisplay = 'mark'
+): string[] => {
+  const labels = resolveSections(fields, layout, patched).map(s => s.label);
+  return variant === 'stacked' && labels.length > 1 ? labels : [];
+};
