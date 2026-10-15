@@ -1,32 +1,33 @@
-import { useMemo, useState, type FC } from "react";
+import { useCallback, useMemo, useState, type FC } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   Box,
-  Divider,
-  FormControlLabel,
-  IconButton,
-  List,
-  ListItemButton,
+  GlobalStyles,
+  ListItemIcon,
   ListItemText,
-  ListSubheader,
+  MenuItem,
   Paper,
-  Switch,
+  TextField,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import {
+  EditFooter,
   SaveSnackbar,
   SectionToc,
   VehicleForm,
   VehicleTypeForm,
-  resolveSections,
-  vehicleFields,
-  vehicleTypeFields,
-  type FieldSpec,
+  useFormSession,
+  type EditFooterProps,
+  type FormSession,
   type Layout,
   type LayoutVariant,
   type ControlSlotProps,
   type SaveToast,
+  type SectionTocVariant,
+  type VehicleTypeFormProps,
 } from "../index";
 import { vehicleSeed, vehicleTypeSeed } from "./initDataSets";
 import { vehicleLayout, vehicleTypeLayout } from "./initLayouts";
@@ -35,35 +36,36 @@ import { installStoriesMock, setMockLatency } from "./mockEndpoint";
 /*
  * Data-aware counterpart to the Dumb-Forms stories: mounts the real,
  * package-exported VehicleForm / VehicleTypeForm (they load + save over GraphQL)
- * against an in-browser mock endpoint. Two stacked record lists — Vehicle types
- * and Vehicles — share one detail pane: clicking an item in either list
- * activates that entity's form. Reproduces the host-guide "complete host
+ * against an in-browser mock endpoint. A toolbar row holds one record dropdown
+ * per entity — VehicleType and Vehicle — sharing one detail pane: picking a
+ * record (or "New …") in either activates that entity's form. Reproduces the
+ * host-guide "complete host
  * page" (list → select → view/edit → save), and shows the parts the guide only
- * describes in prose: `SaveSnackbar` fed from onSaved/onError. The form is
- * always in edit mode. A third column sits between the lists and the form: with
- * `tabStyle: none` it holds a `SectionToc` wired to the stacked form's
- * `activeSection` / `onActiveSectionChange`, and always a story-only "Tune"
- * panel whose switch reveals the patched ("future") fields, hidden by default.
- * Discard is not the page's job — the form renders its own `EditFooter`, whose
- * Cancel restores the loaded entity without a remount.
+ * describes in prose: `SaveSnackbar` fed from onSaved/onError. The form's own
+ * props (`mode`, `variant`, `patched`, `skeletonProps`) are story args, so
+ * they are driven from Storybook Controls rather than page chrome. A stacked
+ * form with several sections gets a `SectionToc`: a column beside it on wide screens, a dropdown under
+ * the toolbar below `md` (`tocVariant`). Toolbar and TOC stay pinned while the
+ * page scrolls, so the TOC's "you are here" stays in sight.
+ * The page places the form's chrome from `useFormSession()`: the TOC from `session.toc` and an `EditFooter` band across the page from `session.footer`, whose Cancel restores the loaded entity without a remount.
  */
 
 // Serve both seeds before any story renders (module scope beats effect ordering).
 installStoriesMock();
 
-const LIST_WIDTH = 260,
-  TUNE_WIDTH = 200;
+const SELECT_WIDTH = 260,
+  TOC_WIDTH = 200,
+  FORM_MAX_WIDTH = 680;
 const NEW_KEY = "new";
 /** Slow enough that the skeleton and the arrival fade are actually watchable. */
 const DEFAULT_READ_DELAY_MS = 600;
 
 /**
- * How a multi-section form presents its sections (mirrors DumbAppMock):
- * - `none`     → no tab bar (stacked sections).
+ * How a `tabs` form draws its tab bar:
  * - `one-line` → scrollable tabs on one row, `>` chevrons for overflow.
  * - `pills`    → wrapping filled-pill tabs (hathor's VehicleTypeForm style).
  */
-type TabStyle = "none" | "one-line" | "pills";
+type TabStyle = "one-line" | "pills";
 
 /** `slotProps` reproducing hathor's wrapping pill tabs: `standard` variant (so
  *  the row can wrap) + a flex-wrap container + filled-pill tab styling. */
@@ -86,30 +88,14 @@ const PILL_TABS_SX = {
   },
 } as const;
 
-/** Derive a form's `variant` + Tabs `slotProps` from a {@link TabStyle}. */
-const deriveTabs = (
-  tabStyle: TabStyle,
-): { variant: LayoutVariant; slotProps: ControlSlotProps } => {
-  if (tabStyle === "none") return { variant: "stacked", slotProps: {} };
-  if (tabStyle === "pills")
-    return { variant: "tabs", slotProps: { tabs: { variant: "standard", sx: PILL_TABS_SX } } };
+/** Tabs `slotProps` for a {@link TabStyle}; a stacked form has no tab bar. */
+const tabSlotProps = (variant: LayoutVariant, tabStyle: TabStyle): ControlSlotProps => {
+  if (variant !== "tabs") return {};
+  if (tabStyle === "pills") return { tabs: { variant: "standard", sx: PILL_TABS_SX } };
   return {
-    variant: "tabs",
-    slotProps: {
-      tabs: { variant: "scrollable", scrollButtons: "auto", allowScrollButtonsMobile: true },
-    },
+    tabs: { variant: "scrollable", scrollButtons: "auto", allowScrollButtonsMobile: true },
   };
 };
-
-/** Drop the `patched` fields from a layout. A layout is a whitelist and an
- *  omitted field still round-trips, so hiding them here loses nothing. */
-const withoutPatched = (layout: Layout, fields: Record<string, FieldSpec>): Layout =>
-  Object.fromEntries(
-    Object.entries(layout).map(([label, items]) => [
-      label,
-      items.filter((item) => !fields[typeof item === "string" ? item : item.field]?.patched),
-    ]),
-  );
 
 /** Which entity the detail pane is showing. */
 type entity = "vehicleType" | "vehicle";
@@ -117,67 +103,99 @@ type entity = "vehicleType" | "vehicle";
 /** A selected record; `netexId` omitted ⇒ a blank "new" form of that entity. */
 type Selection = { entity: entity; netexId?: string };
 
+/** The form props surfaced as story args. VehicleForm takes the same ones. */
+type FormArgs = Pick<VehicleTypeFormProps, "mode" | "variant" | "patched" | "skeletonProps">;
+
 /** The data-aware form props this page drives — VehicleForm and VehicleTypeForm
  *  share one shape (layout is the base `Layout`, not entity-specific). */
-type DataAwareForm = FC<{
-  netexId?: string;
-  mode?: "view" | "edit";
-  variant?: LayoutVariant;
-  slotProps?: ControlSlotProps;
-  layout?: Layout;
-  onSaved?: (netexId: string) => void;
-  onError?: (generalErrors: string[]) => void;
-  activeSection?: string;
-  onActiveSectionChange?: (section: string) => void;
-}>;
+type DataAwareForm = FC<
+  FormArgs & {
+    netexId?: string;
+    slotProps?: ControlSlotProps;
+    layout?: Layout;
+    onSaved?: (netexId: string) => void;
+    onError?: (generalErrors: string[]) => void;
+    session?: FormSession;
+  }
+>;
 
 /** Minimal record shape the lists need from either entity. */
 type Rec = { netexId: string; name?: { value?: string | null } | null };
 
-/** Per-entity wiring: its form component, layout, seed, and list labels. */
+/** Per-entity wiring: its form component, layout, seed, and picker labels. */
 const ENTITY: Record<
   entity,
   {
     Form: DataAwareForm;
-    fields: Record<string, FieldSpec>;
     layout: Layout;
     seed: Record<string, Rec>;
-    heading: string;
+    label: string;
     newLabel: string;
   }
 > = {
   vehicleType: {
     Form: VehicleTypeForm,
-    fields: vehicleTypeFields,
     layout: vehicleTypeLayout,
     seed: vehicleTypeSeed,
-    heading: "Vehicle types",
+    label: "VehicleType",
     newLabel: "New vehicle type",
   },
   vehicle: {
     Form: VehicleForm,
-    fields: vehicleFields,
     layout: vehicleLayout,
     seed: vehicleSeed,
-    heading: "Vehicles",
+    label: "Vehicle",
     newLabel: "New vehicle",
   },
 };
 
 const ENTITY_ORDER: entity[] = ["vehicleType", "vehicle"];
 
-/** What the page opens on: the first record of the first list, derived so it
+/** What the page opens on: the first record of the first entity, derived so it
  *  follows a reordered `ENTITY_ORDER` or a reseeded dataset. */
 const DEFAULT_SELECTION: Selection = {
   entity: ENTITY_ORDER[0],
   netexId: Object.values(ENTITY[ENTITY_ORDER[0]].seed)[0]?.netexId,
 };
 
-/** Story-adjustable props, surfaced as Storybook Controls. */
-interface GqlHostPageProps {
-  /** How multi-section forms (VehicleType) present sections. Single-section
-   *  Vehicle renders flat regardless. */
+/** A picker's options: the seed's records, plus the current selection when the
+ *  static mock doesn't hold it (a saved "new" record comes back as an id the
+ *  seed never had), so the select never holds an out-of-range value. */
+const recordIds = (seed: Record<string, Rec>, current: string): string[] => {
+  const ids = Object.values(seed).map((r) => r.netexId);
+  return current && current !== NEW_KEY && !ids.includes(current) ? [...ids, current] : ids;
+};
+
+/**
+ * Live border-box height of the element the returned ref lands on — the pinned
+ * header wraps onto a second row on narrow screens, so offsets below it can't
+ * be a constant. React 19 runs the ref's returned cleanup on detach.
+ *
+ * @returns a callback ref and the current height in px (0 until measured)
+ */
+const useHeight = (): [(el: HTMLElement | null) => (() => void) | undefined, number] => {
+  const [height, setHeight] = useState(0);
+  const ref = useCallback((el: HTMLElement | null) => {
+    if (!el) return undefined;
+    const ro = new ResizeObserver(([e]) => setHeight(e.borderBoxSize[0].blockSize));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, height];
+};
+
+/** Story-adjustable props, surfaced as Storybook Controls: the form's own props
+ *  passed straight through, plus four the story owns. */
+interface GqlHostPageProps extends FormArgs {
+  /** Spread onto the page's own `EditFooter` — the form no longer renders one.
+   *  Its state comes from the session and always wins. */
+  footerProps?: Pick<EditFooterProps, "labels" | "slotProps" | "sx">;
+  /** Tab bar style when `variant` is `tabs`. Single-section Vehicle renders
+   *  flat regardless. */
   tabStyle?: TabStyle;
+  /** TOC presentation for a stacked form: `auto` picks the dropdown below the
+   *  `md` breakpoint and the list above it. */
+  tocVariant?: SectionTocVariant | "auto";
   /** Mock read latency. The forms render their own load states, so this is the
    *  only way to see the shaped skeleton and the arrival fade — at `0` the
    *  response resolves in the same tick and neither paints.
@@ -188,213 +206,206 @@ interface GqlHostPageProps {
 }
 
 /**
- * Single host screen with two stacked record lists (Vehicle types + Vehicles)
+ * Single host screen with a toolbar of record pickers (VehicleType + Vehicle)
  * feeding one detail pane. Selecting an item swaps the pane to that entity's
- * data-aware form, always in edit mode; the pane owns the host concerns —
+ * data-aware form; the pane owns the host concerns —
  * new-vs-existing via `netexId`, record switch via remount `key`, and reacting
  * to saves.
  */
-const GqlHostPage = ({ tabStyle = "none" }: GqlHostPageProps) => {
-  const { variant, slotProps } = useMemo(() => deriveTabs(tabStyle), [tabStyle]);
+const GqlHostPage = ({
+  mode = "edit",
+  variant = "stacked",
+  tabStyle = "one-line",
+  tocVariant = "auto",
+  patched = "mark",
+  footerProps,
+  skeletonProps,
+}: GqlHostPageProps) => {
+  // The host picks the TOC's look — it knows the room it gives it; SectionToc
+  // measures nothing.
+  const narrow = useMediaQuery(useTheme().breakpoints.down("md"));
+  const toc = tocVariant === "auto" ? (narrow ? "dropdown" : "list") : tocVariant;
+  // Toolbar + (narrow) TOC dropdown stay pinned, so the TOC's scroll feedback
+  // stays in sight; the list column and scrolled-to sections sit below it.
+  const [headerRef, headerHeight] = useHeight();
+  const slotProps = useMemo(() => tabSlotProps(variant, tabStyle), [variant, tabStyle]);
   const [selection, setSelection] = useState<Selection | null>(DEFAULT_SELECTION);
   const [toast, setToast] = useState<SaveToast | null>(null);
-  // Page-level, so the choice survives a record switch.
-  const [showFuture, setShowFuture] = useState(false);
-  // One piece of state for both directions: the form reports the section being
-  // read, the TOC requests one, and the form ignores its own reports coming back.
-  const [section, setSection] = useState<string>();
+  // The form's chrome is ours to place: the TOC (column or pinned dropdown)
+  // and the Save/Cancel band across the whole page, outside every column.
+  const session = useFormSession();
 
   const selectRecord = (entity: entity, netexId?: string) => {
     setSelection({ entity, netexId });
-    setSection(undefined); // sections belong to a record's form, not to the page
   };
 
   const active = selection ? ENTITY[selection.entity] : null;
   const Form = active?.Form;
-  const hasFuture = !!active && Object.values(active.fields).some((f) => f.patched);
-  // One layout for both the form and the TOC, so they hide the same fields.
-  const layout = useMemo(
-    () =>
-      !active || showFuture ? active?.layout : withoutPatched(active.layout, active.fields),
-    [active, showFuture],
-  );
-  // Same call the form makes, so the list is what the form renders — and only
-  // a stacked form with several sections has anything to navigate.
-  const tocSections = useMemo(() => {
-    const labels = active ? resolveSections(active.fields, layout).map((s) => s.label) : [];
-    return variant === "stacked" && labels.length > 1 ? labels : [];
-  }, [active, layout, variant]);
+  // The form publishes its own TOC sections from this layout.
+  const layout = active?.layout;
 
   return (
     <Paper
       elevation={0}
-      sx={{ display: "flex", minHeight: "100vh", bgcolor: "grey.100" }}
+      sx={{ display: "flex", flexDirection: "column", minHeight: "100vh", bgcolor: "grey.100" }}
     >
-      {/* Left: two stacked record lists, one per entity. */}
-      <Box
-        sx={{
-          width: LIST_WIDTH,
-          flexShrink: 0,
-          borderRight: 1,
-          borderColor: "divider",
-          bgcolor: "background.paper",
-          // The page scrolls with the form, so the lists are pinned to the
-          // viewport and scroll on their own when they outgrow it.
-          position: "sticky",
-          top: 0,
-          alignSelf: "flex-start",
-          height: "100vh",
-          overflowY: "auto",
-        }}
-      >
-        {ENTITY_ORDER.map((entity) => {
-          const cfg = ENTITY[entity];
-          return (
-            <Box key={entity}>
-              <List
-                dense
-                subheader={
-                  // 2-col header: title (left) + new-button (right).
-                  <ListSubheader
-                    disableSticky
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      pr: 1,
-                    }}
-                  >
-                    {cfg.heading}
-                    <IconButton
-                      size="small"
-                      edge="end"
-                      aria-label={cfg.newLabel}
-                      title={cfg.newLabel}
-                      onClick={() => selectRecord(entity)}
-                    >
-                      <AddIcon fontSize="small" />
-                    </IconButton>
-                  </ListSubheader>
-                }
-              >
-                {Object.values(cfg.seed).map((r) => (
-                  <ListItemButton
-                    key={r.netexId}
-                    selected={
-                      selection?.entity === entity &&
-                      selection?.netexId === r.netexId
-                    }
-                    onClick={() => selectRecord(entity, r.netexId)}
-                  >
-                    <ListItemText
-                      primary={r.name?.value ?? r.netexId}
-                      secondary={r.netexId}
-                    />
-                  </ListItemButton>
-                ))}
-              </List>
-              <Divider />
-            </Box>
-          );
-        })}
-      </Box>
-
-      {/* Middle: always there for the Tune panel; the table of contents joins
-          it above when the stacked form has sections to navigate. */}
-      <Box
-        sx={{
-          width: TUNE_WIDTH,
-          flexShrink: 0,
-          borderRight: 1,
-          borderColor: "divider",
-          bgcolor: "background.paper",
-        }}
-      >
-        {/* The page scrolls, not the column, so the content is pinned inside it. */}
-        <Box sx={{ position: "sticky", top: 0, p: 2 }}>
-          {tocSections.length > 0 && (
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="overline" color="text.secondary">
-                Sections
-              </Typography>
-              <SectionToc
-                sections={tocSections}
-                active={section ?? tocSections[0]}
-                onSelect={setSection}
-              />
-            </Box>
-          )}
-          <Typography variant="overline" color="text.secondary" component="div">
-            Tune
+      {/* The page's scroller is <html>: give scrollIntoView the header's height
+          so a section picked in either TOC lands below it, not under it. */}
+      <GlobalStyles styles={{ html: { scrollPaddingTop: headerHeight } }} />
+      <Box ref={headerRef} sx={{ position: "sticky", top: 0, zIndex: "appBar" }}>
+        {/* Top: one record picker per entity; the active one shows the selection. */}
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 2,
+            px: 2,
+            py: 1.5,
+            borderBottom: 1,
+            borderColor: "divider",
+            bgcolor: "background.paper",
+          }}
+        >
+          <Typography variant="overline" color="text.secondary">
+            Select form and mock data
           </Typography>
-          <FormControlLabel
-            // Nothing to reveal on an entity with no patched fields.
-            disabled={!hasFuture}
-            control={
-              <Switch
+          {ENTITY_ORDER.map((entity) => {
+            const cfg = ENTITY[entity];
+            const current = selection?.entity === entity ? (selection.netexId ?? NEW_KEY) : "";
+            const name = (id: string) => cfg.seed[id]?.name?.value ?? id;
+            return (
+              <TextField
+                key={entity}
+                select
                 size="small"
-                checked={showFuture}
-                onChange={(e) => setShowFuture(e.target.checked)}
-              />
-            }
-            label="Show future fields (*)"
-            slotProps={{ typography: { variant: "body2" } }}
-            sx={{ ml: 0, gap: 0.5 }}
-          />
-        </Box>
-      </Box>
-
-      {/* Right: the selected entity's data-aware form + host chrome. */}
-      <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, sm: 4 } }}>
-        {selection && active && Form ? (
-          <>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              {selection.netexId ?? active.newLabel}
-            </Typography>
-
-            <Paper
-              variant="outlined"
-              sx={{ p: { xs: 2, sm: 3 }, maxWidth: 680 }}
-            >
-              <Form
-                // New key ⇒ remount, for switching entity/record only. Discarding
-                // edits no longer needs one: the footer's Cancel restores the
-                // hook's baseline in place, with no second round trip.
-                key={`${selection.entity}:${selection.netexId ?? NEW_KEY}`}
-                netexId={selection.netexId}
-                mode="edit"
-                variant={variant}
-                slotProps={slotProps}
-                layout={layout}
-                activeSection={section}
-                onActiveSectionChange={setSection}
-                onSaved={(id) => {
-                  setSelection({ entity: selection.entity, netexId: id });
-                  setToast({ msg: `Saved ${id}`, severity: "success" });
-                }}
-                onError={(msgs) =>
-                  setToast({
-                    msg: msgs.join("\n") || "Save failed",
-                    severity: "error",
-                  })
+                label={cfg.label}
+                value={current}
+                onChange={(e) =>
+                  selectRecord(entity, e.target.value === NEW_KEY ? undefined : e.target.value)
                 }
-              />
-            </Paper>
-          </>
-        ) : (
-          <Typography color="text.secondary">
-            Select a record to view or edit.
-          </Typography>
+                slotProps={{
+                  select: {
+                    renderValue: (v) => (v === NEW_KEY ? cfg.newLabel : name(v as string)),
+                  },
+                }}
+                sx={{ width: SELECT_WIDTH }}
+              >
+                <MenuItem value={NEW_KEY}>
+                  <ListItemIcon>
+                    <AddIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary={cfg.newLabel} />
+                </MenuItem>
+                {recordIds(cfg.seed, current).map((id) => (
+                  <MenuItem key={id} value={id}>
+                    <ListItemText primary={name(id)} secondary={id} />
+                  </MenuItem>
+                ))}
+              </TextField>
+            );
+          })}
+        </Box>
+        {/* Narrow: the TOC as a dropdown under the toolbar, aligned with the form;
+            its value keeps saying which section is in view. */}
+        {toc === "dropdown" && session.toc.sections.length > 0 && (
+          <Box
+            sx={{
+              px: { xs: 2, sm: 4 },
+              py: 1.5,
+              bgcolor: "grey.100",
+              borderBottom: 1,
+              borderColor: "divider",
+            }}
+          >
+            <SectionToc
+              {...session.toc}
+              variant="dropdown"
+              sx={{ maxWidth: FORM_MAX_WIDTH }}
+            />
+          </Box>
         )}
       </Box>
 
+      <Box sx={{ display: "flex", flex: 1 }}>
+        {/* Left: only when the stacked form has sections to navigate. */}
+        {toc === "list" && session.toc.sections.length > 0 && (
+          <Box
+            sx={{
+              width: TOC_WIDTH,
+              flexShrink: 0,
+              borderRight: 1,
+              borderColor: "divider",
+              bgcolor: "background.paper",
+            }}
+          >
+            {/* The page scrolls, not the column, so the content is pinned inside
+                it — below the pinned header. */}
+            <Box sx={{ position: "sticky", top: headerHeight, p: 2 }}>
+              <Typography variant="overline" color="text.secondary">
+                Sections
+              </Typography>
+              <SectionToc {...session.toc} />
+            </Box>
+          </Box>
+        )}
+
+        {/* Right: the selected entity's data-aware form + host chrome. */}
+        <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, sm: 4 } }}>
+          {selection && active && Form ? (
+            <>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                {selection.netexId ?? active.newLabel}
+              </Typography>
+
+              <Paper
+                variant="outlined"
+                sx={{ p: { xs: 2, sm: 3 }, maxWidth: FORM_MAX_WIDTH }}
+              >
+                <Form
+                  // New key ⇒ remount, for switching entity/record only. Discarding
+                  // edits no longer needs one: the footer's Cancel restores the
+                  // hook's baseline in place, with no second round trip.
+                  key={`${selection.entity}:${selection.netexId ?? NEW_KEY}`}
+                  netexId={selection.netexId}
+                  mode={mode}
+                  variant={variant}
+                  slotProps={slotProps}
+                  patched={patched}
+                  layout={layout}
+                  skeletonProps={skeletonProps}
+                  session={session}
+                  onSaved={(id) => {
+                    setSelection({ entity: selection.entity, netexId: id });
+                    setToast({ msg: `Saved ${id}`, severity: "success" });
+                  }}
+                  onError={(msgs) =>
+                    setToast({
+                      msg: msgs.join("\n") || "Save failed",
+                      severity: "error",
+                    })
+                  }
+                />
+              </Paper>
+            </>
+          ) : (
+            <Typography color="text.secondary">
+              Select a record to view or edit.
+            </Typography>
+          )}
+        </Box>
+      </Box>
+
+      {/* Outside the columns, so it spans the page; sticky to the bottom of the
+          viewport by EditFooter's own default. Session state wins over args. */}
+      {mode === "edit" && <EditFooter {...footerProps} {...session.footer} />}
       <SaveSnackbar toast={toast} onClose={() => setToast(null)} />
     </Paper>
   );
 };
 
 const meta: Meta<typeof GqlHostPage> = {
-  title: "compositions/GqlHostPages",
+  title: "HostPages/Fullpage",
   component: GqlHostPage,
   parameters: { layout: "fullscreen" },
   // Configure the mock *before* the story renders. Not in the component body
@@ -406,22 +417,74 @@ const meta: Meta<typeof GqlHostPage> = {
   beforeEach: ({ args }) => {
     setMockLatency({ read: args.readDelayMs ?? DEFAULT_READ_DELAY_MS });
   },
-  args: { tabStyle: "none", readDelayMs: DEFAULT_READ_DELAY_MS },
+  args: {
+    mode: "edit",
+    variant: "stacked",
+    tabStyle: "one-line",
+    tocVariant: "auto",
+    patched: "mark",
+    // The footer's English defaults, spelled out so the control shows what to edit.
+    footerProps: {
+      labels: {
+        save: "Save",
+        cancel: "Cancel",
+        clean: "All changes saved",
+        dirty: "Unsaved changes",
+        saving: "Saving…",
+      },
+    },
+    skeletonProps: { ariaLabel: "Loading form" },
+    readDelayMs: DEFAULT_READ_DELAY_MS,
+  },
   argTypes: {
+    mode: {
+      control: "inline-radio",
+      options: ["view", "edit"],
+      description: "Form `mode`. `view` disables every input and drops the Save/Cancel footer.",
+    },
+    variant: {
+      control: "inline-radio",
+      options: ["stacked", "tabs"],
+      description:
+        "Form `variant` for multi-section forms (VehicleType): stacked gets a table of contents beside it. Vehicle is single-section, so unaffected.",
+    },
     tabStyle: {
       control: "inline-radio",
-      options: ["none", "one-line", "pills"],
+      options: ["one-line", "pills"],
+      if: { arg: "variant", eq: "tabs" },
       description:
-        "How multi-section forms (VehicleType) present sections: none = stacked (no tabs) with a table of contents above the Tune panel, one-line = scrollable tab row, pills = wrapping pill tabs. Vehicle is single-section, so unaffected.",
+        "Story-only: the tab bar's `slotProps`. one-line = scrollable tab row, pills = wrapping pill tabs.",
+    },
+    tocVariant: {
+      control: "inline-radio",
+      options: ["auto", "list", "dropdown"],
+      if: { arg: "variant", eq: "stacked" },
+      description:
+        "Story-only: `SectionToc` `variant`. auto = dropdown pinned above the form below the md breakpoint, list column beside it above; list / dropdown force one.",
+    },
+    patched: {
+      control: "inline-radio",
+      options: ["mark", "plain", "hide"],
+      description:
+        "Form `patched`: how fields from the schema patch overlay (not saved yet) show. mark = trailing *, plain = no *, hide = left out (values still round-trip). Only VehicleType has any.",
+    },
+    footerProps: {
+      control: "object",
+      description: "`EditFooter` props the page passes (`labels`, `slotProps`, `sx`) for the Save/Cancel band.",
+    },
+    skeletonProps: {
+      control: "object",
+      description:
+        "Form `skeletonProps` (`ariaLabel`, `sx`) for the loading skeleton. Raise readDelayMs to see it.",
     },
     readDelayMs: {
       control: { type: "range", min: 0, max: 3000, step: 100 },
       description:
-        "Mock read latency. Raise it to watch the shaped skeleton and the arrival fade; 0 resolves in the same tick, so neither is visible. Select a record in either list to re-trigger a load.",
+        "Mock read latency. Raise it to watch the shaped skeleton and the arrival fade; 0 resolves in the same tick, so neither is visible. Pick a record in either dropdown to re-trigger a load.",
     },
   },
 };
 export default meta;
 type Story = StoryObj<typeof GqlHostPage>;
 
-export const HostPage01: Story = {};
+export const Fullpage: Story = {};

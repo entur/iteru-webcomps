@@ -727,18 +727,16 @@ describe('useEntityForm', () => {
 
   it('flags dirty on an edit and clean again when it is reverted', async () => {
     mockFns.request.mockResolvedValueOnce(envelope(TRAM));
-    const onDirtyChange = vi.fn();
 
-    const { result } = await mount(mkProps({ netexId: 'VEH:1', onDirtyChange }));
+    const { result } = await mount(mkProps({ netexId: 'VEH:1' }));
     await waitFor(() => expect(result.current).not.toBeNull());
     expect(result.current.dirty).toBe(false);
 
     act(() => result.current.setValue({ ...TRAM, name: { value: 'Edited' } } as any));
-    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(true));
+    await waitFor(() => expect(result.current.dirty).toBe(true));
 
     act(() => result.current.setValue(TRAM as any));
-    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
-    expect(result.current.dirty).toBe(false);
+    await waitFor(() => expect(result.current.dirty).toBe(false));
   });
 
   it('re-baselines on a successful save, so a saved form is clean', async () => {
@@ -748,8 +746,7 @@ describe('useEntityForm', () => {
       .mockResolvedValueOnce({ createOrUpdateVehicle: 'VEH:1' })
       .mockResolvedValueOnce(envelope(updated));
 
-    const onDirtyChange = vi.fn();
-    const { result } = await mount(mkProps({ netexId: 'VEH:1', onDirtyChange }));
+    const { result } = await mount(mkProps({ netexId: 'VEH:1' }));
     await waitFor(() => expect(result.current).not.toBeNull());
 
     act(() => result.current.setValue(updated as any));
@@ -759,16 +756,14 @@ describe('useEntityForm', () => {
     expect(result.current.saving).toBe(false);
 
     expect(result.current.dirty).toBe(false);
-    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
     // No second load: the save's own refetch is the new baseline.
     expect(mockFns.request).toHaveBeenCalledTimes(3);
   });
 
   it('reset discards edits back to the loaded entity', async () => {
     mockFns.request.mockResolvedValueOnce(envelope(TRAM));
-    const onDirtyChange = vi.fn();
 
-    const { result } = await mount(mkProps({ netexId: 'VEH:1', onDirtyChange }));
+    const { result } = await mount(mkProps({ netexId: 'VEH:1' }));
     await waitFor(() => expect(result.current).not.toBeNull());
 
     act(() => result.current.setValue({ ...TRAM, name: { value: 'Edited' } } as any));
@@ -780,8 +775,13 @@ describe('useEntityForm', () => {
     // the form does not re-fetch what it already has.
     expect(result.current.value).toEqual(TRAM);
     expect(result.current.dirty).toBe(false);
-    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
     expect(mockFns.request).toHaveBeenCalledTimes(1);
+  });
+
+  it('takes no onDirtyChange — dirty is read from the hook (and the session)', () => {
+    // @ts-expect-error the option is gone; hosts read `dirty` via useFormSession
+    const gone: Pick<UseEntityFormProps, 'onDirtyChange'> = {};
+    expect(gone).toEqual({});
   });
 
   it('reset reverts to the post-save baseline, not the originally loaded entity', async () => {

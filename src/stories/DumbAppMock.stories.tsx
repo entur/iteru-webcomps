@@ -6,11 +6,9 @@ import {
   Card,
   CardContent,
   Drawer,
-  FormControlLabel,
   IconButton,
   Paper,
   Stack,
-  Switch,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -217,113 +215,6 @@ const MockShell = ({
 );
 
 /**
- * App mock: a Paper surface holding a centered Card whose two buttons each open
- * a right-anchored Drawer onto the matching form — "Type" → VehicleTypeForm,
- * "Vehicle" → VehicleForm. Each form's value is owned here so edits round-trip
- * and survive close/reopen.
- */
-const AppMock = () => {
-  const [open, setOpen] = useState<Flavour>(null);
-  const [vehicleType, setVehicleType] =
-    useState<VehicleType>(vehicleTypeSample);
-  const [vehicle, setVehicle] = useState<Vehicle>(vehicleSample);
-  // User choices steering the Drawer forms. Defaults → stacked + editable.
-  const { tabStyle, setTabStyle, variant, slotProps } = useTabStyle();
-  const [readOnly, setReadOnly] = useState(false);
-
-  const mode = readOnly ? "view" : "edit";
-
-  return (
-    <MockShell
-      drawer={
-        <Drawer
-          anchor="right"
-          open={open !== null}
-          onClose={() => setOpen(null)}
-        >
-          {/* Cap at the viewport so the Drawer never overflows on screens
-            narrower than DRAWER_WIDTH; go full-width below the sm breakpoint. */}
-          <Box
-            sx={{
-              width: { xs: "100vw", sm: DRAWER_WIDTH },
-              maxWidth: "100vw",
-              boxSizing: "border-box",
-              p: { xs: 2, sm: 3 },
-            }}
-          >
-            {/* Close affordance — essential on the full-width (xs) sheet where no
-              backdrop is exposed to tap; harmless on the wider sheet too. Sticky
-              so it stays reachable while the form scrolls. */}
-            <Box
-              sx={{
-                position: "sticky",
-                top: 0,
-                zIndex: 1,
-                display: "flex",
-                justifyContent: "flex-end",
-                mb: 1,
-              }}
-            >
-              <IconButton
-                aria-label="Close"
-                onClick={() => setOpen(null)}
-                size="small"
-              >
-                <CloseIcon fontSize="small" />
-              </IconButton>
-            </Box>
-            {open === "type" && (
-              <DumbVehicleTypeForm
-                mode={mode}
-                variant={variant}
-                slotProps={slotProps}
-                layout={vehicleTypeLayout}
-                value={vehicleType}
-                onChange={setVehicleType}
-              />
-            )}
-            {open === "vehicle" && (
-              <DumbVehicleForm
-                mode={mode}
-                variant={variant}
-                slotProps={slotProps}
-                layout={vehicleLayout}
-                value={vehicle}
-                onChange={setVehicle}
-              />
-            )}
-          </Box>
-        </Drawer>
-      }
-    >
-      <Stack alignItems="flex-start" spacing={1}>
-        <TabStyleToggle value={tabStyle} onChange={setTabStyle} />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={readOnly}
-              onChange={(e) => setReadOnly(e.target.checked)}
-            />
-          }
-          label="read-only"
-        />
-      </Stack>
-      <Typography variant="body1" align="center">
-        Click a button to open its Form in a Drawer
-      </Typography>
-      <Stack direction="row" spacing={2}>
-        <Button variant="contained" onClick={() => setOpen("type")}>
-          Type
-        </Button>
-        <Button variant="contained" onClick={() => setOpen("vehicle")}>
-          Vehicle
-        </Button>
-      </Stack>
-    </MockShell>
-  );
-};
-
-/**
  * Save-or-cancel variant: the Drawer becomes a full-height shell — titled
  * header · scrolling form · the library's `EditFooter`, dormant until the form
  * is dirty. Dirtiness is tracked per entity via `useEditable`: the form factory
@@ -440,13 +331,12 @@ const SaveOrCancelMock = () => {
   );
 };
 
-const meta: Meta<typeof AppMock> = {
-  title: "compositions/AppMock1stEd",
-  component: AppMock,
+const meta: Meta<typeof SaveOrCancelMock> = {
+  title: "HostPages/Modal",
+  component: SaveOrCancelMock,
   parameters: { layout: "fullscreen" },
 };
 export default meta;
-type Story = StoryObj<typeof AppMock>;
+type Story = StoryObj<typeof SaveOrCancelMock>;
 
-export const SaveAndCancel: Story = { render: () => <SaveOrCancelMock /> };
-export const Barebone: Story = {};
+export const Modal: Story = {};

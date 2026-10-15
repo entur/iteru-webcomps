@@ -1,9 +1,9 @@
 /**
  * Sticky Save/Cancel footer for an edit session.
  *
- * Purely presentational: it owns no state and performs no save. The data-aware
- * wrappers hand it `dirty`/`saving` and the hook's `handleSave`/`reset`; a host
- * driving the presentational form directly supplies its own equivalents.
+ * Purely presentational: it owns no state and performs no save. A host feeds it
+ * from `useFormSession()`'s `footer`, or from its own state when it drives the
+ * presentational form directly.
  *
  * Dormant while clean, lit when there is something to act on — the signal that
  * distinguishes "nothing to lose" from "unsaved work" without the host having
@@ -65,15 +65,6 @@ export interface EditFooterProps {
    *  the bottom of the scroll container. */
   sx?: SxProps<Theme>;
 }
-
-/**
- * The half of {@link EditFooterProps} a host may set when the footer is rendered
- * for it — by a data-aware wrapper, which owns the rest from `useEntityForm`.
- */
-export type EditFooterHostProps = Omit<
-  EditFooterProps,
-  'dirty' | 'saving' | 'disabled' | 'onSave' | 'onCancel'
->;
 
 /**
  * Render the action footer for an edit session.

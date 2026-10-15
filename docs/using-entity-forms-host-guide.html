@@ -124,7 +124,7 @@
 <div class="callout good"><strong>The library never touches your GraphQL client.</strong> <code>graphql-request</code> is a thin <code>fetch</code> wrapper the forms construct per request — it is not Apollo/urql, has no cache, and shares no state with whatever client your app already uses. It is a peer dependency so the host owns the version, and so <code>graphql</code> is resolved once instead of a copy being compiled into <code>dist/</code>.</div>
 
 <h2 id="import"><span class="num">2</span>Import &amp; the shape of a form</h2>
-<p>Both components are named exports. They render the fields plus — in edit mode — their own <strong>Save/Cancel footer</strong>. You place the component wherever you want the form to appear, anywhere below a <code>SobekProvider</code>.</p>
+<p>Both components are named exports. They render the fields; the <strong>Save/Cancel footer</strong> and section TOC are yours to place from a session (§5). You place the component wherever you want the form to appear, anywhere below a <code>SobekProvider</code>.</p>
 <pre><code>// VehiclePane.tsx
 import { SobekProvider, VehicleForm } from '@entur/iteru-webcomps';
 import type { SobekCtx } from '@entur/iteru-webcomps';
@@ -136,6 +136,7 @@ export const VehiclePane = () =&gt; (
     &lt;VehicleForm netexId="VEH:Vehicle:123" /&gt;
   &lt;/SobekProvider&gt;
 );</code></pre>
+<div class="callout warn"><strong>No <code>session</code>, no save.</strong> A form without a <code>session</code> loads and edits, but nothing can save it, and <code>onSaved</code> never fires. Pass a session and place its footer (§5) for an editable form; use <code>mode="view"</code> for a read-only one.</div>
 
 <div class="callout"><strong>Wrapping a form in your own component?</strong> The props types are exported too, so you can extend them instead of reconstructing them with <code>ComponentProps&lt;typeof VehicleForm&gt;</code>:
 <pre><code>import type { VehicleFormProps } from '@entur/iteru-webcomps';
@@ -149,12 +150,11 @@ type PaneProps = VehicleFormProps &amp; { title?: string };</code></pre></div>
   <thead><tr><th>Prop</th><th>Type</th><th>What it's for</th></tr></thead>
   <tbody>
     <tr><td><code>netexId</code></td><td><code>string</code></td><td>The record to load and edit. <strong>Omit it at mount to start a blank “new” form</strong> (§5).</td></tr>
-    <tr><td><code>mode</code></td><td><code>'view' \| 'edit'</code></td><td>Default <code>'edit'</code>. <code>'view'</code> disables every input and hides the footer.</td></tr>
+    <tr><td><code>mode</code></td><td><code>'view' \| 'edit'</code></td><td>Default <code>'edit'</code>. <code>'view'</code> disables every input and leaves <code>session.footer</code> disabled.</td></tr>
     <tr><td><code>onSaved</code></td><td><code>(netexId) =&gt; void</code></td><td>Called after a save succeeds; receives the saved record's id.</td></tr>
     <tr><td><code>onError</code></td><td><code>(msgs: string[]) =&gt; void</code></td><td>Called with general (non-field) error messages when a save fails, and with the server's messages when a load fails.</td></tr>
     <tr><td><code>onChange</code></td><td><code>(value: Vehicle) =&gt; void</code></td><td>The record as it currently stands in the form. Fires on the load and the post-save refetch too, not only on edits (§6).</td></tr>
-    <tr><td><code>onDirtyChange</code></td><td><code>(dirty: boolean) =&gt; void</code></td><td>Fires when the form crosses between clean and edited (§6).</td></tr>
-    <tr><td><code>footerProps</code></td><td><code>EditFooterHostProps</code></td><td>Labels and styling for the built-in Save/Cancel footer — <code>labels</code>, <code>slotProps</code>, <code>sx</code> (§5).</td></tr>
+    <tr><td><code>session</code></td><td><code>FormSession</code></td><td>From <code>useFormSession()</code>. The form publishes its Save/Cancel state and its section list into it; you place <code>&lt;EditFooter {...session.footer} /&gt;</code> and <code>&lt;SectionToc {...session.toc} /&gt;</code> (§5).</td></tr>
     <tr><td><code>skeletonProps</code></td><td><code>FormSkeletonHostProps</code></td><td><code>ariaLabel</code> and <code>sx</code> for the loading skeleton. Its <em>shape</em> is derived and not overridable — see the callout below.</td></tr>
     <tr><td><code>layout</code>, <code>variant</code>, <code>slotProps</code></td><td>—</td><td>Presentation only — which fields/sections show, tabs vs stacked, MUI overrides. Covered in the README.</td></tr>
   </tbody>
@@ -223,7 +223,7 @@ export const Session = ({ children }: { children: ReactNode }) =&gt; (
 <div class="callout warn"><strong>The flip side: changing credentials alone won't reload the record.</strong> Since the header fields aren't watched, swapping tokens mid-session leaves the currently-loaded record on screen; only the <em>next</em> request uses the new headers. If a credential change should mean “different data,” either change <code>dataOwnerRef</code> with it or force a reload with a <code>key</code> bump (§5).</div>
 
 <h2 id="actions"><span class="num">5</span>New, Save, and Cancel</h2>
-<p>These three host actions map onto the interface as follows. Note that <strong>Save and Cancel are both built in</strong> — you don't render or trigger either; you react to the result.</p>
+<p>These three host actions map onto the interface as follows. Note that <strong>Save and Cancel come from the session</strong> — you place the footer but don't trigger either; you react to the result.</p>
 
 <div class="actions">
   <div class="actioncard">
@@ -233,61 +233,70 @@ export const Session = ({ children }: { children: ReactNode }) =&gt; (
   </div>
   <div class="actioncard">
     <h4>💾 Save</h4>
-    <div class="how">built-in footer + onSaved</div>
-    <p>In <code>edit</code> mode the component renders its own footer and performs the save. You listen with <code>onSaved(id)</code> for success and <code>onError(msgs)</code> for general failures.</p>
+    <div class="how">session footer + onSaved</div>
+    <p>In <code>edit</code> mode the footer you place from the session performs the save. You listen with <code>onSaved(id)</code> for success and <code>onError(msgs)</code> for general failures.</p>
   </div>
   <div class="actioncard">
     <h4>↩︎ Cancel / discard</h4>
-    <div class="how">built-in footer</div>
+    <div class="how">session footer</div>
     <p>The same footer carries Cancel, which restores the record as the server last returned it — in place, with no reload. Both buttons stay inert until something has actually been edited.</p>
   </div>
 </div>
 
 <h3>New</h3>
-<pre><code>// blank form → create a Vehicle (inside your SobekProvider)
-&lt;VehicleForm mode="edit" /&gt;;
+<pre><code>const session = useFormSession();
+
+// blank form → create a Vehicle (inside your SobekProvider)
+&lt;VehicleForm mode="edit" session={session} /&gt;;
+&lt;EditFooter {...session.footer} /&gt;;
 
 // tell the host when it's been created
-&lt;VehicleForm onSaved={(newId: string) =&gt; navigate(`/vehicles/${newId}`)} /&gt;;</code></pre>
+&lt;VehicleForm session={session} onSaved={(newId: string) =&gt; navigate(`/vehicles/${newId}`)} /&gt;;
+&lt;EditFooter {...session.footer} /&gt;;</code></pre>
 <div class="callout"><strong>The organisation is filled in for you.</strong> A create form shows <code>dataOwnerRef</code> already set from the provider, locked — the user neither picks it nor can change it, and the same value is what gets saved.</div>
 <div class="callout warn"><strong>Clearing <code>netexId</code> on a mounted form does not blank it.</strong> Going from an id to <code>undefined</code> only abandons the in-flight load — the values already on screen stay, deliberately, so an edit in progress is never wiped. To actually get an empty create form from a form that was showing a record, remount it: <code>key={netexId ?? 'new'}</code>.</div>
 
 <h3>Save</h3>
-<p>You don't call save. The user clicks the footer's Save; you respond to the outcome:</p>
-<pre><code>&lt;VehicleForm
+<p>You don't write save — you place the footer. Create a session, hand it to the form, and render the footer wherever your layout wants it. The footer stays idle (both buttons disabled, actions inert) until a record is loaded in edit mode:</p>
+<pre><code>import { EditFooter, useFormSession, VehicleForm } from '@entur/iteru-webcomps';
+
+const session = useFormSession();
+
+&lt;VehicleForm
   netexId={id}
+  session={session}
   onSaved={(savedId: string) =&gt; {
     toast.success(`Saved ${savedId}`);
     refetchVehicleList();     // the record is now stale in your list
   }}
   onError={(msgs: string[]) =&gt; toast.error(msgs.join('\n'))}
-/&gt;;</code></pre>
+/&gt;
+&lt;EditFooter {...session.footer} /&gt;   // a page band, a drawer footer, an app bar…</code></pre>
 <div class="callout"><strong>After <code>onSaved</code>, re-pull any of your own copies of the record.</strong> The form shows the freshly-saved values itself, but a list or header elsewhere in your app won't know it changed until you refetch it.</div>
 
 <h3>Cancel / discard</h3>
-<p>Nothing to build: the footer's Cancel restores the record as the server last returned it — the load, or the refetch after your last save. It happens <strong>in place</strong>, so the form does not remount, does not re-fetch, and the user keeps their scroll position.</p>
-<pre><code>// Cancel is already there. This is the whole integration:
-&lt;VehicleForm netexId={id} mode="edit" onSaved={() =&gt; toast.success('Saved')} /&gt;;</code></pre>
+<p>Nothing more to build: the footer's Cancel restores the record as the server last returned it — the load, or the refetch after your last save. It happens <strong>in place</strong>, so the form does not remount, does not re-fetch, and the user keeps their scroll position.</p>
+<pre><code>// Cancel is in session.footer already. This is the whole integration:
+&lt;VehicleForm netexId={id} session={session} onSaved={() =&gt; toast.success('Saved')} /&gt;
+&lt;EditFooter {...session.footer} /&gt;</code></pre>
 <div class="callout good"><strong>Both buttons stay inert until the form is dirty</strong>, and lock again while a save is in flight — so Save can't re-send an unchanged record, and Cancel can't discard nothing. The status line beside them says which state you're in.</div>
-<div class="callout"><strong>The footer speaks English by default.</strong> There is no i18n runtime in this package, so pass your own strings — and any styling — through <code>footerProps</code>:
-<pre><code>&lt;VehicleForm
-  netexId={id}
-  footerProps={{
-    labels: {
-      save: t('common.save'),      cancel: t('common.cancel'),
-      dirty: t('form.unsaved'),    clean:  t('form.saved'),
-      saving: t('form.saving'),
-    },
-    slotProps: { save: { color: 'secondary' } },  // per-button MUI props
-    sx: { px: 3 },                                // applied after every default
+<div class="callout"><strong>The footer speaks English by default.</strong> There is no i18n runtime in this package, so pass your own strings — and any styling — as props on your <code>EditFooter</code>:
+<pre><code>&lt;EditFooter
+  {...session.footer}
+  labels={{
+    save: t('common.save'),      cancel: t('common.cancel'),
+    dirty: t('form.unsaved'),    clean:  t('form.saved'),
+    saving: t('form.saving'),
   }}
-/&gt;;</code></pre>
-The dirty/saving state itself is not reachable through <code>footerProps</code> — the form owns it.</div>
+  slotProps={{ save: { color: 'secondary' } }}  // per-button MUI props
+  sx={{ px: 3 }}                                // applied after every default
+/&gt;</code></pre>
+<code>labels</code>, <code>slotProps</code> and <code>sx</code> never overlap the session's props, so the order you spread them in doesn't matter.</div>
 <div class="callout warn"><strong>Do you still need a <code>key</code>? Yes — for <em>switching records</em>, not for discarding.</strong> Setting <code>key={netexId ?? 'new'}</code> guarantees that moving from one record to another — or from a record to a blank “new” form — starts clean, with no chance of one record's edits bleeding into the next. What changed is that you no longer need a <code>rev</code> counter bumped on Cancel: that pattern cost a full reload of data the form already had.</div>
-<div class="callout"><strong>Want Cancel to also leave edit mode?</strong> The footer discards; it doesn't change <code>mode</code>. If your page has a view↔edit toggle, drive it from your own button and gate it on <code>onDirtyChange</code> (§6) so you never leave with unsaved work — see the complete page in §8.</div>
+<div class="callout"><strong>Want Cancel to also leave edit mode?</strong> The footer discards; it doesn't change <code>mode</code>. If your page has a view↔edit toggle, drive it from your own button and gate it on <code>session.footer.dirty</code> (§6) so you never leave with unsaved work — see the complete page in §8.</div>
 
 <h2 id="watch"><span class="num">6</span>Watching the form from outside</h2>
-<p>The form owns the record it is editing, but two callbacks let the rest of your UI follow along: <code>onChange</code> hands you the current value, <code>onDirtyChange</code> tells you whether anything has been edited.</p>
+<p>The form owns the record it is editing, but <code>onChange</code> hands you the current value, and the session's <code>footer.dirty</code> tells you whether anything has been edited.</p>
 
 <div class="callout"><strong>These are read-only.</strong> The form stays the owner of its state — there is no controlled mode, and passing the value back down as a prop is not supported. Watch it; don't drive it.</div>
 
@@ -307,13 +316,14 @@ export function TitledVehicle({ id }: { id: string }) {
     &lt;/&gt;
   );
 }</code></pre>
-<div class="callout warn"><strong><code>onChange</code> is not “the user edited something.”</strong> It also fires for the load and the post-save refetch, so treating it as an edit signal marks a freshly-loaded form as touched. Use <code>onDirtyChange</code> for that.</div>
+<div class="callout warn"><strong><code>onChange</code> is not “the user edited something.”</strong> It also fires for the load and the post-save refetch, so treating it as an edit signal marks a freshly-loaded form as touched. Use <code>session.footer.dirty</code> for that.</div>
 
 <h3>Guarding unsaved changes</h3>
-<p><code>onDirtyChange</code> reports the form's value against the record the server last returned — the load, or the refetch after a save. A saved form is clean again with nothing to reset on your side:</p>
-<pre><code>import { useEffect, useState } from 'react';
+<p><code>session.footer.dirty</code> reports the form's value against the record the server last returned — the load, or the refetch after a save. A saved form is clean again with nothing to reset on your side:</p>
+<pre><code>import { useEffect } from 'react';
 
-const [dirty, setDirty] = useState&lt;boolean&gt;(false);
+const session = useFormSession();
+const { dirty } = session.footer;
 
 useEffect(() =&gt; {
   if (!dirty) return;
@@ -322,18 +332,18 @@ useEffect(() =&gt; {
   return () =&gt; window.removeEventListener('beforeunload', warn);
 }, [dirty]);
 
-&lt;VehicleForm netexId={id} onDirtyChange={setDirty} /&gt;;</code></pre>
+&lt;VehicleForm netexId={id} session={session} /&gt;;</code></pre>
 <div class="callout good"><strong>Empty is empty, however the control spells it.</strong> A switch the user never touched reports <code>false</code> where the record held nothing at all, and a text field typed into and cleared reports <code>''</code>. Neither counts as an edit. <code>0</code> does count — clearing a number that was <code>0</code> is a real change.</div>
 
 <h2 id="view"><span class="num">7</span>Read-only (view) mode</h2>
-<p>Pass <code>mode="view"</code> to show the same fields with every input disabled and no footer — useful for a details pane or a permission-gated screen.</p>
+<p>Pass <code>mode="view"</code> to show the same fields with every input disabled (<code>session.footer</code> stays disabled; most hosts don't render the footer at all in view mode) — useful for a details pane or a permission-gated screen.</p>
 <pre><code>&lt;VehicleForm netexId={id} mode="view" /&gt;</code></pre>
 <p>Flip <code>mode</code> between <code>'view'</code> and <code>'edit'</code> to drive an Edit button in your own toolbar.</p>
 
 <h2 id="full"><span class="num">8</span>A complete host page</h2>
-<p>List on the left, form on the right. Session from the provider, auth from your app's hook, <code>key</code> for clean switching, a live title, and a view↔edit toggle that refuses to leave with unsaved work. Save and Cancel are the form's own — the page never renders them.</p>
+<p>List on the left, form on the right. Session from the provider, auth from your app's hook, <code>key</code> for clean switching, a live title, and a view↔edit toggle that refuses to leave with unsaved work. The page places Save and Cancel from the session.</p>
 <pre><code>import { useState } from 'react';
-import { SobekProvider, VehicleForm } from '@entur/iteru-webcomps';
+import { EditFooter, SobekProvider, useFormSession, VehicleForm } from '@entur/iteru-webcomps';
 import type { Vehicle } from '@entur/iteru-webcomps';
 import { useAuth } from './auth';
 
@@ -350,7 +360,7 @@ export function VehiclesPage({ vehicles, refetchList, dataOwnerRef }: VehiclesPa
   const [selected, setSelected] = useState&lt;string | undefined&gt;();
   const [mode, setMode] = useState&lt;'view' | 'edit'&gt;('view');
   const [live, setLive] = useState&lt;Vehicle | undefined&gt;();   // current form value
-  const [dirty, setDirty] = useState&lt;boolean&gt;(false);
+  const session = useFormSession();          // footer + dirty
 
   // no memoization needed — read per request, never a reload trigger
   const getHeaders = async (): Promise&lt;Record&lt;string, string&gt;&gt; =&gt; ({
@@ -376,9 +386,9 @@ export function VehiclesPage({ vehicles, refetchList, dataOwnerRef }: VehiclesPa
           &lt;h2&gt;{live?.name?.value ?? '[ unnamed ]'}&lt;/h2&gt;
           {mode === 'view'
             ? &lt;button onClick={() =&gt; setMode('edit')}&gt;Edit&lt;/button&gt;
-            : /* Save + Cancel live in the form's footer. This only leaves
+            : /* Save + Cancel are in the band below. This only leaves
                  edit mode — and refuses to while there's unsaved work. */
-              &lt;button disabled={dirty} onClick={() =&gt; setMode('view')}&gt;
+              &lt;button disabled={session.footer.dirty} onClick={() =&gt; setMode('view')}&gt;
                 Done
               &lt;/button&gt;}
         &lt;/header&gt;
@@ -388,7 +398,7 @@ export function VehiclesPage({ vehicles, refetchList, dataOwnerRef }: VehiclesPa
           netexId={selected}                    // undefined ⇒ new
           mode={mode}
           onChange={setLive}                    // title follows typing
-          onDirtyChange={setDirty}              // gates "Done"
+          session={session}                     // footer state + "Done" gate
           onSaved={(savedId: string) =&gt; {
             setSelected(savedId);
             setMode('view');
@@ -396,6 +406,7 @@ export function VehiclesPage({ vehicles, refetchList, dataOwnerRef }: VehiclesPa
           }}
           onError={(msgs: string[]) =&gt; alert(msgs.join('\n'))}
         /&gt;
+        {mode === 'edit' &amp;&amp; &lt;EditFooter {...session.footer} /&gt;}
       &lt;/section&gt;
     &lt;/div&gt;
     &lt;/SobekProvider&gt;
@@ -411,13 +422,13 @@ export function VehiclesPage({ vehicles, refetchList, dataOwnerRef }: VehiclesPa
   <li><span class="pill">org</span> <code>dataOwnerRef</code> filters loads, is stamped onto every save from the provider, and renders as a locked field the user can't edit.</li>
   <li><span class="pill">stable</span> No memoization needed — inline <code>headers</code>/<code>getHeaders</code> and an inline provider <code>value</code> are all safe. Reloads come from <code>netexId</code>, <code>endpoint</code>, and <code>dataOwnerRef</code> only.</li>
   <li><span class="pill">new</span> Mount without <code>netexId</code> for a blank create form — <code>dataOwnerRef</code> is pre-filled and locked; get the new id from <code>onSaved</code>. Clearing <code>netexId</code> on a live form keeps its values — remount to blank it.</li>
-  <li><span class="pill">save</span> Built in — the component renders its own Save/Cancel footer; you react via <code>onSaved</code> / <code>onError</code>.</li>
-  <li><span class="pill">cancel</span> Built in too — the footer's Cancel restores the server's last copy in place, no remount and no re-fetch. Both buttons are inert until the form is dirty, and locked while saving.</li>
-  <li><span class="pill">labels</span> Footer strings are English by default; pass your own (and any <code>sx</code>/<code>slotProps</code>) via <code>footerProps</code>.</li>
-  <li><span class="pill">watch</span> <code>onChange</code> gives you the current record (load and post-save refetch included, so it is not an “edited” signal); <code>onDirtyChange</code> gives you edited-vs-clean. Both are read-only — the form keeps owning its state.</li>
+  <li><span class="pill">save</span> Built in — place <code>&lt;EditFooter {...session.footer} /&gt;</code> from <code>useFormSession()</code> wherever you like; you react via <code>onSaved</code> / <code>onError</code>.</li>
+  <li><span class="pill">cancel</span> Built in too — the session's Cancel restores the server's last copy in place, no remount and no re-fetch. Both buttons are inert until the form is dirty, and locked while saving.</li>
+  <li><span class="pill">labels</span> Footer strings are English by default; pass your own (and any <code>sx</code>/<code>slotProps</code>) as props on your <code>EditFooter</code>.</li>
+  <li><span class="pill">watch</span> <code>onChange</code> gives you the current record (load and post-save refetch included, so it is not an “edited” signal); <code>session.footer.dirty</code> gives you edited-vs-clean. Both are read-only — the form keeps owning its state.</li>
   <li><span class="pill">key</span> Set <code>key={netexId ?? 'new'}</code> so switching records always starts clean. You no longer need a <code>rev</code> counter for discard — Cancel handles that without a reload.</li>
   <li><span class="pill">refresh</span> After <code>onSaved</code>, refetch any list/header copies of the record you keep.</li>
-  <li><span class="pill">view</span> <code>mode="view"</code> disables inputs and hides the footer.</li>
+  <li><span class="pill">view</span> <code>mode="view"</code> disables inputs and the session's footer.</li>
   <li><span class="pill">load</span> Three distinct outcomes, all rendered for you: a shaped skeleton while in flight, <code>Not found: &lt;netexId&gt;</code> for a settled empty load, and the load error for a failed one. <code>onError</code> fires for a failed load as well as a failed save.</li>
 </ul>
 

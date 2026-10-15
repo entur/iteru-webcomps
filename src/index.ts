@@ -8,18 +8,21 @@
 export { createAbstractEntityDetailsForm } from './EntityDetailsForm/components/abstractForm';
 export { SobekProvider, useSobekCtx } from './context/SobekContext';
 export type { SobekCtx } from './context/SobekContext';
-// Edit-session chrome. The data-aware wrappers render `EditFooter` themselves;
-// both are exported for hosts driving the presentational form directly, and for
-// the save feedback the wrappers only report through `onSaved` / `onError`.
+// Presentational pieces holding no state. `EditFooter` is fed by a host from
+// `useFormSession()`'s `footer` (or by its own state when driving the
+// presentational form directly); `SaveSnackbar` from `onSaved` / `onError`.
 export { EditFooter } from './EntityDetailsForm/components/EditFooter';
 export { SaveSnackbar } from './EntityDetailsForm/components/SaveSnackbar';
 export type {
   EditFooterProps,
   EditFooterLabels,
   EditFooterSlotProps,
-  EditFooterHostProps,
 } from './EntityDetailsForm/components/EditFooter';
 export type { SaveSnackbarProps, SaveToast } from './EntityDetailsForm/components/SaveSnackbar';
+// The outlet for a data-aware form's chrome: the host creates it, hands it to
+// the form, and spreads `toc` / `footer` into `SectionToc` / `EditFooter`.
+export { useFormSession } from './EntityDetailsForm/hooks/useFormSession';
+export type { FormSession, FormSessionToc, FormSessionFooter } from './EntityDetailsForm/hooks/useFormSession';
 // Loading chrome. The wrappers render these themselves; exported for a host
 // driving the presentational form during its own fetch. The skeleton's shape is
 // derived from a `FIELDS` registry, so it never drifts from the form.
@@ -33,7 +36,7 @@ export type {
 // dependency); `resolveSections` yields the sections a given registry + layout
 // will actually render, so the list it is fed can't drift from the form.
 export { SectionToc } from './SectionToc';
-export type { SectionTocProps } from './SectionToc';
+export type { SectionTocProps, SectionTocVariant } from './SectionToc';
 export { resolveSections } from './EntityDetailsForm/utils/sections';
 export type { Section, ResolvedField } from './EntityDetailsForm/utils/sections';
 // Generated wrappers + their props types: VehicleTypeForm/VehicleTypeFormProps,
@@ -49,6 +52,7 @@ export type {
   LayoutItem,
   Layout,
   LayoutVariant,
+  PatchedDisplay,
   ControlSlotProps,
   RefOption,
 } from './EntityDetailsForm/types';

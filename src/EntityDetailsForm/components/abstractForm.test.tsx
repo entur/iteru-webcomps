@@ -374,8 +374,8 @@ describe('patched fields', () => {
     ...fields,
     length: { ...fields.length, patched: true },
   });
-  const mount = (layout?: EntityDetailsFormProps<V>['layout']) =>
-    render(<PForm value={{}} onChange={() => {}} mode="edit" layout={layout} />);
+  const mount = (props: Partial<EntityDetailsFormProps<V>> = {}) =>
+    render(<PForm value={{}} onChange={() => {}} mode="edit" {...props} />);
   /** The row a labelled control sits in: control cell + mark cell. */
   const rowOf = (label: string) => screen.getByLabelText(label).closest('.MuiFormControl-root')!
     .parentElement!.parentElement!;
@@ -393,16 +393,40 @@ describe('patched fields', () => {
     expect(row.firstElementChild).not.toContainElement(marks[0] as HTMLElement);
   });
 
-  it('keeps the column on unmarked rows too, so every control is the same width', () => {
+  it('narrows only the marked row — an unmarked control keeps the full width', () => {
     mount();
-    expect(rowOf('Name').children).toHaveLength(2);
-    expect(rowOf('Name').lastElementChild).toBeEmptyDOMElement();
+    expect(rowOf('Length').children).toHaveLength(2);
+    expect(rowOf('Name').children).toHaveLength(1);
   });
 
   it('adds no column when no rendered field is patched', () => {
-    mount({ Edit: ['name'] });
+    mount({ layout: { Edit: ['name'] } });
     expect(rowOf('Name').children).toHaveLength(1);
     render(<Host />);
     expect(document.querySelector('[data-patch-mark]')).toBeNull();
+  });
+
+  it("patched='plain' renders the field without the * or its column", () => {
+    mount({ patched: 'plain' });
+    expect(screen.getByLabelText('Length')).toBeInTheDocument();
+    expect(document.querySelector('[data-patch-mark]')).toBeNull();
+    expect(rowOf('Name').children).toHaveLength(1);
+    expect(rowOf('Length').children).toHaveLength(1);
+  });
+
+  it("patched='hide' leaves the field out but keeps its value on edit", () => {
+    const onChange = vi.fn();
+    render(
+      <PForm
+        value={{ name: { value: 'Tram' }, length: 7 }}
+        onChange={onChange}
+        mode="edit"
+        patched="hide"
+      />
+    );
+    expect(screen.queryByLabelText('Length')).toBeNull();
+    expect(rowOf('Name').children).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Bus' } });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ length: 7 }));
   });
 });

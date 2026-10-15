@@ -21,6 +21,9 @@ import type { FieldSpec } from '../types';
 import * as forms from './index';
 import * as entities from '../../entities';
 import * as inputKeys from '../../generated/operations/inputKeys';
+import { EditFooter } from '../components/EditFooter';
+import { SectionToc } from '../../SectionToc';
+import { useFormSession, type FormSession } from '../hooks/useFormSession';
 
 // cwd-relative, matching how the generator itself reads the manifest.
 const MANIFEST = 'entities.manifest.json';
@@ -37,8 +40,11 @@ interface ManifestEntry {
 
 interface WrapperProps {
   netexId?: string;
+  mode?: 'view' | 'edit';
+  layout?: Record<string, string[]>;
+  variant?: 'tabs' | 'stacked';
+  session?: FormSession;
   onChange?: (value: unknown) => void;
-  onDirtyChange?: (dirty: boolean) => void;
 }
 
 const camel = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1);
@@ -130,6 +136,22 @@ const bind = (entry: ManifestEntry) => {
   if (!fields) throw new Error(`no distilled FIELDS for ${entry.entity}`);
   if (!mask) throw new Error(`no generated input keyset for ${entry.entity}`);
   return { Form: comp, fields, mask };
+};
+
+/**
+ * What a host does now: one session, the TOC and the footer placed outside the
+ * form. Save / Cancel exist only because this host renders them.
+ */
+const Hosted = ({ Form, ...props }: WrapperProps & { Form: ComponentType<WrapperProps> }) => {
+  const session = useFormSession();
+  return (
+    <>
+      <Form {...props} session={session} />
+      <SectionToc {...session.toc} />
+      <EditFooter {...session.footer} />
+      <output aria-label="editable">{String(session.editable)}</output>
+    </>
+  );
 };
 
 describe.each(manifest.map(e => [e.entity, e] as const))(
@@ -232,7 +254,7 @@ describe.each(manifest.map(e => [e.entity, e] as const))(
         .mockResolvedValueOnce({ [entry.mutationName]: NETEX_ID })
         .mockResolvedValueOnce(rows([row]));
 
-      await mount(<Form netexId={NETEX_ID} />);
+      await mount(<Hosted Form={Form} netexId={NETEX_ID} />);
       await waitFor(() => expect(screen.getByLabelText(humanize('netexId'))).toBeEnabled());
 
       // Edit a patch-only field where one is drivable: proves the field is
@@ -250,13 +272,69 @@ describe.each(manifest.map(e => [e.entity, e] as const))(
       expect(sent.filter(k => !(k in mask))).toEqual([]);
     });
 
+    // Typing drivable fields only: a switch toggled twice is back at its loaded
+    // value, which reads as clean, so it cannot show which edit was sent.
+    const typedKey = editable.find(k => drivable(k).kind !== 'switch');
+
+    it.runIf(typedKey !== undefined)('saves the latest edit through the host footer', async () => {
+      const key = typedKey as string;
+      const { kind, path } = drivable(key);
+      const typed = kind as Typed;
+      mockFns.request
+        .mockResolvedValueOnce(rows([{ netexId: NETEX_ID, ...seed([key]) }]))
+        .mockResolvedValueOnce({ [entry.mutationName]: NETEX_ID })
+        .mockResolvedValueOnce(rows([{ netexId: NETEX_ID, ...seed([key]) }]));
+
+      await mount(<Hosted Form={Form} netexId={NETEX_ID} />);
+      await waitFor(() => expect(screen.getByLabelText(humanize(key))).toBeEnabled());
+
+      // First edit to something that is not the final value, then the final one.
+      const input = screen.getByLabelText(humanize(key));
+      fireEvent.change(input, { target: { value: typed === 'number' ? '13' : 'Intermediate' } });
+      fireEvent.change(input, { target: { value: EDITED[typed] } });
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => expect(mockFns.request).toHaveBeenCalledTimes(3));
+      const { input: sent } = mockFns.request.mock.calls[1][1] as { input: Record<string, unknown> };
+      expect(String(sent[path[0]])).toBe(EDITED[typed]);
+    });
+
+    it.runIf(typedKey !== undefined)('sends one mutation for a double Save in one tick', async () => {
+      const key = typedKey as string;
+      const typed = drivable(key).kind as Typed;
+      mockFns.request
+        .mockResolvedValueOnce(rows([{ netexId: NETEX_ID, ...seed([key]) }]))
+        .mockResolvedValue({ [entry.mutationName]: NETEX_ID });
+
+      await mount(<Hosted Form={Form} netexId={NETEX_ID} />);
+      await waitFor(() => expect(screen.getByLabelText(humanize(key))).toBeEnabled());
+      fireEvent.change(screen.getByLabelText(humanize(key)), { target: { value: EDITED[typed] } });
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+
+      // Native clicks inside one act: no commit between them, so the button is
+      // still enabled for the second — as for a double-click or a doubled shortcut.
+      const save = screen.getByRole('button', { name: 'Save' });
+      await act(async () => {
+        save.click();
+        save.click();
+      });
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled());
+      const mutations = mockFns.request.mock.calls.filter(
+        ([, vars]) => (vars as { input?: unknown } | undefined)?.input !== undefined
+      );
+      expect(mutations).toHaveLength(1);
+    });
+
     it.runIf(editable.length)(
       'keeps the footer inert until an edit, then wakes both actions',
       async () => {
         const key = editable[0];
         mockFns.request.mockResolvedValueOnce(rows([{ netexId: NETEX_ID, ...seed([key]) }]));
 
-        await mount(<Form netexId={NETEX_ID} />);
+        await mount(<Hosted Form={Form} netexId={NETEX_ID} />);
         await waitFor(() => expect(screen.getByLabelText(humanize(key))).toBeEnabled());
 
         // Nothing to save and nothing to discard on a freshly loaded record.
@@ -275,7 +353,7 @@ describe.each(manifest.map(e => [e.entity, e] as const))(
       const kind = drivable(key).kind;
       mockFns.request.mockResolvedValueOnce(rows([{ netexId: NETEX_ID, ...seed([key]) }]));
 
-      await mount(<Form netexId={NETEX_ID} />);
+      await mount(<Hosted Form={Form} netexId={NETEX_ID} />);
       await waitFor(() => expect(screen.getByLabelText(humanize(key))).toBeEnabled());
 
       editControl(kind, humanize(key));
@@ -290,6 +368,94 @@ describe.each(manifest.map(e => [e.entity, e] as const))(
       else expect(input.value).toBe(String(LOADED[kind]));
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
       expect(mockFns.request).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders no Save / Cancel of its own', async () => {
+      mockFns.request.mockResolvedValueOnce(rows([{ netexId: NETEX_ID }]));
+
+      await mount(<Form netexId={NETEX_ID} />);
+      await waitFor(() => expect(screen.getByLabelText(humanize('netexId'))).toBeInTheDocument());
+
+      expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+    });
+
+    it('leaves the host footer disabled in view mode', async () => {
+      mockFns.request.mockResolvedValueOnce(rows([{ netexId: NETEX_ID }]));
+
+      await mount(<Hosted Form={Form} netexId={NETEX_ID} mode="view" />);
+      await waitFor(() => expect(screen.getByLabelText(humanize('netexId'))).toBeInTheDocument());
+
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+      expect(screen.getByLabelText('editable')).toHaveTextContent('false');
+    });
+
+    it('reports the session editable for a loaded edit-mode record', async () => {
+      mockFns.request.mockResolvedValueOnce(rows([{ netexId: NETEX_ID }]));
+
+      await mount(<Hosted Form={Form} netexId={NETEX_ID} />);
+      await waitFor(() => expect(screen.getByLabelText('editable')).toHaveTextContent('true'));
+    });
+
+    it('reports the session not editable after a failed load', async () => {
+      mockFns.request.mockRejectedValueOnce(new Error('boom'));
+
+      await mount(<Hosted Form={Form} netexId={NETEX_ID} />);
+      await waitFor(() => expect(screen.getByText('Failed to load')).toBeInTheDocument());
+
+      expect(screen.getByLabelText('editable')).toHaveTextContent('false');
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    });
+
+    it('leaves the host footer disabled when the record is not found', async () => {
+      mockFns.request.mockResolvedValueOnce(rows([]));
+
+      await mount(<Hosted Form={Form} netexId={NETEX_ID} />);
+      await waitFor(() => expect(screen.getByText(`Not found: ${NETEX_ID}`)).toBeInTheDocument());
+
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+      expect(screen.getByLabelText('editable')).toHaveTextContent('false');
+    });
+
+    // Any two registry keys make a two-section layout; labels are ours, so the
+    // assertion needs no entity knowledge.
+    const [first, second] = Object.keys(fields);
+    const twoSections = { First: [first], Second: [second] };
+
+    it('publishes a stacked layout’s sections to the host TOC', async () => {
+      mockFns.request.mockResolvedValueOnce(rows([{ netexId: NETEX_ID }]));
+
+      await mount(
+        <Hosted Form={Form} netexId={NETEX_ID} layout={twoSections} variant="stacked" />
+      );
+
+      await waitFor(() =>
+        expect(
+          screen.getAllByRole('button').filter(b => b.closest('nav')).map(b => b.textContent)
+        ).toEqual(['First', 'Second'])
+      );
+    });
+
+    it('publishes no sections for a record that is not found', async () => {
+      mockFns.request.mockResolvedValueOnce(rows([]));
+
+      await mount(
+        <Hosted Form={Form} netexId={NETEX_ID} layout={twoSections} variant="stacked" />
+      );
+      await waitFor(() => expect(screen.getByText(`Not found: ${NETEX_ID}`)).toBeInTheDocument());
+
+      expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull();
+    });
+
+    it('publishes no sections for a tabbed form', async () => {
+      mockFns.request.mockResolvedValueOnce(rows([{ netexId: NETEX_ID }]));
+
+      await mount(<Hosted Form={Form} netexId={NETEX_ID} layout={twoSections} variant="tabs" />);
+      await waitFor(() => expect(screen.getByRole('tab', { name: 'First' })).toBeInTheDocument());
+
+      expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull();
     });
 
     it('forwards the loaded entity to the host via onChange', async () => {

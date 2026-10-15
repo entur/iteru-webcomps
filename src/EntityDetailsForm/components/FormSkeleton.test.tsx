@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { FormSkeleton, FormArrival } from './FormSkeleton';
+import { PATCH_MARK_COL_PX } from '../utils/sections';
 import type { FieldSpec, Layout } from '../types';
 
 const FIELDS: Record<string, FieldSpec> = {
@@ -35,6 +36,25 @@ describe('FormSkeleton', () => {
     const { container } = render(<FormSkeleton fields={FIELDS} layout={{ General: ['name'] }} />);
 
     expect(rows(container)).toHaveLength(1);
+  });
+
+  it("narrows only a marked field's placeholder, as the form narrows its control", () => {
+    const patchedFields = { ...FIELDS, count: { ...FIELDS.count, patched: true } };
+    const { container } = render(<FormSkeleton fields={patchedFields} />);
+    const gap = (key: string) =>
+      getComputedStyle(
+        [...rows(container)][Object.keys(FIELDS).indexOf(key)]
+      ).marginRight;
+
+    expect(gap('count')).toBe(`${PATCH_MARK_COL_PX}px`);
+    expect(gap('name')).toBe('0px');
+  });
+
+  it("drops a patched field's placeholder when the form hides it", () => {
+    const patchedFields = { ...FIELDS, count: { ...FIELDS.count, patched: true } };
+    const { container } = render(<FormSkeleton fields={patchedFields} patched="hide" />);
+
+    expect(rows(container)).toHaveLength(Object.keys(FIELDS).length - 1);
   });
 
   it('stands in for the tab bar, showing only the active section’s rows', () => {

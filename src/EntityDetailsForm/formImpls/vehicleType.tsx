@@ -5,8 +5,9 @@ import { createAbstractEntityDetailsForm } from '../components/abstractForm';
 import { useEntityForm, useEntityResource } from '../hooks/useEntityForm';
 import type { EntityResource } from '../hooks/useEntityForm';
 import { useSobekCtx } from '../../context/SobekContext';
-import { EditFooter } from '../components/EditFooter';
-import type { EditFooterHostProps } from '../components/EditFooter';
+import { useSessionConnection } from '../hooks/useFormSession';
+import type { FormSession } from '../hooks/useFormSession';
+import { tocSections } from '../utils/sections';
 import { FormSkeleton, FormArrival } from '../components/FormSkeleton';
 import type { FormSkeletonHostProps } from '../components/FormSkeleton';
 import { FIELDS } from '../../entities/vehicleType';
@@ -34,7 +35,10 @@ const CONFIG = {
 };
 
 export interface VehicleTypeFormProps
-  extends Omit<EntityDetailsFormProps<VehicleType>, 'value' | 'onChange' | 'mode' | 'errors' | 'disabled'> {
+  extends Omit<
+    EntityDetailsFormProps<VehicleType>,
+    'value' | 'onChange' | 'mode' | 'errors' | 'disabled' | 'activeSection' | 'onActiveSectionChange'>
+  {
   netexId?: string;
   mode?: 'view' | 'edit';
   onSaved?: (netexId: string) => void;
@@ -43,15 +47,13 @@ export interface VehicleTypeFormProps
    *  Observation only — the form keeps owning its state. `undefined` when a
    *  load settles with no matching record, so the host can clear what it shows. */
   onChange?: (value: VehicleType | undefined) => void;
-  /** Fired when the form crosses between clean and dirty, against the entity
-   *  the server last returned. */
-  onDirtyChange?: (dirty: boolean) => void;
-  /** Labels and styling for the Save/Cancel footer this renders. Defaults are
-   *  English (no i18n runtime here); `sx` and `slotProps` reach the band and
-   *  the two buttons. The dirty/saving state stays the hook's. */
-  footerProps?: EditFooterHostProps;
+  /** The host's `useFormSession()`. The form publishes its TOC sections and
+   *  its dirty/saving state into it and registers its save and cancel; the
+   *  host places the TOC and the Save/Cancel footer from `session.toc` /
+   *  `session.footer`. Without one the form edits but cannot save. */
+  session?: FormSession;
   /** Label and styling for the loading skeleton this renders. Its *shape* is
-   *  derived from `FIELDS` + `layout` + `variant` and is not overridable —
+   *  derived from `FIELDS` + `layout` + `variant` + `patched` and is not overridable —
    *  that is what keeps it from drifting out of step with the form. */
   skeletonProps?: FormSkeletonHostProps;
 }
@@ -72,6 +74,7 @@ export function VehicleTypeForm({ skeletonProps, ...rest }: VehicleTypeFormProps
           fields={FIELDS}
           layout={rest.layout}
           variant={rest.variant}
+          patched={rest.patched}
         />
       }
     >
@@ -90,10 +93,9 @@ function VehicleTypeFormRecord(
     layout,
     variant,
     slotProps,
-    activeSection,
-    onActiveSectionChange,
+    patched,
     netexId,
-    footerProps,
+    session,
     resource,
     ...rest
   } = props;
@@ -109,6 +111,19 @@ function VehicleTypeFormRecord(
     ...rest,
   });
 
+  // A record that will not render as a form — a failed load, or a settled
+  // load with no row — offers the session no sections and nothing to save.
+  const shown = !(netexId && (load === 'error' || (!value && load === 'ok')));
+  // Before the early returns below: a hook cannot sit after them.
+  const sectionNav = useSessionConnection(session, {
+    sections: shown ? tocSections(FIELDS, layout, variant, patched) : [],
+    dirty,
+    saving,
+    editable: shown && mode === 'edit',
+    save: handleSave,
+    cancel: reset,
+  });
+
   // Both branches are settled states: `load` is never pending here, because
   // a pending record suspends and this component has not rendered at all.
   // A failed load is not a missing record — keep the two distinguishable.
@@ -119,35 +134,23 @@ function VehicleTypeFormRecord(
   if (netexId && !value && load === 'ok') return <div>Not found: {netexId}</div>;
 
   return (
-    <>
-      {/* Fades in as the record arrives, replacing the skeleton. Wraps the
-          presentation only: the fade animates `transform`, which would make
-          an ancestor a containing block and break the footer's sticky. */}
-      <FormArrival>
-        <VehicleTypeFormPresentation
-          value={{ ...(value ?? ({} as VehicleType)), dataOwnerRef }}
-          onChange={setValue}
-          mode={mode}
-          layout={layout}
-          variant={variant}
-          slotProps={slotProps}
-          activeSection={activeSection}
-          onActiveSectionChange={onActiveSectionChange}
-          errors={errors}
-          disabled={saving}
-        />
-      </FormArrival>
-      {/* Inert until the form diverges from the server, so Cancel cannot
-          discard nothing and Save cannot re-send an unchanged entity. */}
-      {mode === 'edit' && (
-        <EditFooter
-          {...footerProps}
-          dirty={dirty}
-          saving={saving}
-          onSave={handleSave}
-          onCancel={reset}
-        />
-      )}
-    </>
+    // Fades in as the record arrives, replacing the skeleton. Wraps the
+    // presentation only: the fade animates `transform`, which makes an
+    // ancestor a containing block — a sticky the host renders inside the
+    // form's parent would stop sticking for the length of the fade.
+    <FormArrival>
+      <VehicleTypeFormPresentation
+        value={{ ...(value ?? ({} as VehicleType)), dataOwnerRef }}
+        onChange={setValue}
+        mode={mode}
+        layout={layout}
+        variant={variant}
+        slotProps={slotProps}
+        patched={patched}
+        {...sectionNav}
+        errors={errors}
+        disabled={saving}
+      />
+    </FormArrival>
   );
 }

@@ -90,6 +90,11 @@ export type Layout<K extends string = string> = Record<string, LayoutItem<K>[]>;
 /** How ≥2 sections are presented: tab bar (one panel) or stacked panels. */
 export type LayoutVariant = 'tabs' | 'stacked';
 
+/** How `patched` fields are shown: `mark` (a trailing `*`, in a column the whole
+ *  form reserves), `plain` (no `*`, no column) or `hide` (left out, like a field
+ *  omitted from the layout — its value still round-trips through `onChange`). */
+export type PatchedDisplay = 'mark' | 'plain' | 'hide';
+
 /** Form-level MUI overrides, keyed by control kind. Applies to *every* field of
  *  that kind. The TextField-backed kinds (`text` / `number` / `name` / `enum`)
  *  take the TextField `slotProps` (merged over the lib's label-shrink default);
@@ -130,6 +135,8 @@ export interface EntityDetailsFormProps<E> {
   /** Per-kind MUI overrides (see `ControlSlotProps`). Applies to every field of
    *  the given kind; per-field overrides are a planned later addition. */
   slotProps?: ControlSlotProps;
+  /** How `patched` (not-yet-saved) fields are shown. Default `mark`. */
+  patched?: PatchedDisplay;
   /** Field-key → server error message (e.g. from validation). */
   errors?: Record<string, string>;
   /** Global disable (e.g. while loading or saving). */

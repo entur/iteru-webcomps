@@ -18,14 +18,15 @@ re-run it.
 
 **Layout of `src/EntityDetailsForm/`** — root holds the contract only
 (`index.ts`, `types.ts`); `components/` everything that renders (`abstractForm`,
-`controls`, `EditFooter`, `SaveSnackbar`), `hooks/` the hooks (`useEntityForm`, `useSectionSpy`), `utils/` the
+`controls`, `EditFooter`, `SaveSnackbar`), `hooks/` the hooks (`useEntityForm`, `useFormSession`, `useSectionSpy`), `utils/` the
 pure functions (`paths`, `toInput`, `reduceToSobekInput`, `normalizeErrors`,
 `dirty`), `formImpls/` the generated wrappers. Tests sit beside their subject.
 Two files outside the directory hardcode paths into it and must move with it:
 `scripts/distillTypes.ts` (`TYPES_IMPORT`, why `types.ts` stays at the root —
 moving it rewrites every committed `src/entities/*`) and
 `scripts/generateWrappers.ts`, whose emitted imports name
-`../components/{abstractForm,EditFooter}` and are pinned by
+`../components/abstractForm`, `../hooks/useFormSession` and `../utils/sections`
+and are pinned by
 `generateWrappers.test.ts`.
 
 `SobekProvider` (`src/context/SobekContext.tsx`) is a typed FC, not the raw
@@ -86,8 +87,8 @@ survives a switch into create mode. `onError` fires from an effect keyed on the
 settled result, so it fires once per record and never for a load the form has
 moved on from.
 
-**Host observation** (`onChange` / `onDirtyChange`, both optional, both
-ref-held so an inline arrow can't re-fire the effects). `onChange` fires on
+**Host observation** (`onChange`, optional, ref-held so an inline arrow can't
+re-fire the effect; dirty reaches the host through the session's `footer.dirty`). `onChange` fires on
 *every* value change — load and post-save refetch included, not just edits — so
 a host header can show the loaded name without waiting for a keystroke.
 Observation only: the hook keeps owning the value, and feeding it back in as a
@@ -107,9 +108,8 @@ nothing to re-baseline. The draft is discarded when the record changes, so a new
 record can't be masked by the previous one's edits. The comparison (`src/EntityDetailsForm/utils/dirty.ts`) treats `undefined | null | false |
 '' | []` as one value, which is what stops an untouched Switch reporting `false`
 against a null-backed baseline, or a text field typed into and cleared, from
-reading as edits. `0` is deliberately not empty. Both callbacks reach the hook
-through the generated wrapper's `...rest`, so the generator only declares them
-on `<Entity>FormProps` — nothing else in the template changes.
+reading as edits. `0` is deliberately not empty. `onChange` reaches the hook
+through the generated wrapper's `...rest`.
 
 **Loading.** While a record is in flight the wrapper's `<Suspense>` shows
 `FormSkeleton` (`src/EntityDetailsForm/components/FormSkeleton.tsx`) as its
@@ -124,34 +124,43 @@ edited `layout`/`variant` reshapes both at once, so there is no row-count
 literal to drift (hathor's `VEHICLE_FORM_ROWS = 7` is the anti-pattern). The
 arriving form fades in via `FormArrival`, which wraps the **presentation only**
 — its keyframe animates `transform`, and a transformed ancestor becomes a
-containing block, which would break `EditFooter`'s `position: sticky` for the
+containing block, which would break any sticky descendant for the
 length of the fade. Both honour `prefers-reduced-motion` (the guard also kills
 MUI's `wave`, which ships none). Host reach is `skeletonProps`
 (`FormSkeletonHostProps` = `ariaLabel` + `sx`); the shape is deliberately not
 overridable. `Not found` and the load-error branch stay plain text — a skeleton
 means "content is coming", which misreads on a terminal state.
 
-**Edit session.** In `mode='edit'` the wrapper renders `EditFooter`
-(`src/EntityDetailsForm/components/EditFooter.tsx`) rather than a bare Save button: a
-status line plus Cancel/Save, all three **inert until `dirty`** — so Save can't
-re-send an unchanged entity and Cancel can't discard nothing. Both actions also
-lock while `saving` (a discard mid-flight would restore a baseline the in-flight
-request is about to replace). Cancel is the hook's `reset()` — drop the draft and
-the save errors, with no request. It keeps `errors.__init` for free: that one is
-*derived* from the load rather than stored, so a discard cannot drop it, and
-consumers rendering the `'error'` phase always have a message. That replaces the host-side remount-under-a-new-`key` idiom, which
-threw away the loaded entity and re-fetched it; the `key` remount is still the
-way to switch *records*. The band is **sticky, so its own `backgroundColor`
-stays opaque** (`background.paper`) and the dirty tint rides on top as a flat
-`linear-gradient` — an `alpha()` colour there is 92% see-through and the fields
-scroll visibly through the buttons. Host reach: `footerProps`
-(`EditFooterHostProps` = `EditFooterProps` minus the state the hook owns) carries
-`labels` (English defaults, no i18n runtime here), `slotProps` (per-button MUI
-overrides, applied *before* the controlled `disabled`/`onClick`) and `sx`
-(applied after every default, so `backgroundImage: 'none'` drops the tint).
-`EditFooter` and `SaveSnackbar` are exported presentational components holding
-no state, so a host driving the presentational form directly (or rendering its
-own chrome from `onSaved`/`onError`) uses the same pieces.
+**Edit session.** The wrappers render **the form only** — no footer, no TOC.
+The host creates `useFormSession()` (`src/EntityDetailsForm/hooks/useFormSession.ts`),
+passes it as `session`, and places `<EditFooter {...session.footer} />` and
+`<SectionToc {...session.toc} />` wherever its layout wants (Fullpage: a band
+across the page, a TOC column or pinned dropdown). The wrapper's record half
+fills it through `useSessionConnection` — before its early returns — keyed by a
+module-private symbol: it publishes `sections` (`tocSections`: stacked + ≥2
+only), `dirty`, `saving`, `editable` (record branch rendered and
+`mode === 'edit'`; Not-found / load-error / view are not), and registers
+`handleSave` / `reset` into refs, so their per-edit identity never re-renders
+the host. Connect and publish run in **layout effects**, so the publish lands
+before paint, and when Suspense hides an already-mounted record (netexId / org
+change without a key remount) the session goes idle and reconnects on reveal.
+`footer.onSave` / `onCancel` forward only when the form is `editable`, dirty and
+not saving (view, Not-found, load error, nothing connected, a clean form and an
+in-flight save are all inert), so a host binding them to Ctrl+S can neither
+save from those states nor double-send a create. A publish re-renders the host
+synchronously before paint — the price of layout effects. A record switch (remount) disconnects the
+old form and connects the new one, which clears the section. Two live forms on
+one session: the later wins, with a `[FormSession]` warning. No session → the
+form edits but cannot save. The footer itself is unchanged: status line plus
+Cancel/Save, all **inert until `dirty`**, both locked while `saving`; Cancel is
+the hook's `reset()` — drop the draft and the save errors, with no request, and
+`errors.__init` survives (it is derived from the load). The `key` remount is
+still the way to switch *records*. The band is **sticky, so its own
+`backgroundColor` stays opaque** (`background.paper`) and the dirty tint rides
+on top as a flat `linear-gradient` — an `alpha()` colour there is 92%
+see-through. `labels` (English defaults), `slotProps` (applied *before* the
+controlled `disabled`/`onClick`) and `sx` are the host's own props on
+`EditFooter`.
 
 - `mode` `'view' | 'edit'` — view disables inputs.
 - `layout?` — whitelist of sections (`{ Section: [fields] }`). Omitted field not
@@ -170,12 +179,16 @@ own chrome from `onSaved`/`onError`) uses the same pieces.
   reaching the end changes no intersection, so that rule runs off a `scroll`
   listener. Sections are keyed by layout key (`data-section`); the effect key is
   the labels as JSON, never delimiter-joined (a key may hold any character). Flat and tabbed forms
-  ignore both. The generated wrapper must destructure them out of `...rest`,
-  which is spread into `useEntityForm`, not into the presentation.
-  The other end is `SectionToc` (`src/SectionToc/`): a stateless `<nav>` list
+  ignore both. On the presentational form only — the generated wrappers omit both from their props and feed them from the session.
+  The other end is `SectionToc` (`src/SectionToc/`): a stateless `<nav>`
   taking `sections` / `active` / `onSelect`, with **no import from the form** —
-  the host joins the two, feeding it `resolveSections(fields, layout)` labels
-  (exported for exactly this) so the list matches what the form renders.
+  a data-aware host feeds it `session.toc` (the wrapper publishes `tocSections(FIELDS, layout, variant, patched)`, so the list matches what the form renders); a host of the presentational form calls `resolveSections` itself.
+  `variant` `'list' | 'dropdown'`: same contract, so the dropdown keeps the scroll
+  feedback (its value is `active`). Every pick reports via the item's `onClick`
+  (a select fires no change for its current value). It measures nothing — the
+  host picks the variant (Fullpage: dropdown below `md`; toolbar + TOC pinned
+  in one header whose measured height is both the list column's sticky `top`
+  and `html { scroll-padding-top }`, so `scrollIntoView` clears it).
 - `serverManaged` fields (`version`, `created`, `changed`, `changedBy`) hidden
   from editable model: locked even in edit, surfaced only to *see* meta/semantic
   context. Backend-owned — **not round-tripped**, never in write payload, don't
@@ -210,6 +223,10 @@ own chrome from `onSaved`/`onError`) uses the same pieces.
   (`text|number|name|enum|date|datetime`) take TextField `slotProps` (merged over
   the label-shrink default); `enumMulti`→Autocomplete, `switch`→`SwitchProps`,
   `grid`→`{ dataGrid }`. Per-field override is a planned later addition.
+- `patched?` `'mark' | 'plain' | 'hide'` — how patched (not-yet-saved) fields
+  show. Default `mark`; `plain` drops the `*` and its column; `hide` leaves them
+  out like an omitted layout field (value still round-trips). Passed through
+  `resolveSections`, so the skeleton and a host TOC drop the same fields.
 
 ## Collection
 
@@ -379,11 +396,14 @@ collects each `extend type <Entity>` and stamps `patched: true` on the derived
 `FIELDS` entries (hoisted leaves of a patched object included). Display
 metadata only — it never decides what is sent. The form draws a `*` in a column
 *after* the control, outside the input (`row()` in `abstractForm`), with a
-"not saved" hint as `title`/`aria-label`. The column is reserved for the whole
-form or not at all (`hasPatched` in `utils/sections`): per row a marked control
-would be narrower than its neighbours, per section a tab switch would resize
-them. `FormSkeleton` reserves the same `PATCH_MARK_COL_PX`. Derived, so the mark
-disappears with the `extend` line.
+"not saved" hint as `title`/`aria-label`. The cell is per row (`marked` in
+`utils/sections`): only a marked control is `PATCH_MARK_COL_PX` narrower, every
+other control keeps the full width — chosen over a form-wide column, which
+shortened every input to line up with the few marked ones. `FormSkeleton`
+narrows the same rows by the same width. Derived, so the mark
+disappears with the `extend` line. A host can also turn it off per form with the
+`patched` prop (`plain` / `hide`), which the generated wrappers hand to both the
+presentation and the skeleton, never to the hook.
 Residue: `Types.<Entity>Input` in `sobekTypes.ts` stays patched, so the
 *variables type* still permits those keys at compile time — only the runtime
 mask stops them.

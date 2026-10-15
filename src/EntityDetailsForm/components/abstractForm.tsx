@@ -3,7 +3,7 @@ import { Box, Stack, Tab, Tabs, Typography } from '@mui/material';
 import type { EntityDetailsFormProps, FieldSpec } from '../types';
 import { getPath, setPath } from '../utils/paths';
 import {
-  hasPatched,
+  marked,
   PATCH_MARK_COL_PX,
   resolveSections,
   type ResolvedField,
@@ -33,6 +33,7 @@ export function createAbstractEntityDetailsForm<E>(
     layout,
     variant = 'tabs',
     slotProps,
+    patched = 'mark',
     errors,
     disabled: disabledProp,
     activeSection,
@@ -41,7 +42,7 @@ export function createAbstractEntityDetailsForm<E>(
     const [active, setActive] = useState(0);
     // Empty sections are dropped by `resolveSections` itself, so the skeleton
     // and the form always agree on how many there are.
-    const sections = resolveSections(fields, layout);
+    const sections = resolveSections(fields, layout, patched);
     const current = Math.min(active, Math.max(0, sections.length - 1));
     // Only the stacked variant is a scroll surface; flat and tabs have no
     // section to scroll to, so the spy stays off for them.
@@ -52,22 +53,18 @@ export function createAbstractEntityDetailsForm<E>(
       onActiveChange: onActiveSectionChange,
     });
 
-    const marks = hasPatched(fields, sections);
-    // One row per field: the control, then — in a form with any patched field —
-    // a fixed column that holds the `*` or stays empty, so every control keeps
-    // the same width whether or not it is marked.
+    // One row per field: the control, then — on a marked row only — a fixed
+    // cell holding the `*`. Unmarked controls keep the full row width.
     const row = (key: string, control: ReactNode): ReactNode => (
       <Box key={key} sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>{control}</Box>
-        {marks && (
+        {marked(fields[key], patched) && (
           <Box
             sx={{ width: PATCH_MARK_COL_PX, flexShrink: 0, textAlign: 'right', color: 'text.secondary' }}
           >
-            {fields[key].patched && (
-              <span title={PATCH_HINT} aria-label={PATCH_HINT} data-patch-mark>
-                *
-              </span>
-            )}
+            <span title={PATCH_HINT} aria-label={PATCH_HINT} data-patch-mark>
+              *
+            </span>
           </Box>
         )}
       </Box>
