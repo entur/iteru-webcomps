@@ -61,7 +61,7 @@ export const vehicleTypeSeed: Record<string, VehicleType> = {
     netexId: "VEH:VehicleType:2",
     name: { lang: "en", value: "BusNordic I:15 DD" }, // busnordic/bn-i-15-dd.json
     deckPlan: { netexId: "VEH:DeckPlan:2", dataOwnerRef: "" },
-    manufacturer: undefined, // a Bus Nordic reference body, not a make
+    manufacturer: "generic", // a Bus Nordic reference body, not a make
     modelName: "I:15 DD",
     euroClass: "EURO VI", // off the code list: still shown, kept on save
     length: 14.9,

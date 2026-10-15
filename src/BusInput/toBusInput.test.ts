@@ -18,7 +18,7 @@ describe('toBusInput — seeds', () => {
   it.each([
     ['Volvo 8900 LE', VOLVO],
     ['Citaro G', CITARO],
-    ['BusNordic I:15 DD, once it has a make', { ...BUSNORDIC, manufacturer: 'BusNordic' }],
+    ['BusNordic I:15 DD', BUSNORDIC],
   ])('%s passes 3dbus validate', (_n, vt) => {
     expect(validate(inpOf(vt))).toEqual([]);
   });
@@ -26,13 +26,13 @@ describe('toBusInput — seeds', () => {
   it('passes validate for every seeded Vehicle over its type', () => {
     for (const v of Object.values(vehicleSeed)) {
       const vt = vehicleTypeSeed[v.transportType?.netexId ?? ''];
-      const r = toBusInput({ ...vt, manufacturer: vt.manufacturer ?? 'BusNordic' }, v);
+      const r = toBusInput(vt, v);
       expect(r.ok && validate(r.inp)).toEqual([]);
     }
   });
 
-  it('reports what the BusNordic seed lacks instead of inventing a make', () => {
-    expect(toBusInput(BUSNORDIC)).toEqual({ ok: false, missing: ['manufacturer'] });
+  it('reports a missing make instead of inventing one', () => {
+    expect(toBusInput({ ...BUSNORDIC, manufacturer: undefined })).toEqual({ ok: false, missing: ['manufacturer'] });
   });
 });
 
