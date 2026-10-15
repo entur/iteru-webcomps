@@ -2,12 +2,10 @@ import { useMemo, useState, type FC } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   Box,
-  FormControlLabel,
   ListItemIcon,
   ListItemText,
   MenuItem,
   Paper,
-  Switch,
   TextField,
   Typography,
 } from "@mui/material";
@@ -25,6 +23,7 @@ import {
   type LayoutVariant,
   type ControlSlotProps,
   type SaveToast,
+  type VehicleTypeFormProps,
 } from "../index";
 import { vehicleSeed, vehicleTypeSeed } from "./initDataSets";
 import { vehicleLayout, vehicleTypeLayout } from "./initLayouts";
@@ -38,11 +37,11 @@ import { installStoriesMock, setMockLatency } from "./mockEndpoint";
  * record (or "New …") in either activates that entity's form. Reproduces the
  * host-guide "complete host
  * page" (list → select → view/edit → save), and shows the parts the guide only
- * describes in prose: `SaveSnackbar` fed from onSaved/onError. The form is
- * always in edit mode. A column sits beside the form: with
- * `tabStyle: none` it holds a `SectionToc` wired to the stacked form's
- * `activeSection` / `onActiveSectionChange`, and always a story-only "Tune"
- * panel whose switch reveals the patched ("future") fields, hidden by default.
+ * describes in prose: `SaveSnackbar` fed from onSaved/onError. The form's own
+ * props (`mode`, `variant`, `footerProps`, `skeletonProps`) are story args, so
+ * they are driven from Storybook Controls rather than page chrome. A stacked
+ * form with several sections gets a column beside it holding a `SectionToc`
+ * wired to its `activeSection` / `onActiveSectionChange`.
  * Discard is not the page's job — the form renders its own `EditFooter`, whose
  * Cancel restores the loaded entity without a remount.
  */
@@ -51,18 +50,17 @@ import { installStoriesMock, setMockLatency } from "./mockEndpoint";
 installStoriesMock();
 
 const SELECT_WIDTH = 260,
-  TUNE_WIDTH = 200;
+  TOC_WIDTH = 200;
 const NEW_KEY = "new";
 /** Slow enough that the skeleton and the arrival fade are actually watchable. */
 const DEFAULT_READ_DELAY_MS = 600;
 
 /**
- * How a multi-section form presents its sections (mirrors DumbAppMock):
- * - `none`     → no tab bar (stacked sections).
+ * How a `tabs` form draws its tab bar:
  * - `one-line` → scrollable tabs on one row, `>` chevrons for overflow.
  * - `pills`    → wrapping filled-pill tabs (hathor's VehicleTypeForm style).
  */
-type TabStyle = "none" | "one-line" | "pills";
+type TabStyle = "one-line" | "pills";
 
 /** `slotProps` reproducing hathor's wrapping pill tabs: `standard` variant (so
  *  the row can wrap) + a flex-wrap container + filled-pill tab styling. */
@@ -85,30 +83,14 @@ const PILL_TABS_SX = {
   },
 } as const;
 
-/** Derive a form's `variant` + Tabs `slotProps` from a {@link TabStyle}. */
-const deriveTabs = (
-  tabStyle: TabStyle,
-): { variant: LayoutVariant; slotProps: ControlSlotProps } => {
-  if (tabStyle === "none") return { variant: "stacked", slotProps: {} };
-  if (tabStyle === "pills")
-    return { variant: "tabs", slotProps: { tabs: { variant: "standard", sx: PILL_TABS_SX } } };
+/** Tabs `slotProps` for a {@link TabStyle}; a stacked form has no tab bar. */
+const tabSlotProps = (variant: LayoutVariant, tabStyle: TabStyle): ControlSlotProps => {
+  if (variant !== "tabs") return {};
+  if (tabStyle === "pills") return { tabs: { variant: "standard", sx: PILL_TABS_SX } };
   return {
-    variant: "tabs",
-    slotProps: {
-      tabs: { variant: "scrollable", scrollButtons: "auto", allowScrollButtonsMobile: true },
-    },
+    tabs: { variant: "scrollable", scrollButtons: "auto", allowScrollButtonsMobile: true },
   };
 };
-
-/** Drop the `patched` fields from a layout. A layout is a whitelist and an
- *  omitted field still round-trips, so hiding them here loses nothing. */
-const withoutPatched = (layout: Layout, fields: Record<string, FieldSpec>): Layout =>
-  Object.fromEntries(
-    Object.entries(layout).map(([label, items]) => [
-      label,
-      items.filter((item) => !fields[typeof item === "string" ? item : item.field]?.patched),
-    ]),
-  );
 
 /** Which entity the detail pane is showing. */
 type entity = "vehicleType" | "vehicle";
@@ -116,19 +98,22 @@ type entity = "vehicleType" | "vehicle";
 /** A selected record; `netexId` omitted ⇒ a blank "new" form of that entity. */
 type Selection = { entity: entity; netexId?: string };
 
+/** The form props surfaced as story args. VehicleForm takes the same ones. */
+type FormArgs = Pick<VehicleTypeFormProps, "mode" | "variant" | "footerProps" | "skeletonProps">;
+
 /** The data-aware form props this page drives — VehicleForm and VehicleTypeForm
  *  share one shape (layout is the base `Layout`, not entity-specific). */
-type DataAwareForm = FC<{
-  netexId?: string;
-  mode?: "view" | "edit";
-  variant?: LayoutVariant;
-  slotProps?: ControlSlotProps;
-  layout?: Layout;
-  onSaved?: (netexId: string) => void;
-  onError?: (generalErrors: string[]) => void;
-  activeSection?: string;
-  onActiveSectionChange?: (section: string) => void;
-}>;
+type DataAwareForm = FC<
+  FormArgs & {
+    netexId?: string;
+    slotProps?: ControlSlotProps;
+    layout?: Layout;
+    onSaved?: (netexId: string) => void;
+    onError?: (generalErrors: string[]) => void;
+    activeSection?: string;
+    onActiveSectionChange?: (section: string) => void;
+  }
+>;
 
 /** Minimal record shape the lists need from either entity. */
 type Rec = { netexId: string; name?: { value?: string | null } | null };
@@ -180,10 +165,11 @@ const recordIds = (seed: Record<string, Rec>, current: string): string[] => {
   return current && current !== NEW_KEY && !ids.includes(current) ? [...ids, current] : ids;
 };
 
-/** Story-adjustable props, surfaced as Storybook Controls. */
-interface GqlHostPageProps {
-  /** How multi-section forms (VehicleType) present sections. Single-section
-   *  Vehicle renders flat regardless. */
+/** Story-adjustable props, surfaced as Storybook Controls: the form's own props
+ *  passed straight through, plus two the story owns. */
+interface GqlHostPageProps extends FormArgs {
+  /** Tab bar style when `variant` is `tabs`. Single-section Vehicle renders
+   *  flat regardless. */
   tabStyle?: TabStyle;
   /** Mock read latency. The forms render their own load states, so this is the
    *  only way to see the shaped skeleton and the arrival fade — at `0` the
@@ -197,16 +183,20 @@ interface GqlHostPageProps {
 /**
  * Single host screen with a toolbar of record pickers (VehicleType + Vehicle)
  * feeding one detail pane. Selecting an item swaps the pane to that entity's
- * data-aware form, always in edit mode; the pane owns the host concerns —
+ * data-aware form; the pane owns the host concerns —
  * new-vs-existing via `netexId`, record switch via remount `key`, and reacting
  * to saves.
  */
-const GqlHostPage = ({ tabStyle = "none" }: GqlHostPageProps) => {
-  const { variant, slotProps } = useMemo(() => deriveTabs(tabStyle), [tabStyle]);
+const GqlHostPage = ({
+  mode = "edit",
+  variant = "stacked",
+  tabStyle = "one-line",
+  footerProps,
+  skeletonProps,
+}: GqlHostPageProps) => {
+  const slotProps = useMemo(() => tabSlotProps(variant, tabStyle), [variant, tabStyle]);
   const [selection, setSelection] = useState<Selection | null>(DEFAULT_SELECTION);
   const [toast, setToast] = useState<SaveToast | null>(null);
-  // Page-level, so the choice survives a record switch.
-  const [showFuture, setShowFuture] = useState(false);
   // One piece of state for both directions: the form reports the section being
   // read, the TOC requests one, and the form ignores its own reports coming back.
   const [section, setSection] = useState<string>();
@@ -218,13 +208,8 @@ const GqlHostPage = ({ tabStyle = "none" }: GqlHostPageProps) => {
 
   const active = selection ? ENTITY[selection.entity] : null;
   const Form = active?.Form;
-  const hasFuture = !!active && Object.values(active.fields).some((f) => f.patched);
-  // One layout for both the form and the TOC, so they hide the same fields.
-  const layout = useMemo(
-    () =>
-      !active || showFuture ? active?.layout : withoutPatched(active.layout, active.fields),
-    [active, showFuture],
-  );
+  // One layout for both the form and the TOC, so they list the same sections.
+  const layout = active?.layout;
   // Same call the form makes, so the list is what the form renders — and only
   // a stacked form with several sections has anything to navigate.
   const tocSections = useMemo(() => {
@@ -292,50 +277,30 @@ const GqlHostPage = ({ tabStyle = "none" }: GqlHostPageProps) => {
       </Box>
 
       <Box sx={{ display: "flex", flex: 1 }}>
-        {/* Left: always there for the Tune panel; the table of contents joins
-            it above when the stacked form has sections to navigate. */}
-        <Box
-          sx={{
-            width: TUNE_WIDTH,
-            flexShrink: 0,
-            borderRight: 1,
-            borderColor: "divider",
-            bgcolor: "background.paper",
-          }}
-        >
-          {/* The page scrolls, not the column, so the content is pinned inside it. */}
-          <Box sx={{ position: "sticky", top: 0, p: 2 }}>
-            {tocSections.length > 0 && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="overline" color="text.secondary">
-                  Sections
-                </Typography>
-                <SectionToc
-                  sections={tocSections}
-                  active={section ?? tocSections[0]}
-                  onSelect={setSection}
-                />
-              </Box>
-            )}
-            <Typography variant="overline" color="text.secondary" component="div">
-              Tune
-            </Typography>
-            <FormControlLabel
-              // Nothing to reveal on an entity with no patched fields.
-              disabled={!hasFuture}
-              control={
-                <Switch
-                  size="small"
-                  checked={showFuture}
-                  onChange={(e) => setShowFuture(e.target.checked)}
-                />
-              }
-              label="Show future fields (*)"
-              slotProps={{ typography: { variant: "body2" } }}
-              sx={{ ml: 0, gap: 0.5 }}
-            />
+        {/* Left: only when the stacked form has sections to navigate. */}
+        {tocSections.length > 0 && (
+          <Box
+            sx={{
+              width: TOC_WIDTH,
+              flexShrink: 0,
+              borderRight: 1,
+              borderColor: "divider",
+              bgcolor: "background.paper",
+            }}
+          >
+            {/* The page scrolls, not the column, so the content is pinned inside it. */}
+            <Box sx={{ position: "sticky", top: 0, p: 2 }}>
+              <Typography variant="overline" color="text.secondary">
+                Sections
+              </Typography>
+              <SectionToc
+                sections={tocSections}
+                active={section ?? tocSections[0]}
+                onSelect={setSection}
+              />
+            </Box>
           </Box>
-        </Box>
+        )}
 
         {/* Right: the selected entity's data-aware form + host chrome. */}
         <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, sm: 4 } }}>
@@ -355,10 +320,12 @@ const GqlHostPage = ({ tabStyle = "none" }: GqlHostPageProps) => {
                   // hook's baseline in place, with no second round trip.
                   key={`${selection.entity}:${selection.netexId ?? NEW_KEY}`}
                   netexId={selection.netexId}
-                  mode="edit"
+                  mode={mode}
                   variant={variant}
                   slotProps={slotProps}
                   layout={layout}
+                  footerProps={footerProps}
+                  skeletonProps={skeletonProps}
                   activeSection={section}
                   onActiveSectionChange={setSection}
                   onSaved={(id) => {
@@ -400,13 +367,50 @@ const meta: Meta<typeof GqlHostPage> = {
   beforeEach: ({ args }) => {
     setMockLatency({ read: args.readDelayMs ?? DEFAULT_READ_DELAY_MS });
   },
-  args: { tabStyle: "none", readDelayMs: DEFAULT_READ_DELAY_MS },
+  args: {
+    mode: "edit",
+    variant: "stacked",
+    tabStyle: "one-line",
+    // The footer's English defaults, spelled out so the control shows what to edit.
+    footerProps: {
+      labels: {
+        save: "Save",
+        cancel: "Cancel",
+        clean: "All changes saved",
+        dirty: "Unsaved changes",
+        saving: "Saving…",
+      },
+    },
+    skeletonProps: { ariaLabel: "Loading form" },
+    readDelayMs: DEFAULT_READ_DELAY_MS,
+  },
   argTypes: {
+    mode: {
+      control: "inline-radio",
+      options: ["view", "edit"],
+      description: "Form `mode`. `view` disables every input and drops the Save/Cancel footer.",
+    },
+    variant: {
+      control: "inline-radio",
+      options: ["stacked", "tabs"],
+      description:
+        "Form `variant` for multi-section forms (VehicleType): stacked gets a table of contents beside it. Vehicle is single-section, so unaffected.",
+    },
     tabStyle: {
       control: "inline-radio",
-      options: ["none", "one-line", "pills"],
+      options: ["one-line", "pills"],
+      if: { arg: "variant", eq: "tabs" },
       description:
-        "How multi-section forms (VehicleType) present sections: none = stacked (no tabs) with a table of contents above the Tune panel, one-line = scrollable tab row, pills = wrapping pill tabs. Vehicle is single-section, so unaffected.",
+        "Story-only: the tab bar's `slotProps`. one-line = scrollable tab row, pills = wrapping pill tabs.",
+    },
+    footerProps: {
+      control: "object",
+      description: "Form `footerProps` (`labels`, `slotProps`, `sx`) for the Save/Cancel band.",
+    },
+    skeletonProps: {
+      control: "object",
+      description:
+        "Form `skeletonProps` (`ariaLabel`, `sx`) for the loading skeleton. Raise readDelayMs to see it.",
     },
     readDelayMs: {
       control: { type: "range", min: 0, max: 3000, step: 100 },
