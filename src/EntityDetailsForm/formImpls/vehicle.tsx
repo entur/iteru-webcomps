@@ -53,7 +53,7 @@ export interface VehicleFormProps
    *  `session.footer`. Without one the form edits but cannot save. */
   session?: FormSession;
   /** Label and styling for the loading skeleton this renders. Its *shape* is
-   *  derived from `FIELDS` + `layout` + `variant` + `patched` and is not overridable —
+   *  derived from `FIELDS` + `layout` + `variant` + `patched` + `widths` and is not overridable —
    *  that is what keeps it from drifting out of step with the form. */
   skeletonProps?: FormSkeletonHostProps;
 }
@@ -75,6 +75,7 @@ export function VehicleForm({ skeletonProps, ...rest }: VehicleFormProps) {
           layout={rest.layout}
           variant={rest.variant}
           patched={rest.patched}
+          widths={rest.widths}
         />
       }
     >
@@ -94,6 +95,7 @@ function VehicleFormRecord(
     variant,
     slotProps,
     patched,
+    widths,
     netexId,
     session,
     resource,
@@ -147,6 +149,7 @@ function VehicleFormRecord(
         variant={variant}
         slotProps={slotProps}
         patched={patched}
+        widths={widths}
         {...sectionNav}
         errors={errors}
         disabled={saving}

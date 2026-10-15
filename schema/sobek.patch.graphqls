@@ -29,7 +29,7 @@ input ValidBetweenInput { fromDate: DateTime toDate: DateTime }
 extend type VehicleType {
   manufacturer: String
   modelName: String
-  fullCharge: Float                  # kWh (battery capacity)
+  fullCharge: Float                  # Wh (NeTEx FullCharge: WattHoursType)
   carLoading: Boolean
   draft: Float                       # m
   tareWeight: Float                  # kg

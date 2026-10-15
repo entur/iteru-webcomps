@@ -8,14 +8,26 @@
  * `layout` reshapes both at once with no hand-tuned row counts.
  */
 import { humanize } from '../../shared/humanize';
-import type { FieldEntry, FieldSpec, Layout, LayoutItem, LayoutVariant, PatchedDisplay, RefOption } from '../types';
+import type {
+  FieldEntry,
+  FieldKind,
+  FieldSpec,
+  FieldWidth,
+  KindWidths,
+  Layout,
+  LayoutItem,
+  LayoutVariant,
+  PatchedDisplay,
+  RefOption,
+} from '../types';
 
-/** A field resolved for rendering: its registry key, display label, the optional
- *  explicit grid column entries, and (for a `reference`) the option-dataset
- *  closure — both from the layout. */
+/** A field resolved for rendering: its registry key, display label, its share
+ *  of the row, the optional explicit grid column entries, and (for a
+ *  `reference`) the option-dataset closure — both from the layout. */
 export interface ResolvedField {
   key: string;
   label: string;
+  width: FieldWidth;
   cols?: FieldEntry[];
   options?: () => RefOption[];
 }
@@ -25,6 +37,36 @@ export interface Section {
   label: string;
   fields: ResolvedField[];
 }
+
+/** Default share of a row per control kind: a number or a date doesn't need a
+ *  name's width, so narrow kinds pack side by side. */
+export const KIND_WIDTH: Record<FieldKind, FieldWidth> = {
+  number: '1/3',
+  date: '1/2',
+  datetime: '1/2',
+  switch: '1/2',
+  text: 'full',
+  name: 'full',
+  enum: 'full',
+  enumMulti: 'full',
+  reference: 'full',
+  grid: 'full',
+};
+
+/** Columns a width spans on the default 12-column MUI `Grid`. */
+const WIDTH_SPAN: Record<FieldWidth, number> = { full: 12, '1/2': 6, '1/3': 4, '1/4': 3 };
+
+/**
+ * The responsive `Grid` `size` for a width: full below `sm`, the fraction from
+ * there up. Shared so the skeleton places a row exactly as the form will.
+ *
+ * @param width the field's resolved width
+ * @returns a `size` prop for an MUI `Grid` item
+ */
+export const gridSize = (width: FieldWidth): { xs: number; sm: number } => ({
+  xs: WIDTH_SPAN.full,
+  sm: WIDTH_SPAN[width],
+});
 
 /** Width of the cell holding a patched field's `*`, to the right of the
  *  control. Shared so the skeleton narrows a row exactly as the form will. */
@@ -42,14 +84,26 @@ export const PATCH_MARK_COL_PX = 16;
 export const marked = (spec: FieldSpec, patched: PatchedDisplay): boolean =>
   patched === 'mark' && !!spec.patched;
 
-/** Normalize a `LayoutItem` to `{ field, label?, entries?, options? }`. Also
- *  used by the collection's column whitelist, which takes the same items. */
+/** Normalize a `LayoutItem` to `{ field, label?, width?, entries?, options? }`.
+ *  Also used by the collection's column whitelist, which takes the same items. */
 export const norm = (
   item: LayoutItem
-): { field: string; label?: string; entries?: FieldEntry[]; options?: () => RefOption[] } =>
+): {
+  field: string;
+  label?: string;
+  width?: FieldWidth;
+  entries?: FieldEntry[];
+  options?: () => RefOption[];
+} =>
   typeof item === 'string'
     ? { field: item }
-    : { field: item.field, label: item.label, entries: item.entries, options: item.options };
+    : {
+        field: item.field,
+        label: item.label,
+        width: item.width,
+        entries: item.entries,
+        options: item.options,
+      };
 
 /**
  * Resolve a registry + optional layout into the sections to render.
@@ -58,23 +112,29 @@ export const norm = (
  * order. With a layout it is a whitelist: unknown keys are dropped, a key
  * repeated across sections lands only in the first, and empty sections are
  * removed so neither renderer draws a heading over nothing. `patched: 'hide'`
- * drops patched fields on both paths, before the empty-section rule.
+ * drops patched fields on both paths, before the empty-section rule. Each
+ * field's width is the layout entry's, else `widths` for its kind, else
+ * `KIND_WIDTH` — so a zero-config form packs its numbers too.
  *
  * @param fields generated `FIELDS` registry for the entity
  * @param layout optional section whitelist
  * @param patched how patched fields are shown; only `hide` changes the shape
+ * @param widths form-level width per kind, over `KIND_WIDTH`
  * @returns non-empty sections, in layout order
  */
 export function resolveSections(
   fields: Record<string, FieldSpec>,
   layout?: Layout,
-  patched: PatchedDisplay = 'mark'
+  patched: PatchedDisplay = 'mark',
+  widths?: KindWidths
 ): Section[] {
   const shown = (key: string) => !!fields[key] && !(patched === 'hide' && fields[key].patched);
+  const widthOf = (key: string, own?: FieldWidth): FieldWidth =>
+    own ?? widths?.[fields[key].kind] ?? KIND_WIDTH[fields[key].kind];
   if (!layout) {
     const all = Object.keys(fields)
       .filter(shown)
-      .map(key => ({ key, label: humanize(key) }));
+      .map(key => ({ key, label: humanize(key), width: widthOf(key) }));
     return all.length ? [{ label: '', fields: all }] : [];
   }
   const seen = new Set<string>();
@@ -87,6 +147,7 @@ export function resolveSections(
         .map(e => ({
           key: e.field,
           label: e.label ?? humanize(e.field),
+          width: widthOf(e.field, e.width),
           cols: e.entries,
           options: e.options,
         })),

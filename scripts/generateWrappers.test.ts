@@ -67,7 +67,7 @@ describe('renderWrapperSource', () => {
     // has to sit inside the boundary, which is why the wrapper splits in two.
     expect(src).toMatch(/import \{ Suspense \} from 'react';/);
     expect(src).toMatch(
-      /<Suspense\s+fallback=\{\s+<FormSkeleton\s+\{\.\.\.skeletonProps\}\s+fields=\{FIELDS\}\s+layout=\{rest\.layout\}\s+variant=\{rest\.variant\}\s+patched=\{rest\.patched\}\s+\/>\s+\}\s+>\s+<VehicleFormRecord \{\.\.\.rest\} resource=\{resource\} \/>\s+<\/Suspense>/
+      /<Suspense\s+fallback=\{\s+<FormSkeleton\s+\{\.\.\.skeletonProps\}\s+fields=\{FIELDS\}\s+layout=\{rest\.layout\}\s+variant=\{rest\.variant\}\s+patched=\{rest\.patched\}\s+widths=\{rest\.widths\}\s+\/>\s+\}\s+>\s+<VehicleFormRecord \{\.\.\.rest\} resource=\{resource\} \/>\s+<\/Suspense>/
     );
   });
 
@@ -80,11 +80,11 @@ describe('renderWrapperSource', () => {
     expect(src).toMatch(/<\/FormArrival>\s+\);\n\}/);
   });
 
-  it('hands the patched display to the presentation, not to the hook', () => {
-    // Left in `...rest` it would be spread into `useEntityForm` and never reach
-    // the form that draws (or hides) the patched fields.
-    expect(src).toMatch(/\n    slotProps,\n    patched,\n/);
-    expect(src).toMatch(/slotProps=\{slotProps\}\s+patched=\{patched\}/);
+  it('hands the patched display and the widths to the presentation, not to the hook', () => {
+    // Left in `...rest` they would be spread into `useEntityForm` and never
+    // reach the form that draws (or hides) the fields.
+    expect(src).toMatch(/\n    slotProps,\n    patched,\n    widths,\n/);
+    expect(src).toMatch(/slotProps=\{slotProps\}\s+patched=\{patched\}\s+widths=\{widths\}/);
   });
 
   it('takes the section pair from the session, not from props', () => {

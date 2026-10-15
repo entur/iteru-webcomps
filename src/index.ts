@@ -37,7 +37,7 @@ export type {
 // will actually render, so the list it is fed can't drift from the form.
 export { SectionToc } from './SectionToc';
 export type { SectionTocProps, SectionTocVariant } from './SectionToc';
-export { resolveSections } from './EntityDetailsForm/utils/sections';
+export { resolveSections, KIND_WIDTH } from './EntityDetailsForm/utils/sections';
 export type { Section, ResolvedField } from './EntityDetailsForm/utils/sections';
 // Generated wrappers + their props types: VehicleTypeForm/VehicleTypeFormProps,
 // VehicleForm/VehicleFormProps. Re-exported wholesale rather than named, so a
@@ -53,6 +53,8 @@ export type {
   Layout,
   LayoutVariant,
   PatchedDisplay,
+  FieldWidth,
+  KindWidths,
   ControlSlotProps,
   RefOption,
 } from './EntityDetailsForm/types';

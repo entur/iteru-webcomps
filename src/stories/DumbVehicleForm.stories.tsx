@@ -8,22 +8,27 @@ import {
 } from "../index";
 import { vehicleSample } from "./initDataSets";
 import { vehicleLayout } from "./initLayouts";
+import { formLookArgs, formLookArgTypes, withFormLook, type FormLookArgs } from "./formControls";
 
 // The client names its own instances — the library exports only the factory.
 const DumbVehicleForm = createAbstractEntityDetailsForm<Vehicle>(vehicleFields);
 
-const meta: Meta<typeof DumbVehicleForm> = {
+/** The form's props plus the story's layout controls (widths, captions). */
+type Args = EntityDetailsFormProps<Vehicle> & FormLookArgs;
+
+const meta: Meta<Args> = {
   title: "FormImplementations/VehicleForm",
   component: DumbVehicleForm,
-  args: { mode: "edit", layout: vehicleLayout },
+  args: { mode: "edit", layout: vehicleLayout, ...formLookArgs },
+  argTypes: formLookArgTypes,
 };
 export default meta;
-type Story = StoryObj<typeof DumbVehicleForm>;
+type Story = StoryObj<Args>;
 
 // Controlled wrapper so the story round-trips edits.
-const Controlled = (args: EntityDetailsFormProps<Vehicle>) => {
+const Controlled = (args: Args) => {
   const [value, setValue] = useState<Vehicle>(vehicleSample);
-  return <DumbVehicleForm {...args} value={value} onChange={setValue} />;
+  return <DumbVehicleForm {...withFormLook(args)} value={value} onChange={setValue} />;
 };
 
 export const Default: Story = { render: Controlled };
