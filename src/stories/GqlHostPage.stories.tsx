@@ -1,8 +1,18 @@
-import { useCallback, useMemo, useState, type FC } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FC,
+  type KeyboardEvent,
+  type Ref,
+} from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   Box,
   GlobalStyles,
+  IconButton,
   ListItemIcon,
   ListItemText,
   MenuItem,
@@ -13,6 +23,8 @@ import {
   useTheme,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
   EditFooter,
   SaveSnackbar,
@@ -46,7 +58,10 @@ import { installStoriesMock, setMockLatency } from "./mockEndpoint";
  * they are driven from Storybook Controls rather than page chrome. A stacked
  * form with several sections gets a `SectionToc`: a column beside it on wide screens, a dropdown under
  * the toolbar below `md` (`tocVariant`). Toolbar and TOC stay pinned while the
- * page scrolls, so the TOC's "you are here" stays in sight.
+ * page scrolls, so the TOC's "you are here" stays in sight. The toolbar
+ * collapses (`toolbar`): on wide screens to a small bar in the gutter right of
+ * the form, which covers nothing; below `md` to one slim pinned row holding the
+ * toggle and the TOC dropdown (or the record name when there is no TOC).
  * The page places the form's chrome from `useFormSession()`: the TOC from `session.toc` and an `EditFooter` band across the page from `session.footer`, whose Cancel restores the loaded entity without a remount.
  */
 
@@ -57,6 +72,11 @@ const SELECT_WIDTH = 260,
   TOC_WIDTH = 200,
   FORM_MAX_WIDTH = 680;
 const NEW_KEY = "new";
+/** The picker region the toolbar toggle discloses (`aria-controls`). */
+const PICKERS_ID = "fullpage-record-pickers";
+/** Gap between the pinned header and the collapsed bar floating below it, px. */
+const FLOAT_GAP_PX = 16,
+  FLOAT_MAX_WIDTH = 220;
 /** Slow enough that the skeleton and the arrival fade are actually watchable. */
 const DEFAULT_READ_DELAY_MS = 600;
 
@@ -93,7 +113,11 @@ const tabSlotProps = (variant: LayoutVariant, tabStyle: TabStyle): ControlSlotPr
   if (variant !== "tabs") return {};
   if (tabStyle === "pills") return { tabs: { variant: "standard", sx: PILL_TABS_SX } };
   return {
-    tabs: { variant: "scrollable", scrollButtons: "auto", allowScrollButtonsMobile: true },
+    tabs: {
+      variant: "scrollable",
+      scrollButtons: "auto",
+      allowScrollButtonsMobile: true,
+    },
   };
 };
 
@@ -184,6 +208,51 @@ const useHeight = (): [(el: HTMLElement | null) => (() => void) | undefined, num
   return [ref, height];
 };
 
+/** Whether the record pickers show (`expanded`) or fold into a toggle bar. */
+type ToolbarState = "expanded" | "collapsed";
+
+/**
+ * Disclosure button for the record pickers, named by the action it takes.
+ *
+ * @param props.expanded whether the pickers currently show
+ * @param props.onToggle flips the state
+ * @param props.buttonRef lands on the button, so focus can return to it
+ * @returns the toggle button
+ */
+const ToolbarToggle = ({
+  expanded,
+  onToggle,
+  buttonRef,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+  buttonRef: Ref<HTMLButtonElement>;
+}) => (
+  <IconButton
+    ref={buttonRef}
+    size="small"
+    aria-expanded={expanded}
+    aria-controls={PICKERS_ID}
+    aria-label={expanded ? "Hide record pickers" : "Show record pickers"}
+    title={expanded ? "Hide record pickers" : "Show record pickers"}
+    onClick={onToggle}
+  >
+    {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+  </IconButton>
+);
+
+/** The active record as the collapsed bar names it: entity caption + name. */
+const RecordName = ({ caption, name }: { caption: string; name: string }) => (
+  <Box sx={{ minWidth: 0, flex: 1 }}>
+    <Typography variant="overline" color="text.secondary" component="div" sx={{ lineHeight: 1.5 }}>
+      {caption}
+    </Typography>
+    <Typography variant="body2" noWrap title={name}>
+      {name}
+    </Typography>
+  </Box>
+);
+
 /** Story-adjustable props, surfaced as Storybook Controls: the form's own props
  *  passed straight through, plus four the story owns. */
 interface GqlHostPageProps extends FormArgs {
@@ -203,6 +272,9 @@ interface GqlHostPageProps extends FormArgs {
    *  Consumed by the meta's `beforeEach`, not by this component: it configures
    *  the mock endpoint, which is story infrastructure rather than page state. */
   readDelayMs?: number;
+  /** Initial toolbar state; the page's toggle takes it from there. Changing
+   *  the control resets it. */
+  toolbar?: ToolbarState;
 }
 
 /**
@@ -220,6 +292,7 @@ const GqlHostPage = ({
   patched = "mark",
   footerProps,
   skeletonProps,
+  toolbar = "expanded",
 }: GqlHostPageProps) => {
   // The host picks the TOC's look — it knows the room it gives it; SectionToc
   // measures nothing.
@@ -234,6 +307,37 @@ const GqlHostPage = ({
   // The form's chrome is ours to place: the TOC (column or pinned dropdown)
   // and the Save/Cancel band across the whole page, outside every column.
   const session = useFormSession();
+  // Page state, so it survives a record switch (that remounts the form only).
+  // The arg seeds it, and a changed arg re-seeds it (adjust-on-prop-change).
+  const [expanded, setExpanded] = useState(toolbar === "expanded");
+  const [seededFrom, setSeededFrom] = useState(toolbar);
+  if (toolbar !== seededFrom) {
+    setSeededFrom(toolbar);
+    setExpanded(toolbar === "expanded");
+  }
+  // Disclosure focus: into the pickers on expand, back to the toggle on
+  // collapse — only after the user toggled, never for an arg change.
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const pickersRef = useRef<HTMLElement>(null);
+  const moveFocus = useRef(false);
+  const toggleToolbar = (next: boolean) => {
+    moveFocus.current = true;
+    setExpanded(next);
+  };
+  useEffect(() => {
+    if (!moveFocus.current) return;
+    moveFocus.current = false;
+    const target = expanded
+      ? pickersRef.current?.querySelector<HTMLElement>('[role="combobox"]')
+      : toggleRef.current;
+    target?.focus();
+  }, [expanded]);
+  // Escape collapses from inside the toolbar — but not from an open select's
+  // menu: it is portalled, so its keydown bubbles here through React while
+  // sitting outside the toolbar's DOM, and Escape there only closes the menu.
+  const collapseOnEscape = (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key === "Escape" && e.currentTarget.contains(e.target as Node)) toggleToolbar(false);
+  };
 
   const selectRecord = (entity: entity, netexId?: string) => {
     setSelection({ entity, netexId });
@@ -243,21 +347,42 @@ const GqlHostPage = ({
   const Form = active?.Form;
   // The form publishes its own TOC sections from this layout.
   const layout = active?.layout;
+  const recordName =
+    selection && active
+      ? selection.netexId
+        ? (active.seed[selection.netexId]?.name?.value ?? selection.netexId)
+        : active.newLabel
+      : "No record";
+  const tocDropdown = toc === "dropdown" && session.toc.sections.length > 0;
+  const toggle = (
+    <ToolbarToggle
+      expanded={expanded}
+      onToggle={() => toggleToolbar(!expanded)}
+      buttonRef={toggleRef}
+    />
+  );
 
   return (
     <Paper
       elevation={0}
-      sx={{ display: "flex", flexDirection: "column", minHeight: "100vh", bgcolor: "grey.100" }}
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "100vh",
+        bgcolor: "grey.100",
+      }}
     >
       {/* The page's scroller is <html>: give scrollIntoView the header's height
           so a section picked in either TOC lands below it, not under it. */}
       <GlobalStyles styles={{ html: { scrollPaddingTop: headerHeight } }} />
       <Box ref={headerRef} sx={{ position: "sticky", top: 0, zIndex: "appBar" }}>
-        {/* Top: one record picker per entity; the active one shows the selection. */}
+        {/* Top: one record picker per entity; the active one shows the selection.
+            Collapsed, the row stays mounted but hidden, so the toggle's
+            aria-controls always names an element. */}
         <Box
+          onKeyDown={collapseOnEscape}
           sx={{
-            display: "flex",
-            flexWrap: "wrap",
+            display: expanded ? "flex" : "none",
             alignItems: "center",
             gap: 2,
             px: 2,
@@ -267,48 +392,90 @@ const GqlHostPage = ({
             bgcolor: "background.paper",
           }}
         >
-          <Typography variant="overline" color="text.secondary">
-            Select form and mock data
-          </Typography>
-          {ENTITY_ORDER.map((entity) => {
-            const cfg = ENTITY[entity];
-            const current = selection?.entity === entity ? (selection.netexId ?? NEW_KEY) : "";
-            const name = (id: string) => cfg.seed[id]?.name?.value ?? id;
-            return (
-              <TextField
-                key={entity}
-                select
-                size="small"
-                label={cfg.label}
-                value={current}
-                onChange={(e) =>
-                  selectRecord(entity, e.target.value === NEW_KEY ? undefined : e.target.value)
-                }
-                slotProps={{
-                  select: {
-                    renderValue: (v) => (v === NEW_KEY ? cfg.newLabel : name(v as string)),
-                  },
-                }}
-                sx={{ width: SELECT_WIDTH }}
-              >
-                <MenuItem value={NEW_KEY}>
-                  <ListItemIcon>
-                    <AddIcon fontSize="small" />
-                  </ListItemIcon>
-                  <ListItemText primary={cfg.newLabel} />
-                </MenuItem>
-                {recordIds(cfg.seed, current).map((id) => (
-                  <MenuItem key={id} value={id}>
-                    <ListItemText primary={name(id)} secondary={id} />
+          <Box
+            ref={pickersRef}
+            id={PICKERS_ID}
+            role="group"
+            aria-label="Record pickers"
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 2,
+              flex: 1,
+            }}
+          >
+            <Typography variant="overline" color="text.secondary">
+              Select form and mock data
+            </Typography>
+            {ENTITY_ORDER.map((entity) => {
+              const cfg = ENTITY[entity];
+              const current = selection?.entity === entity ? (selection.netexId ?? NEW_KEY) : "";
+              const name = (id: string) => cfg.seed[id]?.name?.value ?? id;
+              return (
+                <TextField
+                  key={entity}
+                  select
+                  size="small"
+                  label={cfg.label}
+                  value={current}
+                  onChange={(e) =>
+                    selectRecord(entity, e.target.value === NEW_KEY ? undefined : e.target.value)
+                  }
+                  slotProps={{
+                    select: {
+                      renderValue: (v) => (v === NEW_KEY ? cfg.newLabel : name(v as string)),
+                    },
+                  }}
+                  sx={{ width: SELECT_WIDTH }}
+                >
+                  <MenuItem value={NEW_KEY}>
+                    <ListItemIcon>
+                      <AddIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary={cfg.newLabel} />
                   </MenuItem>
-                ))}
-              </TextField>
-            );
-          })}
+                  {recordIds(cfg.seed, current).map((id) => (
+                    <MenuItem key={id} value={id}>
+                      <ListItemText primary={name(id)} secondary={id} />
+                    </MenuItem>
+                  ))}
+                </TextField>
+              );
+            })}
+          </Box>
+          {expanded && toggle}
         </Box>
-        {/* Narrow: the TOC as a dropdown under the toolbar, aligned with the form;
-            its value keeps saying which section is in view. */}
-        {toc === "dropdown" && session.toc.sections.length > 0 && (
+        {/* Narrow + collapsed: one slim row — the toggle, then the TOC dropdown
+            (kept pinned: it is the "you are here"), else the record's name. */}
+        {!expanded && narrow && (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              px: { xs: 2, sm: 4 },
+              py: 1,
+              bgcolor: tocDropdown ? "grey.100" : "background.paper",
+              borderBottom: 1,
+              borderColor: "divider",
+            }}
+          >
+            {toggle}
+            {tocDropdown ? (
+              <SectionToc
+                {...session.toc}
+                variant="dropdown"
+                sx={{ flex: 1, minWidth: 0, maxWidth: FORM_MAX_WIDTH }}
+              />
+            ) : (
+              <RecordName caption={active?.label ?? "Record"} name={recordName} />
+            )}
+          </Box>
+        )}
+        {/* The TOC as a dropdown under the toolbar, aligned with the form; its
+            value keeps saying which section is in view. */}
+        {tocDropdown && (expanded || !narrow) && (
           <Box
             sx={{
               px: { xs: 2, sm: 4 },
@@ -318,11 +485,7 @@ const GqlHostPage = ({
               borderColor: "divider",
             }}
           >
-            <SectionToc
-              {...session.toc}
-              variant="dropdown"
-              sx={{ maxWidth: FORM_MAX_WIDTH }}
-            />
+            <SectionToc {...session.toc} variant="dropdown" sx={{ maxWidth: FORM_MAX_WIDTH }} />
           </Box>
         )}
       </Box>
@@ -351,47 +514,76 @@ const GqlHostPage = ({
         )}
 
         {/* Right: the selected entity's data-aware form + host chrome. */}
-        <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, sm: 4 } }}>
-          {selection && active && Form ? (
-            <>
-              <Typography variant="h6" sx={{ mb: 2 }}>
-                {selection.netexId ?? active.newLabel}
-              </Typography>
+        <Box
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            p: { xs: 2, sm: 4 },
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 2,
+          }}
+        >
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            {selection && active && Form ? (
+              <>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                  {selection.netexId ?? active.newLabel}
+                </Typography>
 
-              <Paper
-                variant="outlined"
-                sx={{ p: { xs: 2, sm: 3 }, maxWidth: FORM_MAX_WIDTH }}
-              >
-                <Form
-                  // New key ⇒ remount, for switching entity/record only. Discarding
-                  // edits no longer needs one: the footer's Cancel restores the
-                  // hook's baseline in place, with no second round trip.
-                  key={`${selection.entity}:${selection.netexId ?? NEW_KEY}`}
-                  netexId={selection.netexId}
-                  mode={mode}
-                  variant={variant}
-                  slotProps={slotProps}
-                  patched={patched}
-                  layout={layout}
-                  skeletonProps={skeletonProps}
-                  session={session}
-                  onSaved={(id) => {
-                    setSelection({ entity: selection.entity, netexId: id });
-                    setToast({ msg: `Saved ${id}`, severity: "success" });
-                  }}
-                  onError={(msgs) =>
-                    setToast({
-                      msg: msgs.join("\n") || "Save failed",
-                      severity: "error",
-                    })
-                  }
-                />
-              </Paper>
-            </>
-          ) : (
-            <Typography color="text.secondary">
-              Select a record to view or edit.
-            </Typography>
+                <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, maxWidth: FORM_MAX_WIDTH }}>
+                  <Form
+                    // New key ⇒ remount, for switching entity/record only. Discarding
+                    // edits no longer needs one: the footer's Cancel restores the
+                    // hook's baseline in place, with no second round trip.
+                    key={`${selection.entity}:${selection.netexId ?? NEW_KEY}`}
+                    netexId={selection.netexId}
+                    mode={mode}
+                    variant={variant}
+                    slotProps={slotProps}
+                    patched={patched}
+                    layout={layout}
+                    skeletonProps={skeletonProps}
+                    session={session}
+                    onSaved={(id) => {
+                      setSelection({ entity: selection.entity, netexId: id });
+                      setToast({ msg: `Saved ${id}`, severity: "success" });
+                    }}
+                    onError={(msgs) =>
+                      setToast({
+                        msg: msgs.join("\n") || "Save failed",
+                        severity: "error",
+                      })
+                    }
+                  />
+                </Paper>
+              </>
+            ) : (
+              <Typography color="text.secondary">Select a record to view or edit.</Typography>
+            )}
+          </Box>
+          {/* Wide + collapsed: the toolbar floats in the gutter right of the
+              form (capped at FORM_MAX_WIDTH), pinned below the header. Its own
+              flex item, so it takes room instead of covering the form. */}
+          {!expanded && !narrow && (
+            <Paper
+              elevation={2}
+              sx={{
+                position: "sticky",
+                top: headerHeight + FLOAT_GAP_PX,
+                flexShrink: 0,
+                maxWidth: FLOAT_MAX_WIDTH,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                pl: 1.5,
+                pr: 0.5,
+                py: 0.5,
+              }}
+            >
+              <RecordName caption={active?.label ?? "Record"} name={recordName} />
+              {toggle}
+            </Paper>
           )}
         </Box>
       </Box>
@@ -435,6 +627,7 @@ const meta: Meta<typeof GqlHostPage> = {
     },
     skeletonProps: { ariaLabel: "Loading form" },
     readDelayMs: DEFAULT_READ_DELAY_MS,
+    toolbar: "expanded",
   },
   argTypes: {
     mode: {
@@ -470,7 +663,8 @@ const meta: Meta<typeof GqlHostPage> = {
     },
     footerProps: {
       control: "object",
-      description: "`EditFooter` props the page passes (`labels`, `slotProps`, `sx`) for the Save/Cancel band.",
+      description:
+        "`EditFooter` props the page passes (`labels`, `slotProps`, `sx`) for the Save/Cancel band.",
     },
     skeletonProps: {
       control: "object",
@@ -481,6 +675,12 @@ const meta: Meta<typeof GqlHostPage> = {
       control: { type: "range", min: 0, max: 3000, step: 100 },
       description:
         "Mock read latency. Raise it to watch the shaped skeleton and the arrival fade; 0 resolves in the same tick, so neither is visible. Pick a record in either dropdown to re-trigger a load.",
+    },
+    toolbar: {
+      control: "inline-radio",
+      options: ["expanded", "collapsed"],
+      description:
+        "Story-only: initial toolbar state; the toggle in the page flips it. collapsed = the record pickers fold into a small bar right of the form (wide) or a slim pinned row with the TOC dropdown (below md).",
     },
   },
 };

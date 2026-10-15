@@ -188,7 +188,9 @@ controlled `disabled`/`onClick`) and `sx` are the host's own props on
   (a select fires no change for its current value). It measures nothing — the
   host picks the variant (Fullpage: dropdown below `md`; toolbar + TOC pinned
   in one header whose measured height is both the list column's sticky `top`
-  and `html { scroll-padding-top }`, so `scrollIntoView` clears it).
+  and `html { scroll-padding-top }`, so `scrollIntoView` clears it; the
+  toolbar collapses (#55) to a bar in the gutter right of the form, or below
+  `md` to one slim row beside the dropdown, and that height follows).
 - `serverManaged` fields (`version`, `created`, `changed`, `changedBy`) hidden
   from editable model: locked even in edit, surfaced only to *see* meta/semantic
   context. Backend-owned — **not round-tripped**, never in write payload, don't
