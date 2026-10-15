@@ -6,6 +6,36 @@
  */
 import type { LayoutItem, VehicleLayout, VehicleTypeLayout, RefOption } from "../index";
 
+// ── units ───────────────────────────────────────────────────────────────────
+
+/** Captions of the measured fields, unit as a label suffix. Where NeTEx has
+ *  the field, the unit is its XSD type's (`netex_units.xsd`, NeTEx 2.0) —
+ *  sobek stores the NeTEx value unconverted. The rest have no NeTEx
+ *  counterpart and take their source's unit. Counts and coefficients carry none. */
+export const UNIT_LABELS = {
+  // NeTEx-backed
+  length: "Length (m)", // LengthType
+  width: "Width (m)", // LengthType
+  height: "Height (m)", // LengthType
+  weight: "Weight (kg)", // WeightType
+  maximumVelocity: "Maximum velocity (m/s)", // SpeedType: "Maximum velocity in m/s"
+  maximumRange: "Maximum range (m)", // DistanceType
+  fullCharge: "Full charge (Wh)", // VehicleModel.FullCharge: WattHoursType
+  // sobek's own — the unit is in the name
+  maximumEngineEffectKW: "Maximum engine effect (kW)",
+  // hathor#191 (#50)
+  draft: "Draft (m)",
+  tareWeight: "Tare weight (kg)",
+  minOperatingTemperature: "Min operating temperature (°C)",
+  maxOperatingTemperature: "Max operating temperature (°C)",
+  // 3D geometry (#51): metres, converted to mm only for the 3D input
+  tyreDiameter: "Tyre diameter (m)",
+  roofEquipment: "Roof equipment (m)",
+} as const;
+
+/** A layout entry captioned from {@link UNIT_LABELS}. */
+const measured = <K extends keyof typeof UNIT_LABELS>(field: K) => ({ field, label: UNIT_LABELS[field] });
+
 // ── 3D geometry ─────────────────────────────────────────────────────────────
 
 /** The overlay's 3D-geometry fields (entur/iteru-webcomps#51), on both entities:
@@ -22,8 +52,8 @@ const geometry: LayoutItem<"tyreDiameter" | "roofEquipment" | "baseColor" | "sec
       { field: "windowCount", label: "Windows" },
     ],
   },
-  { field: "tyreDiameter", label: "Tyre diameter (m)" },
-  { field: "roofEquipment", label: "Roof equipment (m)" },
+  measured("tyreDiameter"),
+  measured("roofEquipment"),
   { field: "baseColor", label: "Base colour (hex)" },
 ];
 
@@ -61,7 +91,8 @@ export const euroClassCodes: RefOption[] = [
 // Object-key order = section order; array order = field order within the
 // section. `deckPlan` (a distilled `reference`) sits under `transportMode`;
 // `vehicles` is a distilled `grid` (serverManaged) rendered as a read-only table.
-// Measured fields carry their unit as a label suffix.
+// Measured fields carry their unit as a label suffix (`UNIT_LABELS`). Numbers
+// take a third of a row and pack three abreast; switches and dates a half.
 export const vehicleTypeLayout: VehicleTypeLayout = {
   General: [
     "name",
@@ -69,15 +100,15 @@ export const vehicleTypeLayout: VehicleTypeLayout = {
     { field: "deckPlan", options: () => deckPlanRefs },
     "manufacturer",
     "modelName",
-    { field: "fullCharge", label: "Full charge (kWh)" },
+    measured("fullCharge"),
   ],
   Dimensions: [
-    { field: "length", label: "Length (m)" },
-    { field: "width", label: "Width (m)" },
-    { field: "height", label: "Height (m)" },
-    { field: "draft", label: "Draft (m)" },
-    { field: "weight", label: "Weight (kg)" },
-    { field: "tareWeight", label: "Tare weight (kg)" },
+    measured("length"),
+    measured("width"),
+    measured("height"),
+    measured("draft"),
+    measured("weight"),
+    measured("tareWeight"),
   ],
   Geometry: [...geometry],
   Accessibility: ["lowFloor", "accessEquipment", "facilities"],
@@ -86,14 +117,16 @@ export const vehicleTypeLayout: VehicleTypeLayout = {
     "propulsionTypes",
     "fuelTypes",
     { field: "euroClass", options: () => euroClassCodes },
-    { field: "maximumVelocity", label: "Maximum velocity (km/h)" },
-    { field: "maximumRange", label: "Maximum range (km)" },
+    measured("maximumVelocity"),
+    measured("maximumRange"),
     "formDragCoefficient",
     "rollResistanceCoefficient",
-    { field: "maximumEngineEffectKW", label: "Maximum engine effect (kW)" },
+    measured("maximumEngineEffectKW"),
     "hybridCategory",
-    { field: "minOperatingTemperature", label: "Min operating temperature (°C)" },
-    { field: "maxOperatingTemperature", label: "Max operating temperature (°C)" },
+    // The longest captions: a third truncates them in a narrow column, so the
+    // min/max pair takes a half each.
+    { ...measured("minOperatingTemperature"), width: "1/2" },
+    { ...measured("maxOperatingTemperature"), width: "1/2" },
   ],
   Passenger: [
     "fareClass",
@@ -121,16 +154,18 @@ export const vehicleTypeLayout: VehicleTypeLayout = {
 // `transportType` is a distilled `reference`; the `…Date` fields are `date`
 // controls; the validity bounds (hoisted from `validBetween`) and the meta
 // timestamps are `datetime`. `lifecycleStatus` is sobek-derived, so locked.
+// Dates pair up two to a row; the registration number is halved to sit beside
+// its date (a per-field `width`).
 export const vehicleLayout: VehicleLayout = {
   General: [
     "name",
-    "registrationNumber",
+    { field: "registrationNumber", width: "1/2" },
+    "registrationDate",
     { field: "transportType", label: "VehicleType", options: () => vehicleTypeRefs },
     "operationalNumber",
     "chassisNumber",
     "buildDate",
     "completionDate",
-    "registrationDate",
     { field: "fromDate", label: "Valid from" },
     { field: "toDate", label: "Valid to" },
     "lifecycleStatus",

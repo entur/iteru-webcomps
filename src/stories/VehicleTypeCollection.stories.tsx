@@ -19,6 +19,7 @@ import {
   type VehicleType,
 } from "../index";
 import { ALL_TOOLS } from "../EntityCollection/types";
+import { UNIT_LABELS } from "./initLayouts";
 import {
   FareClass,
   PropulsionType,
@@ -115,9 +116,10 @@ const genVehicleTypes = (n: number, seed: number): VehicleType[] => {
       length: num(12, 220),
       width: num(2.4, 3.2, 2),
       height: num(3, 4.5, 2),
-      weight: num(12, 95),
-      maximumRange: num(180, 1200, 0),
-      fullCharge: num(40, 600, 0),
+      // In the XSD's units (`UNIT_LABELS`): kg, m and Wh.
+      weight: num(12_000, 95_000, 0),
+      maximumRange: num(180_000, 1_200_000, 0),
+      fullCharge: num(40_000, 600_000, 0),
       lowFloor: rnd() > 0.4,
       carLoading: rnd() > 0.8,
       selfPropelled: rnd() > 0.3,
@@ -162,10 +164,10 @@ const meta: Meta<typeof VehicleTypeCollection> = {
       "version",
       "transportMode",
       "propulsionTypes",
-      "length",
-      "width",
-      "height",
-      "weight",
+      { field: "length", label: UNIT_LABELS.length },
+      { field: "width", label: UNIT_LABELS.width },
+      { field: "height", label: UNIT_LABELS.height },
+      { field: "weight", label: UNIT_LABELS.weight },
       "seatingCapacity",
       "standingCapacity",
       "fareClass",
