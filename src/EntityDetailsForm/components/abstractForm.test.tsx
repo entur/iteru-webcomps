@@ -194,6 +194,65 @@ describe('createAbstractEntityDetailsForm', () => {
     expect(input.value).toBe('Beta');
   });
 
+  describe('text with options', () => {
+    const CodeForm = createAbstractEntityDetailsForm<{ euroClass?: string | null }>({
+      euroClass: { kind: 'text', path: ['euroClass'] },
+    });
+    const codes = () => [
+      { value: 'Euro5', label: 'Euro 5' },
+      { value: 'Euro6', label: 'Euro 6' },
+    ];
+    const CodeHost = ({ initial }: { initial?: string }) => {
+      const [v, setV] = useState<{ euroClass?: string | null }>({ euroClass: initial });
+      return (
+        <>
+          <CodeForm
+            value={v}
+            onChange={setV}
+            mode="edit"
+            layout={{ Env: [{ field: 'euroClass', options: codes }] }}
+          />
+          <output data-testid="stored">{String(v.euroClass)}</output>
+        </>
+      );
+    };
+    const pick = (name: string) => {
+      fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Euro class' }));
+      fireEvent.click(screen.getByRole('option', { name }));
+    };
+
+    it('renders a select showing the label of the stored code', () => {
+      render(<CodeHost initial="Euro6" />);
+      expect(screen.getByRole('combobox', { name: 'Euro class' })).toHaveTextContent('Euro 6');
+    });
+
+    it('writes the picked code value, and None clears it', () => {
+      render(<CodeHost />);
+      pick('Euro 5');
+      expect(screen.getByTestId('stored')).toHaveTextContent('Euro5');
+      pick('None');
+      expect(screen.getByTestId('stored')).toHaveTextContent('undefined');
+    });
+
+    it('keeps a stored value that is not in the list as its own option', () => {
+      render(<CodeHost initial="EURO VI" />);
+      expect(screen.getByRole('combobox', { name: 'Euro class' })).toHaveTextContent('EURO VI');
+      fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Euro class' }));
+      expect(screen.getAllByRole('option').map(o => o.textContent)).toEqual([
+        'None',
+        'EURO VI',
+        'Euro 5',
+        'Euro 6',
+      ]);
+    });
+
+    it('stays a free-text field without options', () => {
+      render(<CodeForm value={{ euroClass: 'Euro6' }} onChange={() => {}} mode="edit" />);
+      expect((screen.getByLabelText('Euro class') as HTMLInputElement).value).toBe('Euro6');
+      expect(screen.queryByRole('combobox')).toBeNull();
+    });
+  });
+
   it('surfaces errors and disables inputs when disabled is true', () => {
     const { container } = render(
       <Form

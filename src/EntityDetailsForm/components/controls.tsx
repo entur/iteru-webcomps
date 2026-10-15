@@ -30,6 +30,12 @@ const textOr = (s: string): string | undefined => (s === '' ? undefined : s);
 const isoSlice = (v: unknown, len: number): string => (typeof v === 'string' ? v.slice(0, len) : '');
 const mergeName = (cur: Mls, text: string): Mls =>
   text === '' ? undefined : { ...cur, value: text };
+/** A stored code missing from the host's list is offered as its own option
+ *  (label = the raw code), so the select can show it and a save can't blank it. */
+const withStored = (opts: RefOption[], cur: unknown): RefOption[] =>
+  typeof cur === 'string' && cur !== '' && !opts.some(o => o.value === cur)
+    ? [{ value: cur, label: cur }, ...opts]
+    : opts;
 
 export interface ControlProps {
   spec: FieldSpec;
@@ -38,8 +44,9 @@ export interface ControlProps {
   disabled: boolean;
   /** Emit the next raw value for this field's path (`undefined` clears it). */
   onChange: (next: unknown) => void;
-  /** `reference` only — option-dataset closure (the layout entry's `options`).
-   *  Present → render an Autocomplete; omit → degrade to a free-text id field. */
+  /** Option-dataset closure (the layout entry's `options`). `reference`: present
+   *  → an Autocomplete, omit → a free-text id field. `text`: present → a select
+   *  over the host's code values, omit → free text. Ignored by other kinds. */
   options?: () => RefOption[];
   /** Form-level per-kind MUI overrides. The slice for this field's `spec.kind`
    *  is applied to its control (see `ControlSlotProps`). */
@@ -94,7 +101,29 @@ export function renderControl({
         />
       );
 
-    case 'text':
+    case 'text': {
+      // A host-supplied code list turns free text into a select (e.g. euroClass
+      // over sobek's EMISSION_STANDARD code values). The field stays a String.
+      const codes = options?.();
+      if (codes)
+        return (
+          <TextField
+            {...common}
+            slotProps={mergeSlots(slotProps?.text)}
+            select
+            value={(value as string | null | undefined) ?? ''}
+            onChange={e => onChange(textOr(e.target.value))}
+          >
+            <MenuItem value="">
+              <em>None</em>
+            </MenuItem>
+            {withStored(codes, value).map(o => (
+              <MenuItem key={o.value} value={o.value}>
+                {o.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        );
       return (
         <TextField
           {...common}
@@ -103,6 +132,7 @@ export function renderControl({
           onChange={e => onChange(textOr(e.target.value))}
         />
       );
+    }
 
     case 'date':
       return (
@@ -118,8 +148,8 @@ export function renderControl({
 
     case 'datetime':
       // Native datetime-local: the stored ISO (tz/seconds) is sliced to the
-      // input's `YYYY-MM-DDTHH:mm`. Lossy on write — fine, datetime fields here
-      // are all serverManaged (display-only, never round-tripped).
+      // input's `YYYY-MM-DDTHH:mm`. Lossy on write: an edit stores the local
+      // wall-clock string, without seconds or offset.
       return (
         <TextField
           {...common}
