@@ -43,6 +43,10 @@ export type { Section, ResolvedField } from './EntityDetailsForm/utils/sections'
 // VehicleForm/VehicleFormProps. Re-exported wholesale rather than named, so a
 // new manifest entry reaches the public API the moment it is generated.
 export * from './EntityDetailsForm/formImpls';
+// VehicleType / Vehicle → @entur/iteru-3dbus input. Pure: the package itself is
+// not imported, so a host that draws no bus pulls in no three.js.
+export { toBusInput, doorHints } from './BusInput';
+export type { BusInput, BusInputResult, BusInputSection, DoorHint } from './BusInput';
 export type {
   EntityDetailsFormProps,
   EntityDetailsForm,

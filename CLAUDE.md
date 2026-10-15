@@ -369,6 +369,37 @@ Tests: `components/collection.test.tsx` is manifest-driven like
 generated map). The DataGrid renders rows under jsdom only with
 `slotProps.dataGrid.disableVirtualization`.
 
+## Bus input (3D)
+
+`toBusInput(vt, v?)` (`src/BusInput/`) — VehicleType, or a Vehicle over its
+type, → `@entur/iteru-3dbus` input (contract 2.0). **Pure: the lib never
+imports 3dbus or three**, so `dist` stays three-free; the package is a
+devDependency for the story and the tests only (type shim:
+`src/types/iteru-3dbus.d.ts`). Metres → integer mm here and nowhere else. The
+Vehicle's `tyreDiameter` / `baseColor` / `roofEquipment` / `sections` win over
+the type's; `brand`/`model`/`width`/`height` are the type's; `front_display`
+is the drawn entity's name; `body` from the section count. **Nothing that
+changes the render is invented**: a required value with no source comes back
+as `{ ok: false, missing: [registry keys] }`. Unset keys are left out, never
+`undefined` (3dbus rejects unknown root keys). `BusSection.doors` (a count) →
+`doors_hint` via `doorHints`: slots front overhang → each axle gap → rear
+overhang, first N; one door single-leaf, more double; glazed/bias default.
+Required enums 3dbus never reads (`bus_class`, `floor_type`) are placeholders:
+the schema's first member its `allOf` rules leave unconstrained (`I`, not `A`,
+which caps the bus at 9.5 m rigid) — entur/iteru-3dbus#39. Tests run the real
+3dbus `validate` over every seed.
+
+The Fullpage story's preview (`src/stories/BusView.tsx`) is column 3 from `lg`
+(under the form below it): header toggle bitmap (`mkStageShot` → PNG) | 3D
+(`mkStage`), fed by the form's `onChange`, so unsaved edits redraw (settled
+250 ms, keyed on content). One live stage per mount, the bus swapped per input,
+framed once per record (BusView is keyed by record). No WebGL (off, or out of
+contexts) → an alert in the column; it must never throw into the page.
+`.npmrc` `allow-remote=root`: npm ≥ 12 refuses the GitHub Release tarball URL
+otherwise. 3dbus is private while this repo is public — the URL 404s until it
+is made public; until then unpack the release tarball into `node_modules` by
+hand (`gh release download v0.1.0 -R entur/iteru-3dbus`).
+
 ## GraphQL → TS pipeline
 
 Never hand-maintain entity shapes. Generate from live schema, distill to

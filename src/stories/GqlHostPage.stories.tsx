@@ -40,9 +40,14 @@ import {
   type KindWidths,
   type SaveToast,
   type SectionTocVariant,
+  type BusInputResult,
+  type Vehicle,
+  type VehicleType,
   type VehicleTypeFormProps,
+  toBusInput,
 } from "../index";
 import { vehicleSeed, vehicleTypeSeed } from "./initDataSets";
+import { BusView, type BusViewMode } from "./BusView";
 import { vehicleLayout, vehicleTypeLayout } from "./initLayouts";
 import { installStoriesMock, setMockLatency } from "./mockEndpoint";
 import { captionSlots, formLookArgs, formLookArgTypes, widthsOf, type FormLookArgs } from "./formControls";
@@ -79,6 +84,9 @@ const PICKERS_ID = "fullpage-record-pickers";
 /** Gap between the pinned header and the collapsed bar floating below it, px. */
 const FLOAT_GAP_PX = 16,
   FLOAT_MAX_WIDTH = 220;
+/** Theme spacing above the 3D column: the form's heading (h6, 32px) plus its
+ *  margin, so the two panels start level. */
+const BUS_COLUMN_TOP = 6;
 /** Slow enough that the skeleton and the arrival fade are actually watchable. */
 const DEFAULT_READ_DELAY_MS = 600;
 
@@ -142,6 +150,7 @@ type DataAwareForm = FC<
     layout?: Layout;
     onSaved?: (netexId: string) => void;
     onError?: (generalErrors: string[]) => void;
+    onChange?: (value: Rec | undefined) => void;
     session?: FormSession;
   }
 >;
@@ -280,6 +289,8 @@ interface GqlHostPageProps extends FormArgs, FormLookArgs {
   /** Initial toolbar state; the page's toggle takes it from there. Changing
    *  the control resets it. */
   toolbar?: ToolbarState;
+  /** Initial 3D preview mode (#60); the column's own toggle takes it from there. */
+  busView?: BusViewMode;
 }
 
 /**
@@ -298,6 +309,7 @@ const GqlHostPage = ({
   footerProps,
   skeletonProps,
   toolbar = "collapsed",
+  busView = "3d",
   ...look
 }: GqlHostPageProps) => {
   // The host picks the TOC's look — it knows the room it gives it; SectionToc
@@ -315,6 +327,13 @@ const GqlHostPage = ({
   // Read at render only (no effect keys on it), so a fresh object is fine.
   const widths = widthsOf(look);
   const [selection, setSelection] = useState<Selection | null>(DEFAULT_SELECTION);
+  // The open record as the form holds it — load, edits and refetch — so the
+  // preview follows unsaved edits. Cleared on a record switch.
+  const [liveValue, setLiveValue] = useState<Rec | undefined>(undefined);
+  const [busMode, setBusMode] = useState<BusViewMode>(busView);
+  useEffect(() => setBusMode(busView), [busView]);
+  // From lg up the preview is a column of its own; below, it sits under the form.
+  const busColumn = useMediaQuery(useTheme().breakpoints.up("lg"));
   const [toast, setToast] = useState<SaveToast | null>(null);
   // The form's chrome is ours to place: the TOC (column or pinned dropdown)
   // and the Save/Cancel band across the whole page, outside every column.
@@ -352,6 +371,7 @@ const GqlHostPage = ({
   };
 
   const selectRecord = (entity: entity, netexId?: string) => {
+    setLiveValue(undefined);
     setSelection({ entity, netexId });
   };
 
@@ -366,6 +386,32 @@ const GqlHostPage = ({
         : active.newLabel
       : "No record";
   const tocDropdown = toc === "dropdown" && session.toc.sections.length > 0;
+  const recordKey = selection ? `${selection.entity}:${selection.netexId ?? NEW_KEY}` : "";
+  // A Vehicle is drawn over the type it references, served from the same seed
+  // the mock answers with.
+  const busType =
+    selection?.entity === "vehicle"
+      ? vehicleTypeSeed[(liveValue as Vehicle | undefined)?.transportType?.netexId ?? ""]
+      : (liveValue as VehicleType | undefined);
+  const busResult: BusInputResult | null = !selection
+    ? null
+    : selection.entity === "vehicle" && !busType
+      ? { ok: false, missing: ["transportType"] }
+      : toBusInput(busType ?? {}, selection.entity === "vehicle" ? (liveValue as Vehicle) : undefined);
+  const preview = (
+    <BusView
+      key={recordKey}
+      result={busResult}
+      lengthM={busType?.length}
+      missingWhere={
+        selection?.entity === "vehicle" && busType
+          ? `on this Vehicle or its VehicleType ${busType.netexId}`
+          : undefined
+      }
+      mode={busMode}
+      onModeChange={setBusMode}
+    />
+  );
   const toggle = (
     <ToolbarToggle
       expanded={expanded}
@@ -536,7 +582,13 @@ const GqlHostPage = ({
             gap: 2,
           }}
         >
-          <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box
+            sx={
+              busColumn
+                ? { flex: `0 1 ${FORM_MAX_WIDTH}px`, minWidth: 0 }
+                : { flex: 1, minWidth: 0 }
+            }
+          >
             {selection && active && Form ? (
               <>
                 <Typography variant="h6" sx={{ mb: 2 }}>
@@ -548,7 +600,7 @@ const GqlHostPage = ({
                     // New key ⇒ remount, for switching entity/record only. Discarding
                     // edits no longer needs one: the footer's Cancel restores the
                     // hook's baseline in place, with no second round trip.
-                    key={`${selection.entity}:${selection.netexId ?? NEW_KEY}`}
+                    key={recordKey}
                     netexId={selection.netexId}
                     mode={mode}
                     variant={variant}
@@ -558,6 +610,7 @@ const GqlHostPage = ({
                     layout={layout}
                     skeletonProps={skeletonProps}
                     session={session}
+                    onChange={setLiveValue}
                     onSaved={(id) => {
                       setSelection({ entity: selection.entity, netexId: id });
                       setToast({ msg: `Saved ${id}`, severity: "success" });
@@ -570,11 +623,27 @@ const GqlHostPage = ({
                     }
                   />
                 </Paper>
+                {!busColumn && <Box sx={{ mt: 3, maxWidth: FORM_MAX_WIDTH }}>{preview}</Box>}
               </>
             ) : (
               <Typography color="text.secondary">Select a record to view or edit.</Typography>
             )}
           </Box>
+          {/* Third column, from lg up: the bus, in whatever width is left. Pinned
+              below the header, level with the form's panel. */}
+          {busColumn && (
+            <Box
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                position: "sticky",
+                top: headerHeight + FLOAT_GAP_PX,
+                mt: BUS_COLUMN_TOP,
+              }}
+            >
+              {preview}
+            </Box>
+          )}
           {/* Wide + collapsed: the toolbar floats in the gutter right of the
               form (capped at FORM_MAX_WIDTH), pinned below the header. Its own
               flex item, so it takes room instead of covering the form. */}
@@ -641,6 +710,7 @@ const meta: Meta<typeof GqlHostPage> = {
     skeletonProps: { ariaLabel: "Loading form" },
     readDelayMs: DEFAULT_READ_DELAY_MS,
     toolbar: "collapsed",
+    busView: "3d",
     ...formLookArgs,
   },
   argTypes: {
@@ -690,6 +760,12 @@ const meta: Meta<typeof GqlHostPage> = {
       control: { type: "range", min: 0, max: 3000, step: 100 },
       description:
         "Mock read latency. Raise it to watch the shaped skeleton and the arrival fade; 0 resolves in the same tick, so neither is visible. Pick a record in either dropdown to re-trigger a load.",
+    },
+    busView: {
+      control: "inline-radio",
+      options: ["3d", "bitmap"],
+      description:
+        "Story-only: initial mode of the 3D preview column (#60); its own toggle takes it from there. bitmap = a PNG from mkStageShot, 3d = the live three.js canvas from mkStage.",
     },
     toolbar: {
       control: "inline-radio",
