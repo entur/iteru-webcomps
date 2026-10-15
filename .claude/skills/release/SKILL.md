@@ -47,7 +47,7 @@ Run from a clean, synced `main`.
    One sed over the file handles all four:
 
    ```bash
-   sed -i "s/v$OLD/v$NEW/g; s/entur-iteru-webcomps-$OLD\.tgz/entur-iteru-webcomps-$NEW.tgz/g; s/\^$OLD/^$NEW/g" \
+   sed -i "s/v$OLD/v$NEW/g; s/entur-[a-z-]*-$OLD\.tgz/entur-iteru-webcomps-$NEW.tgz/g; s/\^$OLD/^$NEW/g" \
      docs/using-entity-forms-host-guide.html
    ```
 

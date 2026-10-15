@@ -102,7 +102,7 @@
 
 <div class="callout good"><strong>Install from a GitHub Release.</strong> The repo is public, so the tarball URL needs no token:</div>
 
-<pre><code>npm i https://github.com/entur/iteru-webcomps/releases/download/v0.9.0/entur-iteru-webcomps-0.9.0.tgz</code></pre>
+<pre><code>npm i https://github.com/entur/iteru-webcomps/releases/download/v0.9.0/entur-mui-comps-nmr-0.9.0.tgz</code></pre>
 
 <p>Releases are listed at <a href="https://github.com/entur/iteru-webcomps/releases">github.com/entur/iteru-webcomps/releases</a>. Each carries one <code>.tgz</code> asset plus a note recording which sobek schema it was built against. The package is <em>not</em> on the npm registry — <code>npm i @entur/iteru-webcomps</code> returns a 404.</p>
 
@@ -405,7 +405,7 @@ export function VehiclesPage({ vehicles, refetchList, dataOwnerRef }: VehiclesPa
 
 <h2 id="checklist"><span class="num">9</span>Checklist</h2>
 <ul class="tight">
-  <li><span class="pill">install</span> <code>npm i https://github.com/entur/iteru-webcomps/releases/download/v0.9.0/entur-iteru-webcomps-0.9.0.tgz</code> — no token. Upgrades are manual URL edits. Host supplies React 19 / MUI 7 / x-data-grid 8 / Emotion 11 / graphql-request 7.</li>
+  <li><span class="pill">install</span> <code>npm i https://github.com/entur/iteru-webcomps/releases/download/v0.9.0/entur-mui-comps-nmr-0.9.0.tgz</code> — no token. Upgrades are manual URL edits. Host supplies React 19 / MUI 7 / x-data-grid 8 / Emotion 11 / graphql-request 7.</li>
   <li><span class="pill">provider</span> <code>SobekProvider</code> is mandatory and carries the whole session — <code>endpoint</code>, <code>dataOwnerRef</code>, <code>headers</code>, <code>getHeaders</code>. None of them are form props any more; a form with no provider above it throws.</li>
   <li><span class="pill">auth</span> Token → <code>getHeaders</code> (may be async); constants → <code>headers</code>. Both allowed.</li>
   <li><span class="pill">org</span> <code>dataOwnerRef</code> filters loads, is stamped onto every save from the provider, and renders as a locked field the user can't edit.</li>
