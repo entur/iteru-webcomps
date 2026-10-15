@@ -141,14 +141,18 @@ export function useSessionConnection(
   const channel = link?.channel;
   const id = useId();
 
-  const latest = useRef<SessionActions>(state);
+  const latest = useRef<SessionActions & { editable: boolean }>(state);
   useLayoutEffect(() => {
-    latest.current = { save: state.save, cancel: state.cancel };
+    latest.current = { save: state.save, cancel: state.cancel, editable: state.editable };
   });
 
   useLayoutEffect(() => {
     if (!channel) return undefined;
-    channel.connect(id, { save: () => latest.current.save(), cancel: () => latest.current.cancel() });
+    // A form that is not editable is "no form connected" to the host: inert.
+    channel.connect(id, {
+      save: () => { if (latest.current.editable) latest.current.save(); },
+      cancel: () => { if (latest.current.editable) latest.current.cancel(); },
+    });
     return () => channel.disconnect(id);
   }, [channel, id]);
 

@@ -81,6 +81,22 @@ describe('useFormSession', () => {
     expect(cancel1).not.toHaveBeenCalled();
   });
 
+  it('does not forward save or cancel while the form is not editable', () => {
+    const [save, cancel] = [vi.fn(), vi.fn()];
+    const { rerender } = render(
+      <Host>{s => <Fake session={s} state={{ ...LIVE, editable: false }} save={save} cancel={cancel} />}</Host>
+    );
+
+    act(() => latest.footer.onSave());
+    act(() => latest.footer.onCancel());
+    expect(save).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+
+    rerender(<Host>{s => <Fake session={s} save={save} cancel={cancel} />}</Host>);
+    act(() => latest.footer.onSave());
+    expect(save).toHaveBeenCalledOnce();
+  });
+
   it('returns to idle when the form unmounts', () => {
     const { rerender } = render(<Host>{s => <Fake session={s} />}</Host>);
     rerender(<Host>{() => null}</Host>);

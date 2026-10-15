@@ -149,6 +149,7 @@ const Hosted = ({ Form, ...props }: WrapperProps & { Form: ComponentType<Wrapper
       <Form {...props} session={session} />
       <SectionToc {...session.toc} />
       <EditFooter {...session.footer} />
+      <output aria-label="editable">{String(session.editable)}</output>
     </>
   );
 };
@@ -331,6 +332,24 @@ describe.each(manifest.map(e => [e.entity, e] as const))(
 
       expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+      expect(screen.getByLabelText('editable')).toHaveTextContent('false');
+    });
+
+    it('reports the session editable for a loaded edit-mode record', async () => {
+      mockFns.request.mockResolvedValueOnce(rows([{ netexId: NETEX_ID }]));
+
+      await mount(<Hosted Form={Form} netexId={NETEX_ID} />);
+      await waitFor(() => expect(screen.getByLabelText('editable')).toHaveTextContent('true'));
+    });
+
+    it('reports the session not editable after a failed load', async () => {
+      mockFns.request.mockRejectedValueOnce(new Error('boom'));
+
+      await mount(<Hosted Form={Form} netexId={NETEX_ID} />);
+      await waitFor(() => expect(screen.getByText('Failed to load')).toBeInTheDocument());
+
+      expect(screen.getByLabelText('editable')).toHaveTextContent('false');
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     });
 
     it('leaves the host footer disabled when the record is not found', async () => {
@@ -340,6 +359,8 @@ describe.each(manifest.map(e => [e.entity, e] as const))(
       await waitFor(() => expect(screen.getByText(`Not found: ${NETEX_ID}`)).toBeInTheDocument());
 
       expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+      expect(screen.getByLabelText('editable')).toHaveTextContent('false');
     });
 
     // Any two registry keys make a two-section layout; labels are ours, so the
@@ -359,6 +380,17 @@ describe.each(manifest.map(e => [e.entity, e] as const))(
           screen.getAllByRole('button').filter(b => b.closest('nav')).map(b => b.textContent)
         ).toEqual(['First', 'Second'])
       );
+    });
+
+    it('publishes no sections for a record that is not found', async () => {
+      mockFns.request.mockResolvedValueOnce(rows([]));
+
+      await mount(
+        <Hosted Form={Form} netexId={NETEX_ID} layout={twoSections} variant="stacked" />
+      );
+      await waitFor(() => expect(screen.getByText(`Not found: ${NETEX_ID}`)).toBeInTheDocument());
+
+      expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull();
     });
 
     it('publishes no sections for a tabbed form', async () => {
