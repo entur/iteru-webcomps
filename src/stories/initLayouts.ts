@@ -50,6 +50,7 @@ const geometry: LayoutItem<"tyreDiameter" | "roofEquipment" | "baseColor" | "sec
       { field: "axles", label: "Axles (m)" },
       { field: "bellowsAhead", label: "Bellows ahead (m)" },
       { field: "windowCount", label: "Windows" },
+      { field: "doors", label: "Doors" },
     ],
   },
   measured("tyreDiameter"),

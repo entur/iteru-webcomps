@@ -79,13 +79,17 @@ extend input VehicleInput {
 # `sections` a read-only `grid` (like `vehicles`); the id keys its rows.
 # `windowCount` is 3dbus `windows_hint.count`: side windows on the entry side,
 # door glass excluded; empty = the band is filled with panes of about the same
-# width.
+# width. `doors` is the section's door count; the 3D adapter expands it into
+# 3dbus `doors_hint` (#60) — the zones front overhang, each axle gap, rear
+# overhang, filled front to rear; one door is single-leaf, more are double;
+# glazed, middle bias. Empty = no doors drawn.
 type BusSection {
   id: ID
   length: Float
   axles: [Float]
   bellowsAhead: Float
   windowCount: Int
+  doors: Int
 }
 input BusSectionInput {
   id: ID
@@ -93,6 +97,7 @@ input BusSectionInput {
   axles: [Float]
   bellowsAhead: Float
   windowCount: Int
+  doors: Int
 }
 extend type VehicleType {
   sections: [BusSection]
