@@ -14,14 +14,14 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import {
+  EditFooter,
   SaveSnackbar,
   SectionToc,
   VehicleForm,
   VehicleTypeForm,
-  resolveSections,
-  vehicleFields,
-  vehicleTypeFields,
-  type FieldSpec,
+  useFormSession,
+  type EditFooterProps,
+  type FormSession,
   type Layout,
   type LayoutVariant,
   type ControlSlotProps,
@@ -42,14 +42,12 @@ import { installStoriesMock, setMockLatency } from "./mockEndpoint";
  * host-guide "complete host
  * page" (list → select → view/edit → save), and shows the parts the guide only
  * describes in prose: `SaveSnackbar` fed from onSaved/onError. The form's own
- * props (`mode`, `variant`, `patched`, `footerProps`, `skeletonProps`) are story args, so
+ * props (`mode`, `variant`, `patched`, `skeletonProps`) are story args, so
  * they are driven from Storybook Controls rather than page chrome. A stacked
- * form with several sections gets a `SectionToc` wired to its `activeSection` /
- * `onActiveSectionChange`: a column beside it on wide screens, a dropdown under
+ * form with several sections gets a `SectionToc`: a column beside it on wide screens, a dropdown under
  * the toolbar below `md` (`tocVariant`). Toolbar and TOC stay pinned while the
  * page scrolls, so the TOC's "you are here" stays in sight.
- * Discard is not the page's job — the form renders its own `EditFooter`, whose
- * Cancel restores the loaded entity without a remount.
+ * The page places the form's chrome from `useFormSession()`: the TOC from `session.toc` and an `EditFooter` band across the page from `session.footer`, whose Cancel restores the loaded entity without a remount.
  */
 
 // Serve both seeds before any story renders (module scope beats effect ordering).
@@ -106,10 +104,7 @@ type entity = "vehicleType" | "vehicle";
 type Selection = { entity: entity; netexId?: string };
 
 /** The form props surfaced as story args. VehicleForm takes the same ones. */
-type FormArgs = Pick<
-  VehicleTypeFormProps,
-  "mode" | "variant" | "patched" | "footerProps" | "skeletonProps"
->;
+type FormArgs = Pick<VehicleTypeFormProps, "mode" | "variant" | "patched" | "skeletonProps">;
 
 /** The data-aware form props this page drives — VehicleForm and VehicleTypeForm
  *  share one shape (layout is the base `Layout`, not entity-specific). */
@@ -120,8 +115,7 @@ type DataAwareForm = FC<
     layout?: Layout;
     onSaved?: (netexId: string) => void;
     onError?: (generalErrors: string[]) => void;
-    activeSection?: string;
-    onActiveSectionChange?: (section: string) => void;
+    session?: FormSession;
   }
 >;
 
@@ -133,7 +127,6 @@ const ENTITY: Record<
   entity,
   {
     Form: DataAwareForm;
-    fields: Record<string, FieldSpec>;
     layout: Layout;
     seed: Record<string, Rec>;
     label: string;
@@ -142,7 +135,6 @@ const ENTITY: Record<
 > = {
   vehicleType: {
     Form: VehicleTypeForm,
-    fields: vehicleTypeFields,
     layout: vehicleTypeLayout,
     seed: vehicleTypeSeed,
     label: "VehicleType",
@@ -150,7 +142,6 @@ const ENTITY: Record<
   },
   vehicle: {
     Form: VehicleForm,
-    fields: vehicleFields,
     layout: vehicleLayout,
     seed: vehicleSeed,
     label: "Vehicle",
@@ -194,8 +185,11 @@ const useHeight = (): [(el: HTMLElement | null) => (() => void) | undefined, num
 };
 
 /** Story-adjustable props, surfaced as Storybook Controls: the form's own props
- *  passed straight through, plus three the story owns. */
+ *  passed straight through, plus four the story owns. */
 interface GqlHostPageProps extends FormArgs {
+  /** Spread onto the page's own `EditFooter` — the form no longer renders one.
+   *  Its state comes from the session and always wins. */
+  footerProps?: Pick<EditFooterProps, "labels" | "slotProps" | "sx">;
   /** Tab bar style when `variant` is `tabs`. Single-section Vehicle renders
    *  flat regardless. */
   tabStyle?: TabStyle;
@@ -237,27 +231,18 @@ const GqlHostPage = ({
   const slotProps = useMemo(() => tabSlotProps(variant, tabStyle), [variant, tabStyle]);
   const [selection, setSelection] = useState<Selection | null>(DEFAULT_SELECTION);
   const [toast, setToast] = useState<SaveToast | null>(null);
-  // One piece of state for both directions: the form reports the section being
-  // read, the TOC requests one, and the form ignores its own reports coming back.
-  const [section, setSection] = useState<string>();
+  // The form's chrome is ours to place: the TOC (column or pinned dropdown)
+  // and the Save/Cancel band across the whole page, outside every column.
+  const session = useFormSession();
 
   const selectRecord = (entity: entity, netexId?: string) => {
     setSelection({ entity, netexId });
-    setSection(undefined); // sections belong to a record's form, not to the page
   };
 
   const active = selection ? ENTITY[selection.entity] : null;
   const Form = active?.Form;
-  // One layout for both the form and the TOC, so they list the same sections.
+  // The form publishes its own TOC sections from this layout.
   const layout = active?.layout;
-  // Same call the form makes, so the list is what the form renders — and only
-  // a stacked form with several sections has anything to navigate.
-  const tocSections = useMemo(() => {
-    const labels = active
-      ? resolveSections(active.fields, layout, patched).map((s) => s.label)
-      : [];
-    return variant === "stacked" && labels.length > 1 ? labels : [];
-  }, [active, layout, variant, patched]);
 
   return (
     <Paper
@@ -323,7 +308,7 @@ const GqlHostPage = ({
         </Box>
         {/* Narrow: the TOC as a dropdown under the toolbar, aligned with the form;
             its value keeps saying which section is in view. */}
-        {toc === "dropdown" && tocSections.length > 0 && (
+        {toc === "dropdown" && session.toc.sections.length > 0 && (
           <Box
             sx={{
               px: { xs: 2, sm: 4 },
@@ -334,10 +319,8 @@ const GqlHostPage = ({
             }}
           >
             <SectionToc
+              {...session.toc}
               variant="dropdown"
-              sections={tocSections}
-              active={section ?? tocSections[0]}
-              onSelect={setSection}
               sx={{ maxWidth: FORM_MAX_WIDTH }}
             />
           </Box>
@@ -346,7 +329,7 @@ const GqlHostPage = ({
 
       <Box sx={{ display: "flex", flex: 1 }}>
         {/* Left: only when the stacked form has sections to navigate. */}
-        {toc === "list" && tocSections.length > 0 && (
+        {toc === "list" && session.toc.sections.length > 0 && (
           <Box
             sx={{
               width: TOC_WIDTH,
@@ -362,11 +345,7 @@ const GqlHostPage = ({
               <Typography variant="overline" color="text.secondary">
                 Sections
               </Typography>
-              <SectionToc
-                sections={tocSections}
-                active={section ?? tocSections[0]}
-                onSelect={setSection}
-              />
+              <SectionToc {...session.toc} />
             </Box>
           </Box>
         )}
@@ -394,10 +373,8 @@ const GqlHostPage = ({
                   slotProps={slotProps}
                   patched={patched}
                   layout={layout}
-                  footerProps={footerProps}
                   skeletonProps={skeletonProps}
-                  activeSection={section}
-                  onActiveSectionChange={setSection}
+                  session={session}
                   onSaved={(id) => {
                     setSelection({ entity: selection.entity, netexId: id });
                     setToast({ msg: `Saved ${id}`, severity: "success" });
@@ -419,6 +396,9 @@ const GqlHostPage = ({
         </Box>
       </Box>
 
+      {/* Outside the columns, so it spans the page; sticky to the bottom of the
+          viewport by EditFooter's own default. Session state wins over args. */}
+      {mode === "edit" && <EditFooter {...footerProps} {...session.footer} />}
       <SaveSnackbar toast={toast} onClose={() => setToast(null)} />
     </Paper>
   );
@@ -490,7 +470,7 @@ const meta: Meta<typeof GqlHostPage> = {
     },
     footerProps: {
       control: "object",
-      description: "Form `footerProps` (`labels`, `slotProps`, `sx`) for the Save/Cancel band.",
+      description: "`EditFooter` props the page passes (`labels`, `slotProps`, `sx`) for the Save/Cancel band.",
     },
     skeletonProps: {
       control: "object",
