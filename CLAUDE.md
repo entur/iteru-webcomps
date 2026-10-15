@@ -426,7 +426,7 @@ about what a patched field *is* — they stay editable and round-trip through
 **The `*` marker.** Distill does read the overlay for one thing: `parsePatch`
 collects each `extend type <Entity>` and stamps `patched: true` on the derived
 `FIELDS` entries (hoisted leaves of a patched object included). Display
-metadata only — it never decides what is sent. The form draws a bold `*` (`PATCH_MARK_SX`) in a column
+metadata only — it never decides what is sent. The form draws a bold red `*` (`PATCH_MARK_SX`, `error.main`) in a column
 *after* the control, outside the input (`row()` in `abstractForm`), with a
 "not saved" hint as `title`/`aria-label`. The cell is per row (`marked` in
 `utils/sections`): only a marked control is `PATCH_MARK_COL_PX` narrower, every

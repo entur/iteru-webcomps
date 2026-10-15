@@ -19,7 +19,7 @@ const SECTION_SCROLL_MARGIN = 2;
  *  i18n runtime here). */
 const PATCH_HINT = 'Not saved — not yet in the backend schema';
 /** The `*` reads as a flag, not as punctuation beside the input. */
-const PATCH_MARK_SX = { fontWeight: 'fontWeightBold', fontSize: '1.25rem', lineHeight: 1, color: 'text.primary' } as const;
+const PATCH_MARK_SX = { fontWeight: 'fontWeightBold', fontSize: '1.25rem', lineHeight: 1, color: 'error.main' } as const;
 /** Theme spacing between controls sharing a row, and below each row. */
 const COL_GAP = 2, ROW_GAP = 2;
 
