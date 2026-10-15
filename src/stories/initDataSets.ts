@@ -8,7 +8,13 @@
 import type { Vehicle, VehicleType } from "../index";
 // Generated `Vehicle` (aliased) is the nested grid-row shape on VehicleType;
 // distinct from the index `Vehicle` entity used as the Vehicle-form value.
-import { TransportMode, type Vehicle as GenVehicle } from "../generated/sobekTypes";
+import {
+  AccessEquipment,
+  LifecycleStatus,
+  TransportMode,
+  VehicleFacility,
+  type Vehicle as GenVehicle,
+} from "../generated/sobekTypes";
 
 // ── VehicleType ─────────────────────────────────────────────────────────────
 
@@ -27,6 +33,10 @@ export const vehicleTypeSample: VehicleType = {
   transportMode: TransportMode.Bus,
   deckPlan: { netexId: "VEH:DeckPlan:1", dataOwnerRef: "" },
   manufacturer: "Volvo",
+  modelName: "8900 LE",
+  euroClass: "Euro6",
+  accessEquipment: [AccessEquipment.Kneeling, AccessEquipment.Ramp],
+  facilities: [VehicleFacility.ClimateControl, VehicleFacility.Cctv],
   length: 12.396,
   width: 2.55,
   height: 3.3,
@@ -52,6 +62,8 @@ export const vehicleTypeSeed: Record<string, VehicleType> = {
     name: { lang: "en", value: "BusNordic I:15 DD" }, // busnordic/bn-i-15-dd.json
     deckPlan: { netexId: "VEH:DeckPlan:2", dataOwnerRef: "" },
     manufacturer: undefined, // a Bus Nordic reference body, not a make
+    modelName: "I:15 DD",
+    euroClass: "EURO VI", // off the code list: still shown, kept on save
     length: 14.9,
     height: 4.25,
     lowFloor: false,
@@ -67,6 +79,8 @@ export const vehicleTypeSeed: Record<string, VehicleType> = {
     name: { lang: "en", value: "Mercedes-Benz Citaro G" }, // citaro-g.json
     deckPlan: { netexId: "VEH:DeckPlan:3", dataOwnerRef: "" },
     manufacturer: "Mercedes-Benz",
+    modelName: "Citaro G",
+    facilities: [VehicleFacility.Wifi, VehicleFacility.ClimateControl],
     length: 18.2, // 10.6 + 0.6 bellows + 7.0
     height: 3.1,
     lowFloor: true,
@@ -92,7 +106,10 @@ export const vehicleSample: Vehicle = {
   operationalNumber: "701",
   chassisNumber: "CHS-0000-701",
   buildDate: "2019-06-01",
+  completionDate: "2019-11-20",
   registrationDate: "2020-01-15",
+  validBetween: { fromDate: "2020-01-15T00:00:00Z" },
+  lifecycleStatus: LifecycleStatus.Active,
   description: { lang: "en", value: "City bus, low entry" },
   dataOwnerRef: "",
   created: "2020-01-15T09:30:00Z",
@@ -128,7 +145,9 @@ export const vehicleSeed: Record<string, Vehicle> = {
     operationalNumber: "12",
     chassisNumber: "CHS-0000-012",
     buildDate: "2022-03-10",
+    completionDate: "2022-07-04",
     registrationDate: "2022-09-01",
+    validBetween: { fromDate: "2022-09-01T00:00:00Z" },
     description: { lang: "en", value: "Articulated city bus" },
     // An override: this bus runs in the yellow livery, not its type's red.
     baseColor: "#F2B705",

@@ -27,10 +27,11 @@ const geometry: LayoutItem<"tyreDiameter" | "roofEquipment" | "baseColor" | "sec
   { field: "baseColor", label: "Base colour (hex)" },
 ];
 
-// ── reference option-lists ────────────────────────────────────────────────
+// ── option-lists ──────────────────────────────────────────────────────────
 // In a real app these come from a query; here they are static. A layout entry's
-// `options` closure captures one — selecting writes `value` (a netexId) into the
-// reference field's id leaf, `label` is display-only.
+// `options` closure captures one. On a `reference` field, selecting writes
+// `value` (a netexId) into the id leaf; on a `text` field it writes the code
+// itself. `label` is display-only either way.
 
 /** Candidate VehicleTypes for `Vehicle.transportType`. */
 export const vehicleTypeRefs: RefOption[] = [
@@ -46,33 +47,53 @@ export const deckPlanRefs: RefOption[] = [
   { value: "VEH:DeckPlan:3", label: "Low-floor articulated" },
 ];
 
+/** Emission classes for `VehicleType.euroClass` — stands in for sobek's
+ *  `EMISSION_STANDARD` code list (`codeValues` query), as hathor loads it. */
+export const euroClassCodes: RefOption[] = [
+  { value: "Euro3", label: "Euro 3" },
+  { value: "Euro4", label: "Euro 4" },
+  { value: "Euro5", label: "Euro 5" },
+  { value: "Euro6", label: "Euro 6" },
+];
+
 // ── VehicleType ─────────────────────────────────────────────────────────────
 
 // Object-key order = section order; array order = field order within the
 // section. `deckPlan` (a distilled `reference`) sits under `transportMode`;
 // `vehicles` is a distilled `grid` (serverManaged) rendered as a read-only table.
+// Measured fields carry their unit as a label suffix.
 export const vehicleTypeLayout: VehicleTypeLayout = {
   General: [
     "name",
     "transportMode",
     { field: "deckPlan", options: () => deckPlanRefs },
     "manufacturer",
-    "range",
-    "fullCharge",
+    "modelName",
+    { field: "fullCharge", label: "Full charge (kWh)" },
   ],
-  Dimensions: ["length", "width", "height", "weight"],
+  Dimensions: [
+    { field: "length", label: "Length (m)" },
+    { field: "width", label: "Width (m)" },
+    { field: "height", label: "Height (m)" },
+    { field: "draft", label: "Draft (m)" },
+    { field: "weight", label: "Weight (kg)" },
+    { field: "tareWeight", label: "Tare weight (kg)" },
+  ],
   Geometry: [...geometry],
-  Accessibility: ["lowFloor"],
+  Accessibility: ["lowFloor", "accessEquipment", "facilities"],
   Environment: [
     "selfPropelled",
     "propulsionTypes",
     "fuelTypes",
-    "maximumVelocity",
-    "maximumRange",
+    { field: "euroClass", options: () => euroClassCodes },
+    { field: "maximumVelocity", label: "Maximum velocity (km/h)" },
+    { field: "maximumRange", label: "Maximum range (km)" },
     "formDragCoefficient",
     "rollResistanceCoefficient",
-    "maximumEngineEffectKW",
+    { field: "maximumEngineEffectKW", label: "Maximum engine effect (kW)" },
     "hybridCategory",
+    { field: "minOperatingTemperature", label: "Min operating temperature (°C)" },
+    { field: "maxOperatingTemperature", label: "Max operating temperature (°C)" },
   ],
   Passenger: [
     "fareClass",
@@ -97,8 +118,9 @@ export const vehicleTypeLayout: VehicleTypeLayout = {
 // ── Vehicle ───────────────────────────────────────────────────────────────
 
 // General, then the 3D geometry overrides (a set value beats the type's).
-// `transportType` is a distilled `reference`; `buildDate` / `registrationDate`
-// are `date` controls; the meta timestamps are `datetime`.
+// `transportType` is a distilled `reference`; the `…Date` fields are `date`
+// controls; the validity bounds (hoisted from `validBetween`) and the meta
+// timestamps are `datetime`. `lifecycleStatus` is sobek-derived, so locked.
 export const vehicleLayout: VehicleLayout = {
   General: [
     "name",
@@ -107,7 +129,16 @@ export const vehicleLayout: VehicleLayout = {
     "operationalNumber",
     "chassisNumber",
     "buildDate",
+    "completionDate",
     "registrationDate",
+    { field: "fromDate", label: "Valid from" },
+    { field: "toDate", label: "Valid to" },
+    "lifecycleStatus",
+    "callsign",
+    "phoneNumber",
+    { field: "mmsi", label: "MMSI" },
+    "transponderType",
+    { field: "transponderId", label: "Transponder ID" },
     "description",
   ],
   Geometry: [...geometry],
