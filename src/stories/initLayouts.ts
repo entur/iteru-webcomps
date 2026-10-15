@@ -12,9 +12,7 @@ import type { LayoutItem, VehicleLayout, VehicleTypeLayout, RefOption } from "..
  *  metres in the form, converted to mm only when the 3D input is built. Units
  *  ride as a label suffix. `sections` is a read-only grid, front to rear. */
 const geometry: LayoutItem<"tyreDiameter" | "roofEquipment" | "baseColor" | "sections">[] = [
-  { field: "tyreDiameter", label: "Tyre diameter (m)" },
-  { field: "roofEquipment", label: "Roof equipment (m)" },
-  { field: "baseColor", label: "Base colour (hex)" },
+  // First: the sections define most of the rendered bus.
   {
     field: "sections",
     entries: [
@@ -24,6 +22,9 @@ const geometry: LayoutItem<"tyreDiameter" | "roofEquipment" | "baseColor" | "sec
       { field: "windowCount", label: "Windows" },
     ],
   },
+  { field: "tyreDiameter", label: "Tyre diameter (m)" },
+  { field: "roofEquipment", label: "Roof equipment (m)" },
+  { field: "baseColor", label: "Base colour (hex)" },
 ];
 
 // ── reference option-lists ────────────────────────────────────────────────
@@ -33,9 +34,9 @@ const geometry: LayoutItem<"tyreDiameter" | "roofEquipment" | "baseColor" | "sec
 
 /** Candidate VehicleTypes for `Vehicle.transportType`. */
 export const vehicleTypeRefs: RefOption[] = [
-  { value: "VEH:VehicleType:1", label: "Class 70 EMU" },
-  { value: "VEH:VehicleType:2", label: "Class 80 DMU" },
-  { value: "VEH:VehicleType:3", label: "Articulated Tram" },
+  { value: "VEH:VehicleType:1", label: "Volvo 8900 LE 12.4 m" },
+  { value: "VEH:VehicleType:2", label: "BusNordic I:15 DD" },
+  { value: "VEH:VehicleType:3", label: "Mercedes-Benz Citaro G" },
 ];
 
 /** Candidate DeckPlans for `VehicleType.deckPlan`. */
