@@ -97,6 +97,30 @@ describe('useFormSession', () => {
     expect(save).toHaveBeenCalledOnce();
   });
 
+  it('forwards save / cancel only when editable, dirty and not saving', () => {
+    const [save, cancel] = [vi.fn(), vi.fn()];
+    const fire = () => {
+      act(() => latest.footer.onSave());
+      act(() => latest.footer.onCancel());
+    };
+    const { rerender } = render(
+      <Host>{s => <Fake session={s} state={{ ...LIVE, dirty: false }} save={save} cancel={cancel} />}</Host>
+    );
+    fire();
+    expect(save).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+
+    rerender(<Host>{s => <Fake session={s} state={{ ...LIVE, saving: true }} save={save} cancel={cancel} />}</Host>);
+    fire();
+    expect(save).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+
+    rerender(<Host>{s => <Fake session={s} save={save} cancel={cancel} />}</Host>);
+    fire();
+    expect(save).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
   it('returns to idle when the form unmounts', () => {
     const { rerender } = render(<Host>{s => <Fake session={s} />}</Host>);
     rerender(<Host>{() => null}</Host>);
@@ -120,6 +144,7 @@ describe('useFormSession', () => {
   });
 
   it('reconnecting (a record switch) clears the section, so the TOC restarts at the top', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     let nav: SectionNav = {};
     const { rerender } = render(
       <Host>{s => <Fake key="one" session={s} onNav={n => (nav = n)} />}</Host>
@@ -128,6 +153,7 @@ describe('useFormSession', () => {
     rerender(<Host>{s => <Fake key="two" session={s} onNav={n => (nav = n)} />}</Host>);
     expect(nav.activeSection).toBeUndefined();
     expect(latest.toc.active).toBe('A');
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('warns when a second form connects while one is live — the later one wins', () => {

@@ -5,7 +5,7 @@
  * hands it to the form, and spreads `session.toc` into `SectionToc` and
  * `session.footer` into `EditFooter` wherever its layout wants them. The wrapper
  * fills the session through `useSessionConnection`, keyed by a symbol this
- * module never exports, so hosts can read the session but not write to it.
+ * package never re-exports, so hosts can read the session but not write to it.
  */
 import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
@@ -98,6 +98,7 @@ export function useFormSession(): FormSession {
         if (owner.current !== id) return;
         owner.current = null;
         actions.current = null;
+        setSection(undefined); // the next record must not inherit this one's section
         setState(IDLE);
       },
       publish: (id, next) => {
@@ -141,17 +142,24 @@ export function useSessionConnection(
   const channel = link?.channel;
   const id = useId();
 
-  const latest = useRef<SessionActions & { editable: boolean }>(state);
+  const latest = useRef<SessionActions & Pick<SessionState, 'editable' | 'dirty' | 'saving'>>(state);
   useLayoutEffect(() => {
-    latest.current = { save: state.save, cancel: state.cancel, editable: state.editable };
+    latest.current = {
+      save: state.save,
+      cancel: state.cancel,
+      editable: state.editable,
+      dirty: state.dirty,
+      saving: state.saving,
+    };
   });
 
   useLayoutEffect(() => {
     if (!channel) return undefined;
-    // A form that is not editable is "no form connected" to the host: inert.
+    // Same contract as the footer: inert unless editable and dirty, locked while saving.
+    const live = () => latest.current.editable && latest.current.dirty && !latest.current.saving;
     channel.connect(id, {
-      save: () => { if (latest.current.editable) latest.current.save(); },
-      cancel: () => { if (latest.current.editable) latest.current.cancel(); },
+      save: () => { if (live()) latest.current.save(); },
+      cancel: () => { if (live()) latest.current.cancel(); },
     });
     return () => channel.disconnect(id);
   }, [channel, id]);

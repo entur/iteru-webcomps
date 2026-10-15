@@ -272,6 +272,35 @@ describe.each(manifest.map(e => [e.entity, e] as const))(
       expect(sent.filter(k => !(k in mask))).toEqual([]);
     });
 
+    // Typing drivable fields only: a switch toggled twice is back at its loaded
+    // value, which reads as clean, so it cannot show which edit was sent.
+    const typedKey = editable.find(k => drivable(k).kind !== 'switch');
+
+    it.runIf(typedKey !== undefined)('saves the latest edit through the host footer', async () => {
+      const key = typedKey as string;
+      const { kind, path } = drivable(key);
+      const typed = kind as Typed;
+      mockFns.request
+        .mockResolvedValueOnce(rows([{ netexId: NETEX_ID, ...seed([key]) }]))
+        .mockResolvedValueOnce({ [entry.mutationName]: NETEX_ID })
+        .mockResolvedValueOnce(rows([{ netexId: NETEX_ID, ...seed([key]) }]));
+
+      await mount(<Hosted Form={Form} netexId={NETEX_ID} />);
+      await waitFor(() => expect(screen.getByLabelText(humanize(key))).toBeEnabled());
+
+      // First edit to something that is not the final value, then the final one.
+      const input = screen.getByLabelText(humanize(key));
+      fireEvent.change(input, { target: { value: typed === 'number' ? '13' : 'Intermediate' } });
+      fireEvent.change(input, { target: { value: EDITED[typed] } });
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => expect(mockFns.request).toHaveBeenCalledTimes(3));
+      const { input: sent } = mockFns.request.mock.calls[1][1] as { input: Record<string, unknown> };
+      expect(String(sent[path[0]])).toBe(EDITED[typed]);
+    });
+
     it.runIf(editable.length)(
       'keeps the footer inert until an edit, then wakes both actions',
       async () => {

@@ -144,9 +144,11 @@ only), `dirty`, `saving`, `editable` (record branch rendered and
 the host. Connect and publish run in **layout effects**, so the publish lands
 before paint, and when Suspense hides an already-mounted record (netexId / org
 change without a key remount) the session goes idle and reconnects on reveal.
-`footer.onSave` / `onCancel` do nothing while the session is not `editable`
-(view, Not-found, load error, nothing connected), so a host binding them to
-Ctrl+S cannot save from those states. A record switch (remount) disconnects the
+`footer.onSave` / `onCancel` forward only when the form is `editable`, dirty and
+not saving (view, Not-found, load error, nothing connected, a clean form and an
+in-flight save are all inert), so a host binding them to Ctrl+S can neither
+save from those states nor double-send a create. A publish re-renders the host
+synchronously before paint — the price of layout effects. A record switch (remount) disconnects the
 old form and connects the new one, which clears the section. Two live forms on
 one session: the later wins, with a `[FormSession]` warning. No session → the
 form edits but cannot save. The footer itself is unchanged: status line plus

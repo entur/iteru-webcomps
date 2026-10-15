@@ -136,6 +136,7 @@ export const VehiclePane = () =&gt; (
     &lt;VehicleForm netexId="VEH:Vehicle:123" /&gt;
   &lt;/SobekProvider&gt;
 );</code></pre>
+<div class="callout warn"><strong>No <code>session</code>, no save.</strong> A form without a <code>session</code> loads and edits, but nothing can save it, and <code>onSaved</code> never fires. Pass a session and place its footer (§5) for an editable form; use <code>mode="view"</code> for a read-only one.</div>
 
 <div class="callout"><strong>Wrapping a form in your own component?</strong> The props types are exported too, so you can extend them instead of reconstructing them with <code>ComponentProps&lt;typeof VehicleForm&gt;</code>:
 <pre><code>import type { VehicleFormProps } from '@entur/mui-comps-nmr';
@@ -243,11 +244,15 @@ export const Session = ({ children }: { children: ReactNode }) =&gt; (
 </div>
 
 <h3>New</h3>
-<pre><code>// blank form → create a Vehicle (inside your SobekProvider)
-&lt;VehicleForm mode="edit" /&gt;;
+<pre><code>const session = useFormSession();
+
+// blank form → create a Vehicle (inside your SobekProvider)
+&lt;VehicleForm mode="edit" session={session} /&gt;;
+&lt;EditFooter {...session.footer} /&gt;;
 
 // tell the host when it's been created
-&lt;VehicleForm onSaved={(newId: string) =&gt; navigate(`/vehicles/${newId}`)} /&gt;;</code></pre>
+&lt;VehicleForm session={session} onSaved={(newId: string) =&gt; navigate(`/vehicles/${newId}`)} /&gt;;
+&lt;EditFooter {...session.footer} /&gt;;</code></pre>
 <div class="callout"><strong>The organisation is filled in for you.</strong> A create form shows <code>dataOwnerRef</code> already set from the provider, locked — the user neither picks it nor can change it, and the same value is what gets saved.</div>
 <div class="callout warn"><strong>Clearing <code>netexId</code> on a mounted form does not blank it.</strong> Going from an id to <code>undefined</code> only abandons the in-flight load — the values already on screen stay, deliberately, so an edit in progress is never wiped. To actually get an empty create form from a form that was showing a record, remount it: <code>key={netexId ?? 'new'}</code>.</div>
 
@@ -286,7 +291,7 @@ const session = useFormSession();
   slotProps={{ save: { color: 'secondary' } }}  // per-button MUI props
   sx={{ px: 3 }}                                // applied after every default
 /&gt;</code></pre>
-Spread <code>session.footer</code> last if you build the props elsewhere — the dirty/saving state is the form's.</div>
+<code>labels</code>, <code>slotProps</code> and <code>sx</code> never overlap the session's props, so the order you spread them in doesn't matter.</div>
 <div class="callout warn"><strong>Do you still need a <code>key</code>? Yes — for <em>switching records</em>, not for discarding.</strong> Setting <code>key={netexId ?? 'new'}</code> guarantees that moving from one record to another — or from a record to a blank “new” form — starts clean, with no chance of one record's edits bleeding into the next. What changed is that you no longer need a <code>rev</code> counter bumped on Cancel: that pattern cost a full reload of data the form already had.</div>
 <div class="callout"><strong>Want Cancel to also leave edit mode?</strong> The footer discards; it doesn't change <code>mode</code>. If your page has a view↔edit toggle, drive it from your own button and gate it on <code>session.footer.dirty</code> (§6) so you never leave with unsaved work — see the complete page in §8.</div>
 
