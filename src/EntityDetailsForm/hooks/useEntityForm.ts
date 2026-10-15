@@ -57,15 +57,9 @@ export interface UseEntityFormProps<E = any> extends EntityFormConfig {
    * Every change to the form's entity, including the initial load and the
    * post-save refetch — not just user edits. Read-only observation: the hook
    * stays the source of truth, so feeding the value back in as a prop is not
-   * supported. Use `onDirtyChange` to detect *edits*.
+   * supported. Read the returned `dirty` to detect *edits*.
    */
   onChange?: (value: any) => void;
-  /**
-   * Fired when the form crosses between clean and dirty. The baseline is the
-   * entity the server last handed back (load or post-save refetch), compared
-   * under the empty-ish rule in `../utils/dirty`.
-   */
-  onDirtyChange?: (dirty: boolean) => void;
 }
 
 /**
@@ -182,7 +176,7 @@ export function useEntityResource<E>(
 // Internal hook — accepts generic E to type the returned entity shape.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function useEntityForm<E>(props: UseEntityFormProps<E>) {
-  const { fields, query, mutation, resource, onSaved, onError, onChange, onDirtyChange } = props;
+  const { fields, query, mutation, resource, onSaved, onError, onChange } = props;
   // Session inputs for the *save* half. The load half reads its own copy in
   // `useEntityResource`, above the boundary.
   const { endpoint, headers, getHeaders, dataOwnerRef } = useSobekCtx();
@@ -265,10 +259,8 @@ export function useEntityForm<E>(props: UseEntityFormProps<E>) {
   // arrow in a dependency list would re-fire on every render.
   const onErrorRef = useRef(onError);
   const onChangeRef = useRef(onChange);
-  const onDirtyChangeRef = useRef(onDirtyChange);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
-  useEffect(() => { onDirtyChangeRef.current = onDirtyChange; }, [onDirtyChange]);
 
   // A failed load reaches the host once per record. `res` is the settled result
   // for the current key, so a retired or superseded load — whose result nobody
@@ -277,8 +269,8 @@ export function useEntityForm<E>(props: UseEntityFormProps<E>) {
     if (res && !res.ok) onErrorRef.current?.(res.messages);
   }, [res]);
 
-  // Report value/dirty transitions to the host. Both guard on the previous
-  // value so a re-render that did not move the form stays silent.
+  // Report value changes to the host, guarded on the previous value so a
+  // re-render that did not move the form stays silent.
   //
   // `prevValue` starts at `undefined`, not at `value`: the first commit already
   // carries the loaded record (there is no pre-load commit to miss any more),
@@ -290,13 +282,6 @@ export function useEntityForm<E>(props: UseEntityFormProps<E>) {
     prevValue.current = value;
     onChangeRef.current?.(value);
   }, [value]);
-
-  const prevDirty = useRef(dirty);
-  useEffect(() => {
-    if (prevDirty.current === dirty) return;
-    prevDirty.current = dirty;
-    onDirtyChangeRef.current?.(dirty);
-  }, [dirty]);
 
   // Save + refetch, as a React 19 Action: `saving` is the transition's own
   // pending flag, held for the whole async body and released when it settles.
