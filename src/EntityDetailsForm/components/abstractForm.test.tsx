@@ -3,6 +3,7 @@ import { act, render, screen, fireEvent } from '@testing-library/react';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { createAbstractEntityDetailsForm } from './abstractForm';
 import type { FieldSpec, EntityDetailsFormProps } from '../types';
+import { isDirty } from '../utils/dirty';
 
 interface V {
   name?: { value?: string | null } | null;
@@ -122,6 +123,63 @@ describe('createAbstractEntityDetailsForm', () => {
     const input = screen.getByLabelText('Built') as HTMLInputElement;
     expect(input.type).toBe('date');
     expect(input.value).toBe('2020-01-15');
+  });
+
+  describe('datetime kind', () => {
+    // Non-UTC, so the local display and the stored UTC digits differ.
+    let prevTz: string | undefined;
+    beforeEach(() => {
+      prevTz = process.env.TZ;
+      process.env.TZ = 'Europe/Oslo';
+    });
+    afterEach(() => {
+      process.env.TZ = prevTz;
+    });
+
+    type T = { validFrom?: string | null };
+    const TForm = createAbstractEntityDetailsForm<T>({
+      validFrom: { kind: 'datetime', path: ['validFrom'] },
+    });
+    const mountT = (baseline: T) => {
+      const seen: T[] = [];
+      const THost = () => {
+        const [v, setV] = useState<T>(baseline);
+        return (
+          <TForm
+            value={v}
+            onChange={next => {
+              seen.push(next);
+              setV(next);
+            }}
+            mode="edit"
+          />
+        );
+      };
+      render(<THost />);
+      return { input: screen.getByLabelText('Valid from') as HTMLInputElement, seen };
+    };
+
+    it('shows the stored instant in local time', () => {
+      const { input } = mountT({ validFrom: '2020-01-15T00:00:00Z' });
+      expect(input.type).toBe('datetime-local');
+      expect(input.value).toBe('2020-01-15T01:00');
+    });
+
+    it('emits an edit as an explicitly zoned timestamp', () => {
+      const { input, seen } = mountT({ validFrom: '2020-01-15T00:00:00Z' });
+      fireEvent.change(input, { target: { value: '2020-01-15T01:01' } });
+      expect(seen.at(-1)?.validFrom).toBe('2020-01-15T00:01:00Z');
+    });
+
+    it('restoring the displayed time restores the instant, so the form is clean', () => {
+      const baseline = { validFrom: '2020-01-15T01:00:00+01:00' };
+      const { input, seen } = mountT(baseline);
+      fireEvent.change(input, { target: { value: '2020-01-15T01:01' } });
+      expect(isDirty(seen.at(-1), baseline)).toBe(true);
+      fireEvent.change(input, { target: { value: '2020-01-15T01:00' } });
+      expect(seen.at(-1)?.validFrom).toBe('2020-01-15T00:00:00Z');
+      expect(isDirty(seen.at(-1), baseline)).toBe(false);
+    });
   });
 
   interface R {

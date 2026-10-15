@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Autocomplete, FormControlLabel, MenuItem, Switch, TextField } from '@mui/material';
 import type { TextFieldProps } from '@mui/material';
 import type { ControlSlotProps, FieldSpec, RefOption } from '../types';
+import { fromLocalInput, toLocalInput } from '../utils/datetime';
 
 /** A MultilingualString-ish shape: only `.value` is edited; `.lang` is preserved. */
 type Mls = { lang?: string | null; value?: string | null } | null | undefined;
@@ -25,9 +26,8 @@ const mergeSlots = (extra?: TextFieldProps['slotProps']): TextFieldProps['slotPr
 const numVal = (n: unknown): number | '' => (n == null ? '' : (n as number));
 const numOr = (s: string): number | undefined => (s === '' ? undefined : Number(s));
 const textOr = (s: string): string | undefined => (s === '' ? undefined : s);
-/** Slice a stored ISO string down to a native date input's value format:
- *  `date` → `YYYY-MM-DD` (10 chars), `datetime-local` → `YYYY-MM-DDTHH:mm` (16). */
-const isoSlice = (v: unknown, len: number): string => (typeof v === 'string' ? v.slice(0, len) : '');
+/** Slice a stored ISO string down to a native date input's `YYYY-MM-DD`. */
+const isoSlice = (v: unknown): string => (typeof v === 'string' ? v.slice(0, 10) : '');
 const mergeName = (cur: Mls, text: string): Mls =>
   text === '' ? undefined : { ...cur, value: text };
 /** A stored code missing from the host's list is offered as its own option
@@ -141,23 +141,23 @@ export function renderControl({
           sx={NATIVE_INPUT_SX}
           slotProps={mergeSlots(slotProps?.date)}
           type="date"
-          value={isoSlice(value, 10)}
+          value={isoSlice(value)}
           onChange={e => onChange(textOr(e.target.value))}
         />
       );
 
     case 'datetime':
-      // Native datetime-local: the stored ISO (tz/seconds) is sliced to the
-      // input's `YYYY-MM-DDTHH:mm`. Lossy on write: an edit stores the local
-      // wall-clock string, without seconds or offset.
+      // Native datetime-local holds no offset: it shows the stored instant in
+      // local time, and an edit goes back out as a UTC `…Z` timestamp
+      // (`utils/datetime`), so restoring the shown time restores the instant.
       return (
         <TextField
           {...common}
           sx={NATIVE_INPUT_SX}
           slotProps={mergeSlots(slotProps?.datetime)}
           type="datetime-local"
-          value={isoSlice(value, 16)}
-          onChange={e => onChange(textOr(e.target.value))}
+          value={toLocalInput(value)}
+          onChange={e => onChange(fromLocalInput(e.target.value))}
         />
       );
 

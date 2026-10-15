@@ -108,7 +108,9 @@ nothing to re-baseline. The draft is discarded when the record changes, so a new
 record can't be masked by the previous one's edits. The comparison (`src/EntityDetailsForm/utils/dirty.ts`) treats `undefined | null | false |
 '' | []` as one value, which is what stops an untouched Switch reporting `false`
 against a null-backed baseline, or a text field typed into and cleared, from
-reading as edits. `0` is deliberately not empty. `onChange` reaches the hook
+reading as edits. `0` is deliberately not empty. Two zoned ISO timestamps compare
+by instant (`sameInstant`), so a `datetime` set back reads clean whatever offset
+the server spelled. `onChange` reaches the hook
 through the generated wrapper's `...rest`.
 
 **Loading.** While a record is in flight the wrapper's `<Suspense>` shows
@@ -224,7 +226,8 @@ controlled `disabled`/`onClick`) and `sx` are the host's own props on
   code itself, `None` clears. A stored value missing from the list is offered
   as its own option, so it shows and survives a save.
 - `date` / `datetime` render native `<input type=date|datetime-local>` (no date
-  dep). `datetime` value is the stored ISO sliced to `YYYY-MM-DDTHH:mm`.
+  dep). `datetime` shows the stored instant in the browser's local time and
+  writes an edit back as UTC `…Z` (`utils/datetime`) — never a zone-less string.
 - `slotProps?` (form-level) — per-`kind` MUI overrides. TextField-backed kinds
   (`text|number|name|enum|date|datetime`) take TextField `slotProps` (merged over
   the label-shrink default); `enumMulti`→Autocomplete, `switch`→`SwitchProps`,
