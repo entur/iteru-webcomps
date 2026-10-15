@@ -17,7 +17,7 @@ enum AccessEquipment { KNEELING RAMP LIFT HOIST }
 enum VehicleFacility { WIFI CLIMATE_CONTROL CCTV DEFIBRILLATOR }
 enum TransponderType { AIS_CLASS_A AIS_CLASS_B OTHER }
 enum LifecycleStatus { ACTIVE INACTIVE DESTROYED }
-# Id-less list → no FIELDS entry; round-trips on Entity until a KV control (#9).
+# Id-less list → no FIELDS entry; round-trips on Entity.
 type KeyValue { key: String value: String }
 input KeyValueInput { key: String value: String }
 # NeTEx ValidBetween — a value object, so distill hoists fromDate / toDate.
@@ -71,8 +71,6 @@ extend input VehicleInput {
   transponderId: String
   contactRefs: [KeyValueInput]
 }
-
-# KV ("mockery") props from mural — not modelled yet. See entur/iteru-webcomps#9
 
 # 3D geometry — inputs that drive @entur/iteru-3dbus geometry and have no NeTEx
 # counterpart yet (entur/iteru-webcomps#51). Metres here; the 3D adapter converts
