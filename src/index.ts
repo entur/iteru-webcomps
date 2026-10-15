@@ -1,5 +1,5 @@
 /**
- * Public API of `@entur/mui-comps-nmr`.
+ * Public API of `@entur/iteru-webcomps`.
  *
  * The generic form factory + data-aware form implementations, plus the
  * generated per-entity types and field registries. Consumers never import

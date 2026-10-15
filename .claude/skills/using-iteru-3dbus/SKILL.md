@@ -1,6 +1,6 @@
 ---
 name: using-iteru-3dbus
-description: Use when rendering a bus in 3D, or a picture of one, inside this lib or hathor: a VehicleType preview, collection cards with bus thumbnails, or anything importing @entur/iteru-3dbus (mkBus, faces, mkStage, mkStageShot, validate). Also when TypeScript reports no declaration file for it, when a test fails creating a WebGLRenderer under jsdom, or when "too many active WebGL contexts" appears.
+description: 'Use when rendering a bus in 3D, or a picture of one, inside this lib or hathor: a VehicleType preview, collection cards with bus thumbnails, or anything importing @entur/iteru-3dbus (mkBus, faces, mkStage, mkStageShot, validate). Also when TypeScript reports no declaration file for it, when a test fails creating a WebGLRenderer under jsdom, or when "too many active WebGL contexts" appears.'
 ---
 
 # Using `@entur/iteru-3dbus`
