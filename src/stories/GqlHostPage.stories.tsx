@@ -1,4 +1,4 @@
-import { useMemo, useState, type FC } from "react";
+import { useCallback, useMemo, useState, type FC } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   Box,
@@ -45,8 +45,9 @@ import { installStoriesMock, setMockLatency } from "./mockEndpoint";
  * props (`mode`, `variant`, `patched`, `footerProps`, `skeletonProps`) are story args, so
  * they are driven from Storybook Controls rather than page chrome. A stacked
  * form with several sections gets a `SectionToc` wired to its `activeSection` /
- * `onActiveSectionChange`: a column beside it on wide screens, a dropdown pinned
- * above it below `md` (`tocVariant`), whose value then reads as "you are here".
+ * `onActiveSectionChange`: a column beside it on wide screens, a dropdown under
+ * the toolbar below `md` (`tocVariant`). Toolbar and TOC stay pinned while the
+ * page scrolls, so the TOC's "you are here" stays in sight.
  * Discard is not the page's job — the form renders its own `EditFooter`, whose
  * Cancel restores the loaded entity without a remount.
  */
@@ -57,9 +58,6 @@ installStoriesMock();
 const SELECT_WIDTH = 260,
   TOC_WIDTH = 200,
   FORM_MAX_WIDTH = 680;
-/** Height of the pinned TOC dropdown bar, and the page's `scroll-padding-top`
- *  while it shows — otherwise a section scrolled into view lands under it. */
-const TOC_BAR_PX = 56;
 const NEW_KEY = "new";
 /** Slow enough that the skeleton and the arrival fade are actually watchable. */
 const DEFAULT_READ_DELAY_MS = 600;
@@ -177,6 +175,24 @@ const recordIds = (seed: Record<string, Rec>, current: string): string[] => {
   return current && current !== NEW_KEY && !ids.includes(current) ? [...ids, current] : ids;
 };
 
+/**
+ * Live border-box height of the element the returned ref lands on — the pinned
+ * header wraps onto a second row on narrow screens, so offsets below it can't
+ * be a constant. React 19 runs the ref's returned cleanup on detach.
+ *
+ * @returns a callback ref and the current height in px (0 until measured)
+ */
+const useHeight = (): [(el: HTMLElement | null) => (() => void) | undefined, number] => {
+  const [height, setHeight] = useState(0);
+  const ref = useCallback((el: HTMLElement | null) => {
+    if (!el) return undefined;
+    const ro = new ResizeObserver(([e]) => setHeight(e.borderBoxSize[0].blockSize));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, height];
+};
+
 /** Story-adjustable props, surfaced as Storybook Controls: the form's own props
  *  passed straight through, plus three the story owns. */
 interface GqlHostPageProps extends FormArgs {
@@ -215,6 +231,9 @@ const GqlHostPage = ({
   // measures nothing.
   const narrow = useMediaQuery(useTheme().breakpoints.down("md"));
   const toc = tocVariant === "auto" ? (narrow ? "dropdown" : "list") : tocVariant;
+  // Toolbar + (narrow) TOC dropdown stay pinned, so the TOC's scroll feedback
+  // stays in sight; the list column and scrolled-to sections sit below it.
+  const [headerRef, headerHeight] = useHeight();
   const slotProps = useMemo(() => tabSlotProps(variant, tabStyle), [variant, tabStyle]);
   const [selection, setSelection] = useState<Selection | null>(DEFAULT_SELECTION);
   const [toast, setToast] = useState<SaveToast | null>(null);
@@ -245,58 +264,84 @@ const GqlHostPage = ({
       elevation={0}
       sx={{ display: "flex", flexDirection: "column", minHeight: "100vh", bgcolor: "grey.100" }}
     >
-      {/* Top: one record picker per entity; the active one shows the selection. */}
-      <Box
-        sx={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: 2,
-          px: 2,
-          py: 1.5,
-          borderBottom: 1,
-          borderColor: "divider",
-          bgcolor: "background.paper",
-        }}
-      >
-        <Typography variant="overline" color="text.secondary">
-          Select form and mock data
-        </Typography>
-        {ENTITY_ORDER.map((entity) => {
-          const cfg = ENTITY[entity];
-          const current = selection?.entity === entity ? (selection.netexId ?? NEW_KEY) : "";
-          const name = (id: string) => cfg.seed[id]?.name?.value ?? id;
-          return (
-            <TextField
-              key={entity}
-              select
-              size="small"
-              label={cfg.label}
-              value={current}
-              onChange={(e) =>
-                selectRecord(entity, e.target.value === NEW_KEY ? undefined : e.target.value)
-              }
-              slotProps={{
-                select: {
-                  renderValue: (v) => (v === NEW_KEY ? cfg.newLabel : name(v as string)),
-                },
-              }}
-              sx={{ width: SELECT_WIDTH }}
-            >
-              <MenuItem value={NEW_KEY}>
-                <ListItemIcon>
-                  <AddIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText primary={cfg.newLabel} />
-              </MenuItem>
-              {recordIds(cfg.seed, current).map((id) => (
-                <MenuItem key={id} value={id}>
-                  <ListItemText primary={name(id)} secondary={id} />
+      {/* The page's scroller is <html>: give scrollIntoView the header's height
+          so a section picked in either TOC lands below it, not under it. */}
+      <GlobalStyles styles={{ html: { scrollPaddingTop: headerHeight } }} />
+      <Box ref={headerRef} sx={{ position: "sticky", top: 0, zIndex: "appBar" }}>
+        {/* Top: one record picker per entity; the active one shows the selection. */}
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 2,
+            px: 2,
+            py: 1.5,
+            borderBottom: 1,
+            borderColor: "divider",
+            bgcolor: "background.paper",
+          }}
+        >
+          <Typography variant="overline" color="text.secondary">
+            Select form and mock data
+          </Typography>
+          {ENTITY_ORDER.map((entity) => {
+            const cfg = ENTITY[entity];
+            const current = selection?.entity === entity ? (selection.netexId ?? NEW_KEY) : "";
+            const name = (id: string) => cfg.seed[id]?.name?.value ?? id;
+            return (
+              <TextField
+                key={entity}
+                select
+                size="small"
+                label={cfg.label}
+                value={current}
+                onChange={(e) =>
+                  selectRecord(entity, e.target.value === NEW_KEY ? undefined : e.target.value)
+                }
+                slotProps={{
+                  select: {
+                    renderValue: (v) => (v === NEW_KEY ? cfg.newLabel : name(v as string)),
+                  },
+                }}
+                sx={{ width: SELECT_WIDTH }}
+              >
+                <MenuItem value={NEW_KEY}>
+                  <ListItemIcon>
+                    <AddIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary={cfg.newLabel} />
                 </MenuItem>
-              ))}
-            </TextField>
-          );
-        })}
+                {recordIds(cfg.seed, current).map((id) => (
+                  <MenuItem key={id} value={id}>
+                    <ListItemText primary={name(id)} secondary={id} />
+                  </MenuItem>
+                ))}
+              </TextField>
+            );
+          })}
+        </Box>
+        {/* Narrow: the TOC as a dropdown under the toolbar, aligned with the form;
+            its value keeps saying which section is in view. */}
+        {toc === "dropdown" && tocSections.length > 0 && (
+          <Box
+            sx={{
+              px: { xs: 2, sm: 4 },
+              py: 1.5,
+              bgcolor: "grey.100",
+              borderBottom: 1,
+              borderColor: "divider",
+            }}
+          >
+            <SectionToc
+              variant="dropdown"
+              sections={tocSections}
+              active={section ?? tocSections[0]}
+              onSelect={setSection}
+              sx={{ maxWidth: FORM_MAX_WIDTH }}
+            />
+          </Box>
+        )}
       </Box>
 
       <Box sx={{ display: "flex", flex: 1 }}>
@@ -311,8 +356,9 @@ const GqlHostPage = ({
               bgcolor: "background.paper",
             }}
           >
-            {/* The page scrolls, not the column, so the content is pinned inside it. */}
-            <Box sx={{ position: "sticky", top: 0, p: 2 }}>
+            {/* The page scrolls, not the column, so the content is pinned inside
+                it — below the pinned header. */}
+            <Box sx={{ position: "sticky", top: headerHeight, p: 2 }}>
               <Typography variant="overline" color="text.secondary">
                 Sections
               </Typography>
@@ -327,39 +373,6 @@ const GqlHostPage = ({
 
         {/* Right: the selected entity's data-aware form + host chrome. */}
         <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, sm: 4 } }}>
-          {toc === "dropdown" && tocSections.length > 0 && (
-            <>
-              <GlobalStyles styles={{ html: { scrollPaddingTop: TOC_BAR_PX } }} />
-              {/* Pinned, so its value keeps saying which section is in view.
-                  Bleeds over the column padding so content scrolls under it. */}
-              <Box
-                sx={{
-                  position: "sticky",
-                  top: 0,
-                  zIndex: 2,
-                  height: TOC_BAR_PX,
-                  boxSizing: "border-box",
-                  display: "flex",
-                  alignItems: "center",
-                  mx: { xs: -2, sm: -4 },
-                  mt: { xs: -2, sm: -4 },
-                  mb: 2,
-                  px: { xs: 2, sm: 4 },
-                  bgcolor: "grey.100",
-                  borderBottom: 1,
-                  borderColor: "divider",
-                }}
-              >
-                <SectionToc
-                  variant="dropdown"
-                  sections={tocSections}
-                  active={section ?? tocSections[0]}
-                  onSelect={setSection}
-                  sx={{ flex: 1, maxWidth: FORM_MAX_WIDTH }}
-                />
-              </Box>
-            </>
-          )}
           {selection && active && Form ? (
             <>
               <Typography variant="h6" sx={{ mb: 2 }}>

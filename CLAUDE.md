@@ -179,8 +179,9 @@ own chrome from `onSaved`/`onError`) uses the same pieces.
   `variant` `'list' | 'dropdown'`: same contract, so the dropdown keeps the scroll
   feedback (its value is `active`). Every pick reports via the item's `onClick`
   (a select fires no change for its current value). It measures nothing — the
-  host picks the variant (Fullpage: dropdown below `md`, pinned, with
-  `scroll-padding-top` = bar height so `scrollIntoView` clears it).
+  host picks the variant (Fullpage: dropdown below `md`; toolbar + TOC pinned
+  in one header whose measured height is both the list column's sticky `top`
+  and `html { scroll-padding-top }`, so `scrollIntoView` clears it).
 - `serverManaged` fields (`version`, `created`, `changed`, `changedBy`) hidden
   from editable model: locked even in edit, surfaced only to *see* meta/semantic
   context. Backend-owned — **not round-tripped**, never in write payload, don't
