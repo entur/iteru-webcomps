@@ -7,7 +7,13 @@
  * a null-backed baseline, or a text field typed into and cleared again, would
  * both read as edits. `0` is deliberately **not** empty — clearing a numeric
  * field that held `0` is a real change.
+ *
+ * Two zoned ISO timestamps are equal when they name the same instant, so a
+ * `datetime` edited and set back reads clean even when the server spelled the
+ * offset differently from the control's UTC output.
  */
+
+import { sameInstant } from './datetime';
 
 /** Leaves that mean "nothing here", however the control happens to spell it. */
 const isEmpty = (v: unknown): boolean =>
@@ -22,6 +28,7 @@ const isEmpty = (v: unknown): boolean =>
 function same(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (isEmpty(a) && isEmpty(b)) return true;
+  if (typeof a === 'string' && typeof b === 'string') return sameInstant(a, b);
 
   if (Array.isArray(a) || Array.isArray(b)) {
     if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;

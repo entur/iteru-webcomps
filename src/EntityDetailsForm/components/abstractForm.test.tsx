@@ -3,6 +3,7 @@ import { act, render, screen, fireEvent } from '@testing-library/react';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { createAbstractEntityDetailsForm } from './abstractForm';
 import type { FieldSpec, EntityDetailsFormProps } from '../types';
+import { isDirty } from '../utils/dirty';
 
 interface V {
   name?: { value?: string | null } | null;
@@ -124,6 +125,63 @@ describe('createAbstractEntityDetailsForm', () => {
     expect(input.value).toBe('2020-01-15');
   });
 
+  describe('datetime kind', () => {
+    // Non-UTC, so the local display and the stored UTC digits differ.
+    let prevTz: string | undefined;
+    beforeEach(() => {
+      prevTz = process.env.TZ;
+      process.env.TZ = 'Europe/Oslo';
+    });
+    afterEach(() => {
+      process.env.TZ = prevTz;
+    });
+
+    type T = { validFrom?: string | null };
+    const TForm = createAbstractEntityDetailsForm<T>({
+      validFrom: { kind: 'datetime', path: ['validFrom'] },
+    });
+    const mountT = (baseline: T) => {
+      const seen: T[] = [];
+      const THost = () => {
+        const [v, setV] = useState<T>(baseline);
+        return (
+          <TForm
+            value={v}
+            onChange={next => {
+              seen.push(next);
+              setV(next);
+            }}
+            mode="edit"
+          />
+        );
+      };
+      render(<THost />);
+      return { input: screen.getByLabelText('Valid from') as HTMLInputElement, seen };
+    };
+
+    it('shows the stored instant in local time', () => {
+      const { input } = mountT({ validFrom: '2020-01-15T00:00:00Z' });
+      expect(input.type).toBe('datetime-local');
+      expect(input.value).toBe('2020-01-15T01:00');
+    });
+
+    it('emits an edit as an explicitly zoned timestamp', () => {
+      const { input, seen } = mountT({ validFrom: '2020-01-15T00:00:00Z' });
+      fireEvent.change(input, { target: { value: '2020-01-15T01:01' } });
+      expect(seen.at(-1)?.validFrom).toBe('2020-01-15T00:01:00Z');
+    });
+
+    it('restoring the displayed time restores the instant, so the form is clean', () => {
+      const baseline = { validFrom: '2020-01-15T01:00:00+01:00' };
+      const { input, seen } = mountT(baseline);
+      fireEvent.change(input, { target: { value: '2020-01-15T01:01' } });
+      expect(isDirty(seen.at(-1), baseline)).toBe(true);
+      fireEvent.change(input, { target: { value: '2020-01-15T01:00' } });
+      expect(seen.at(-1)?.validFrom).toBe('2020-01-15T00:00:00Z');
+      expect(isDirty(seen.at(-1), baseline)).toBe(false);
+    });
+  });
+
   interface R {
     transportType?: { netexId?: string | null } | null;
   }
@@ -192,6 +250,65 @@ describe('createAbstractEntityDetailsForm', () => {
     fireEvent.mouseDown(input); // open the listbox
     fireEvent.click(screen.getByText('Beta'));
     expect(input.value).toBe('Beta');
+  });
+
+  describe('text with options', () => {
+    const CodeForm = createAbstractEntityDetailsForm<{ euroClass?: string | null }>({
+      euroClass: { kind: 'text', path: ['euroClass'] },
+    });
+    const codes = () => [
+      { value: 'Euro5', label: 'Euro 5' },
+      { value: 'Euro6', label: 'Euro 6' },
+    ];
+    const CodeHost = ({ initial }: { initial?: string }) => {
+      const [v, setV] = useState<{ euroClass?: string | null }>({ euroClass: initial });
+      return (
+        <>
+          <CodeForm
+            value={v}
+            onChange={setV}
+            mode="edit"
+            layout={{ Env: [{ field: 'euroClass', options: codes }] }}
+          />
+          <output data-testid="stored">{String(v.euroClass)}</output>
+        </>
+      );
+    };
+    const pick = (name: string) => {
+      fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Euro class' }));
+      fireEvent.click(screen.getByRole('option', { name }));
+    };
+
+    it('renders a select showing the label of the stored code', () => {
+      render(<CodeHost initial="Euro6" />);
+      expect(screen.getByRole('combobox', { name: 'Euro class' })).toHaveTextContent('Euro 6');
+    });
+
+    it('writes the picked code value, and None clears it', () => {
+      render(<CodeHost />);
+      pick('Euro 5');
+      expect(screen.getByTestId('stored')).toHaveTextContent('Euro5');
+      pick('None');
+      expect(screen.getByTestId('stored')).toHaveTextContent('undefined');
+    });
+
+    it('keeps a stored value that is not in the list as its own option', () => {
+      render(<CodeHost initial="EURO VI" />);
+      expect(screen.getByRole('combobox', { name: 'Euro class' })).toHaveTextContent('EURO VI');
+      fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Euro class' }));
+      expect(screen.getAllByRole('option').map(o => o.textContent)).toEqual([
+        'None',
+        'EURO VI',
+        'Euro 5',
+        'Euro 6',
+      ]);
+    });
+
+    it('stays a free-text field without options', () => {
+      render(<CodeForm value={{ euroClass: 'Euro6' }} onChange={() => {}} mode="edit" />);
+      expect((screen.getByLabelText('Euro class') as HTMLInputElement).value).toBe('Euro6');
+      expect(screen.queryByRole('combobox')).toBeNull();
+    });
   });
 
   it('surfaces errors and disables inputs when disabled is true', () => {

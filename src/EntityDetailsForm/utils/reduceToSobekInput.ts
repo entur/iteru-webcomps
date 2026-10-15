@@ -2,7 +2,7 @@
  * Reduce a form-derived input object to the fields the live sobek schema accepts.
  *
  * `FIELDS` is distilled from the *patched* schema, so `toInputEntity` can hand
- * back keys (`manufacturer`, `range`, …) that exist only in
+ * back keys (`manufacturer`, `fullCharge`, …) that exist only in
  * `schema/sobek.patch.graphqls`. The backend rejects those, so they are stripped
  * here — at the wire edge, leaving the form model itself untouched.
  *

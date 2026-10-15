@@ -9,19 +9,67 @@
 # render as ordinary editable controls and round-trip through `onChange`; only
 # the wire edge drops them.
 
-# vehicleModel props inlined onto VehicleType (manufacturer / range / full-charge).
-# Added to BOTH read + input so distill derives them as editable (not serverManaged).
+# Future fields agreed in entur/hathor#191 (entur/iteru-webcomps#50). Each is
+# on BOTH the read type and the input, so distill derives it as editable — except
+# `lifecycleStatus`, which sobek will derive (deactivate + validity): read type
+# only, so it is serverManaged and renders as a permanently locked control.
+enum AccessEquipment { KNEELING RAMP LIFT HOIST }
+enum VehicleFacility { WIFI CLIMATE_CONTROL CCTV DEFIBRILLATOR }
+enum TransponderType { AIS_CLASS_A AIS_CLASS_B OTHER }
+enum LifecycleStatus { ACTIVE INACTIVE DESTROYED }
+# Id-less list → no FIELDS entry; round-trips on Entity until a KV control (#9).
+type KeyValue { key: String value: String }
+input KeyValueInput { key: String value: String }
+# NeTEx ValidBetween — a value object, so distill hoists fromDate / toDate.
+type ValidBetween { fromDate: DateTime toDate: DateTime }
+input ValidBetweenInput { fromDate: DateTime toDate: DateTime }
+
+# NeTEx VehicleModel props inlined onto VehicleType (manufacturer, modelName,
+# fullCharge). `range` is gone: sobek's `maximumRange` already carries it.
 extend type VehicleType {
   manufacturer: String
-  range: Float
-  fullCharge: Float
+  modelName: String
+  fullCharge: Float                  # kWh (battery capacity)
   carLoading: Boolean
+  draft: Float                       # m
+  tareWeight: Float                  # kg
+  minOperatingTemperature: Float     # °C
+  maxOperatingTemperature: Float     # °C
+  accessEquipment: [AccessEquipment]
+  facilities: [VehicleFacility]      # sobek#114 `satisfiesFacilities`; rename when it lands
 }
 extend input VehicleTypeInput {
   manufacturer: String
-  range: Float
+  modelName: String
   fullCharge: Float
   carLoading: Boolean
+  draft: Float
+  tareWeight: Float
+  minOperatingTemperature: Float
+  maxOperatingTemperature: Float
+  accessEquipment: [AccessEquipment]
+  facilities: [VehicleFacility]
+}
+extend type Vehicle {
+  completionDate: Date
+  validBetween: ValidBetween         # no DecommissionDate on Vehicle in NeTEx 2.0
+  callsign: String
+  phoneNumber: String
+  mmsi: String                       # ^\d{9}$ — validation is a follow-up
+  transponderType: TransponderType
+  transponderId: String
+  contactRefs: [KeyValue]
+  lifecycleStatus: LifecycleStatus   # read only → locked
+}
+extend input VehicleInput {
+  completionDate: Date
+  validBetween: ValidBetweenInput
+  callsign: String
+  phoneNumber: String
+  mmsi: String
+  transponderType: TransponderType
+  transponderId: String
+  contactRefs: [KeyValueInput]
 }
 
 # KV ("mockery") props from mural — not modelled yet. See entur/iteru-webcomps#9

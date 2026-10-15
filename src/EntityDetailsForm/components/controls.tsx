@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Autocomplete, FormControlLabel, MenuItem, Switch, TextField } from '@mui/material';
 import type { TextFieldProps } from '@mui/material';
 import type { ControlSlotProps, FieldSpec, RefOption } from '../types';
+import { fromLocalInput, toLocalInput } from '../utils/datetime';
 
 /** A MultilingualString-ish shape: only `.value` is edited; `.lang` is preserved. */
 type Mls = { lang?: string | null; value?: string | null } | null | undefined;
@@ -25,11 +26,16 @@ const mergeSlots = (extra?: TextFieldProps['slotProps']): TextFieldProps['slotPr
 const numVal = (n: unknown): number | '' => (n == null ? '' : (n as number));
 const numOr = (s: string): number | undefined => (s === '' ? undefined : Number(s));
 const textOr = (s: string): string | undefined => (s === '' ? undefined : s);
-/** Slice a stored ISO string down to a native date input's value format:
- *  `date` → `YYYY-MM-DD` (10 chars), `datetime-local` → `YYYY-MM-DDTHH:mm` (16). */
-const isoSlice = (v: unknown, len: number): string => (typeof v === 'string' ? v.slice(0, len) : '');
+/** Slice a stored ISO string down to a native date input's `YYYY-MM-DD`. */
+const isoSlice = (v: unknown): string => (typeof v === 'string' ? v.slice(0, 10) : '');
 const mergeName = (cur: Mls, text: string): Mls =>
   text === '' ? undefined : { ...cur, value: text };
+/** A stored code missing from the host's list is offered as its own option
+ *  (label = the raw code), so the select can show it and a save can't blank it. */
+const withStored = (opts: RefOption[], cur: unknown): RefOption[] =>
+  typeof cur === 'string' && cur !== '' && !opts.some(o => o.value === cur)
+    ? [{ value: cur, label: cur }, ...opts]
+    : opts;
 
 export interface ControlProps {
   spec: FieldSpec;
@@ -38,8 +44,9 @@ export interface ControlProps {
   disabled: boolean;
   /** Emit the next raw value for this field's path (`undefined` clears it). */
   onChange: (next: unknown) => void;
-  /** `reference` only — option-dataset closure (the layout entry's `options`).
-   *  Present → render an Autocomplete; omit → degrade to a free-text id field. */
+  /** Option-dataset closure (the layout entry's `options`). `reference`: present
+   *  → an Autocomplete, omit → a free-text id field. `text`: present → a select
+   *  over the host's code values, omit → free text. Ignored by other kinds. */
   options?: () => RefOption[];
   /** Form-level per-kind MUI overrides. The slice for this field's `spec.kind`
    *  is applied to its control (see `ControlSlotProps`). */
@@ -94,7 +101,29 @@ export function renderControl({
         />
       );
 
-    case 'text':
+    case 'text': {
+      // A host-supplied code list turns free text into a select (e.g. euroClass
+      // over sobek's EMISSION_STANDARD code values). The field stays a String.
+      const codes = options?.();
+      if (codes)
+        return (
+          <TextField
+            {...common}
+            slotProps={mergeSlots(slotProps?.text)}
+            select
+            value={(value as string | null | undefined) ?? ''}
+            onChange={e => onChange(textOr(e.target.value))}
+          >
+            <MenuItem value="">
+              <em>None</em>
+            </MenuItem>
+            {withStored(codes, value).map(o => (
+              <MenuItem key={o.value} value={o.value}>
+                {o.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        );
       return (
         <TextField
           {...common}
@@ -103,6 +132,7 @@ export function renderControl({
           onChange={e => onChange(textOr(e.target.value))}
         />
       );
+    }
 
     case 'date':
       return (
@@ -111,23 +141,23 @@ export function renderControl({
           sx={NATIVE_INPUT_SX}
           slotProps={mergeSlots(slotProps?.date)}
           type="date"
-          value={isoSlice(value, 10)}
+          value={isoSlice(value)}
           onChange={e => onChange(textOr(e.target.value))}
         />
       );
 
     case 'datetime':
-      // Native datetime-local: the stored ISO (tz/seconds) is sliced to the
-      // input's `YYYY-MM-DDTHH:mm`. Lossy on write — fine, datetime fields here
-      // are all serverManaged (display-only, never round-tripped).
+      // Native datetime-local holds no offset: it shows the stored instant in
+      // local time, and an edit goes back out as a UTC `…Z` timestamp
+      // (`utils/datetime`), so restoring the shown time restores the instant.
       return (
         <TextField
           {...common}
           sx={NATIVE_INPUT_SX}
           slotProps={mergeSlots(slotProps?.datetime)}
           type="datetime-local"
-          value={isoSlice(value, 16)}
-          onChange={e => onChange(textOr(e.target.value))}
+          value={toLocalInput(value)}
+          onChange={e => onChange(fromLocalInput(e.target.value))}
         />
       );
 

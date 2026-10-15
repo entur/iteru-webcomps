@@ -34,6 +34,11 @@ describe('isDirty', () => {
     expect(isDirty({ euroClass: null }, {})).toBe(false);
   });
 
+  it('compares zoned timestamps by instant, not by spelling', () => {
+    expect(isDirty({ t: '2020-01-15T00:00:00Z' }, { t: '2020-01-15T01:00:00+01:00' })).toBe(false);
+    expect(isDirty({ t: '2020-01-15T00:01:00Z' }, { t: '2020-01-15T00:00:00Z' })).toBe(true);
+  });
+
   // Guard against over-normalizing: 0 is a real value a user can mean.
   it('does not treat a zero as absent', () => {
     expect(isDirty({ weight: 0 }, {})).toBe(true);

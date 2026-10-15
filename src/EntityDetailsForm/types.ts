@@ -25,9 +25,9 @@ export type FieldKind =
   | 'date'
   | 'datetime';
 
-/** One selectable option for a `reference` field's Autocomplete. `value` is the
- *  referenced entity's identity (written into the field's id leaf); `label` is
- *  display-only. */
+/** One selectable option for a `reference` field's Autocomplete or a `text`
+ *  field's code select. `value` is what is written (a referenced entity's id, or
+ *  the code itself); `label` is display-only. */
 export interface RefOption {
   value: string;
   label: string;
@@ -71,10 +71,12 @@ export interface FieldEntry<K extends string = string> {
    *  dropped. Omit to auto-derive every column from the row data. Ignored for
    *  non-grid fields. */
   entries?: FieldEntry[];
-  /** **`reference` fields only** — supplies the Autocomplete's candidate dataset.
-   *  A closure (capturing the client's data) returning `{ value, label }[]`;
-   *  `value` is the referenced entity's id. Omit → the field degrades to a
-   *  free-text id input. Ignored for non-reference fields. */
+  /** **`reference` and `text` fields only** — a closure (capturing the client's
+   *  data) returning `{ value, label }[]`. `reference`: the Autocomplete's
+   *  candidates, `value` = the referenced entity's id; omit → a free-text id
+   *  input. `text`: a select over host-supplied code values (e.g. `euroClass`),
+   *  `value` = the stored string; a stored value missing from the list is still
+   *  offered; omit → free text. Ignored for other kinds. */
   options?: () => RefOption[];
   [k: string]: unknown; // future per-field overrides (e.g. width)
 }
