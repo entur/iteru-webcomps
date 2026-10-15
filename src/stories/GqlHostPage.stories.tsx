@@ -394,7 +394,7 @@ const GqlHostPage = ({ tabStyle = "none" }: GqlHostPageProps) => {
 };
 
 const meta: Meta<typeof GqlHostPage> = {
-  title: "compositions/GqlHostPages",
+  title: "HostPages/Fullpage",
   component: GqlHostPage,
   parameters: { layout: "fullscreen" },
   // Configure the mock *before* the story renders. Not in the component body
@@ -424,4 +424,4 @@ const meta: Meta<typeof GqlHostPage> = {
 export default meta;
 type Story = StoryObj<typeof GqlHostPage>;
 
-export const HostPage01: Story = {};
+export const Fullpage: Story = {};

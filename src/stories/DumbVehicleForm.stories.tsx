@@ -13,7 +13,7 @@ import { vehicleLayout } from "./initLayouts";
 const DumbVehicleForm = createAbstractEntityDetailsForm<Vehicle>(vehicleFields);
 
 const meta: Meta<typeof DumbVehicleForm> = {
-  title: "Dumb-Forms/VehicleForm",
+  title: "FormImplementations/VehicleForm",
   component: DumbVehicleForm,
   args: { mode: "edit", layout: vehicleLayout },
 };

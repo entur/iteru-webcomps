@@ -26,14 +26,14 @@ const preview: Preview = {
   parameters: {
     controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
     backgrounds: { default: "paper" },
-    // Sidebar order: compositions on top (GqlHostPages first within it — Storybook
-    // opens the first story, so this makes GqlHostPages the landing page), then
+    // Sidebar order: HostPages on top (Fullpage first within it — Storybook
+    // opens the first story, so this makes Fullpage the landing page), then
     // DataGrid, then Forms, then anything else A–Z.
     options: {
       storySort: {
         order: [
-          "compositions",
-          ["GqlHostPages", "*"],
+          "HostPages",
+          ["Fullpage", "*"],
           "DataGrid",
           "Forms",
           "*",

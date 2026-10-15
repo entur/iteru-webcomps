@@ -14,7 +14,7 @@ const DumbVehicleTypeForm =
   createAbstractEntityDetailsForm<VehicleType>(vehicleTypeFields);
 
 const meta: Meta<typeof DumbVehicleTypeForm> = {
-  title: "Dumb-Forms/VehicleTypeForm",
+  title: "FormImplementations/VehicleTypeForm",
   component: DumbVehicleTypeForm,
   args: { mode: "edit", layout: vehicleTypeLayout },
 };
