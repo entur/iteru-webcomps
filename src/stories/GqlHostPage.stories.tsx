@@ -37,6 +37,7 @@ import {
   type Layout,
   type LayoutVariant,
   type ControlSlotProps,
+  type KindWidths,
   type SaveToast,
   type SectionTocVariant,
   type VehicleTypeFormProps,
@@ -44,6 +45,7 @@ import {
 import { vehicleSeed, vehicleTypeSeed } from "./initDataSets";
 import { vehicleLayout, vehicleTypeLayout } from "./initLayouts";
 import { installStoriesMock, setMockLatency } from "./mockEndpoint";
+import { captionSlots, formLookArgs, formLookArgTypes, widthsOf, type FormLookArgs } from "./formControls";
 
 /*
  * Data-aware counterpart to the Dumb-Forms stories: mounts the real,
@@ -136,6 +138,7 @@ type DataAwareForm = FC<
   FormArgs & {
     netexId?: string;
     slotProps?: ControlSlotProps;
+    widths?: KindWidths;
     layout?: Layout;
     onSaved?: (netexId: string) => void;
     onError?: (generalErrors: string[]) => void;
@@ -255,7 +258,7 @@ const RecordName = ({ caption, name }: { caption: string; name: string }) => (
 
 /** Story-adjustable props, surfaced as Storybook Controls: the form's own props
  *  passed straight through, plus four the story owns. */
-interface GqlHostPageProps extends FormArgs {
+interface GqlHostPageProps extends FormArgs, FormLookArgs {
   /** Spread onto the page's own `EditFooter` — the form no longer renders one.
    *  Its state comes from the session and always wins. */
   footerProps?: Pick<EditFooterProps, "labels" | "slotProps" | "sx">;
@@ -293,6 +296,7 @@ const GqlHostPage = ({
   footerProps,
   skeletonProps,
   toolbar = "expanded",
+  ...look
 }: GqlHostPageProps) => {
   // The host picks the TOC's look — it knows the room it gives it; SectionToc
   // measures nothing.
@@ -301,7 +305,13 @@ const GqlHostPage = ({
   // Toolbar + (narrow) TOC dropdown stay pinned, so the TOC's scroll feedback
   // stays in sight; the list column and scrolled-to sections sit below it.
   const [headerRef, headerHeight] = useHeight();
-  const slotProps = useMemo(() => tabSlotProps(variant, tabStyle), [variant, tabStyle]);
+  const { captions } = look;
+  const slotProps = useMemo(
+    () => ({ ...captionSlots(captions), ...tabSlotProps(variant, tabStyle) }),
+    [captions, variant, tabStyle],
+  );
+  // Read at render only (no effect keys on it), so a fresh object is fine.
+  const widths = widthsOf(look);
   const [selection, setSelection] = useState<Selection | null>(DEFAULT_SELECTION);
   const [toast, setToast] = useState<SaveToast | null>(null);
   // The form's chrome is ours to place: the TOC (column or pinned dropdown)
@@ -542,6 +552,7 @@ const GqlHostPage = ({
                     variant={variant}
                     slotProps={slotProps}
                     patched={patched}
+                    widths={widths}
                     layout={layout}
                     skeletonProps={skeletonProps}
                     session={session}
@@ -628,8 +639,10 @@ const meta: Meta<typeof GqlHostPage> = {
     skeletonProps: { ariaLabel: "Loading form" },
     readDelayMs: DEFAULT_READ_DELAY_MS,
     toolbar: "expanded",
+    ...formLookArgs,
   },
   argTypes: {
+    ...formLookArgTypes,
     mode: {
       control: "inline-radio",
       options: ["view", "edit"],

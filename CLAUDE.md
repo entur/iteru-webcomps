@@ -247,7 +247,11 @@ controlled `disabled`/`onClick`) and `sx` are the host's own props on
   `ResolvedField.width` + `gridSize()` feed both form and `FormSkeleton`, so the
   skeleton places the same cells. The `*` cell stays per control, inside its
   grid cell. Watch long unit captions at 1/3: the temperature pair in the
-  story layout is `1/2` because it truncates in a ~620px column.
+  story layout is `1/2` because it truncates in a ~620px column. The form
+  stories and Fullpage expose one width radio per kind plus a `captions`
+  radio (`pinned` = lib default, `floating` = MUI's, via
+  `slotProps.<kind>.inputLabel.shrink`) from `src/stories/formControls.ts` —
+  story-only, no lib prop; enumMulti / reference stay pinned.
 
 ## Collection
 
