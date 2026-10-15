@@ -301,6 +301,33 @@ describe.each(manifest.map(e => [e.entity, e] as const))(
       expect(String(sent[path[0]])).toBe(EDITED[typed]);
     });
 
+    it.runIf(typedKey !== undefined)('sends one mutation for a double Save in one tick', async () => {
+      const key = typedKey as string;
+      const typed = drivable(key).kind as Typed;
+      mockFns.request
+        .mockResolvedValueOnce(rows([{ netexId: NETEX_ID, ...seed([key]) }]))
+        .mockResolvedValue({ [entry.mutationName]: NETEX_ID });
+
+      await mount(<Hosted Form={Form} netexId={NETEX_ID} />);
+      await waitFor(() => expect(screen.getByLabelText(humanize(key))).toBeEnabled());
+      fireEvent.change(screen.getByLabelText(humanize(key)), { target: { value: EDITED[typed] } });
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+
+      // Native clicks inside one act: no commit between them, so the button is
+      // still enabled for the second — as for a double-click or a doubled shortcut.
+      const save = screen.getByRole('button', { name: 'Save' });
+      await act(async () => {
+        save.click();
+        save.click();
+      });
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled());
+      const mutations = mockFns.request.mock.calls.filter(
+        ([, vars]) => (vars as { input?: unknown } | undefined)?.input !== undefined
+      );
+      expect(mutations).toHaveLength(1);
+    });
+
     it.runIf(editable.length)(
       'keeps the footer inert until an edit, then wakes both actions',
       async () => {

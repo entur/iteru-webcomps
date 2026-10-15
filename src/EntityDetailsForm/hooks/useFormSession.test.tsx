@@ -74,6 +74,9 @@ describe('useFormSession', () => {
     rerender(<Host>{s => <Fake session={s} save={save2} cancel={cancel2} />}</Host>);
 
     act(() => latest.footer.onSave());
+    // A real save commits its pending flag; the spies don't, so commit here to
+    // release the one-action-per-commit latch.
+    rerender(<Host>{s => <Fake session={s} save={save2} cancel={cancel2} />}</Host>);
     act(() => latest.footer.onCancel());
     expect(save2).toHaveBeenCalledOnce();
     expect(cancel2).toHaveBeenCalledOnce();
@@ -115,8 +118,11 @@ describe('useFormSession', () => {
     expect(save).not.toHaveBeenCalled();
     expect(cancel).not.toHaveBeenCalled();
 
-    rerender(<Host>{s => <Fake session={s} save={save} cancel={cancel} />}</Host>);
-    fire();
+    const live = () => <Host>{s => <Fake session={s} save={save} cancel={cancel} />}</Host>;
+    rerender(live());
+    act(() => latest.footer.onSave());
+    rerender(live()); // release the one-action-per-commit latch, as a real save's commit does
+    act(() => latest.footer.onCancel());
     expect(save).toHaveBeenCalledOnce();
     expect(cancel).toHaveBeenCalledOnce();
   });
@@ -154,6 +160,37 @@ describe('useFormSession', () => {
     expect(nav.activeSection).toBeUndefined();
     expect(latest.toc.active).toBe('A');
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('a replacement form never sees the previous form’s section, not even on its first render', () => {
+    // useSectionSpy seeds its "already reported" ref from the first-render value,
+    // so a stale section there would silence the spy for that section.
+    const seen: (string | undefined)[] = [];
+    const { rerender } = render(<Host>{s => <Fake key="one" session={s} />}</Host>);
+    act(() => latest.toc.onSelect('B'));
+    rerender(
+      <Host>{s => <Fake key="two" session={s} onNav={n => seen.push(n.activeSection)} />}</Host>
+    );
+    expect(seen[0]).toBeUndefined();
+    expect(seen.at(-1)).toBeUndefined();
+  });
+
+  it('forwards at most one action per commit — a repeat Save or a Cancel in the same tick is dropped', () => {
+    const save = vi.fn();
+    const cancel = vi.fn();
+    const { rerender } = render(<Host>{s => <Fake session={s} save={save} cancel={cancel} />}</Host>);
+    act(() => {
+      latest.footer.onSave();
+      latest.footer.onSave();
+      latest.footer.onCancel();
+    });
+    expect(save).toHaveBeenCalledOnce();
+    expect(cancel).not.toHaveBeenCalled();
+
+    // The next commit releases the latch (a real save commits its pending flag).
+    rerender(<Host>{s => <Fake session={s} save={save} cancel={cancel} />}</Host>);
+    act(() => latest.footer.onCancel());
+    expect(cancel).toHaveBeenCalledOnce();
   });
 
   it('warns when a second form connects while one is live — the later one wins', () => {

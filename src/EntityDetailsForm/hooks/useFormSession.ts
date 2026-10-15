@@ -56,7 +56,16 @@ export interface Channel {
   connect: (id: string, actions: SessionActions) => void;
   disconnect: (id: string) => void;
   publish: (id: string, state: SessionState) => void;
-  setSection: (section: string | undefined) => void;
+  /** A form's scroll spy reports the section it is reading. */
+  report: (id: string, section: string) => void;
+}
+
+/** The section, tagged with the form it belongs to (`null`: none connected). A
+ *  form is only ever handed a section tagged with its own id, so a replacement
+ *  never sees its predecessor's — not even on its first render. */
+interface Selection {
+  by: string | null;
+  section?: string;
 }
 
 export interface FormSession {
@@ -67,7 +76,7 @@ export interface FormSession {
   /** A form is connected, showing its record, and in edit mode. */
   editable: boolean;
   /** Wrapper-only channel; not part of the host API. */
-  readonly [LINK]: { channel: Channel; section?: string };
+  readonly [LINK]: { channel: Channel; selection: Selection };
 }
 
 const IDLE: SessionState = { sections: [], dirty: false, saving: false, editable: false };
@@ -82,7 +91,7 @@ export function useFormSession(): FormSession {
   // One piece of state for both directions, as a host held it before: the TOC
   // requests a section, the form's spy reports one, and the spy ignores its own
   // reports coming back.
-  const [section, setSection] = useState<string>();
+  const [selection, setSelection] = useState<Selection>({ by: null });
   const owner = useRef<string | null>(null);
   const actions = useRef<SessionActions | null>(null);
 
@@ -92,33 +101,36 @@ export function useFormSession(): FormSession {
         if (owner.current !== null && owner.current !== id) console.warn(WARN_SECOND);
         owner.current = id;
         actions.current = next;
-        setSection(undefined); // a new record's TOC starts at its first section
+        setSelection({ by: id }); // a new record's TOC starts at its first section
       },
       disconnect: id => {
         if (owner.current !== id) return;
         owner.current = null;
         actions.current = null;
-        setSection(undefined); // the next record must not inherit this one's section
+        setSelection({ by: null });
         setState(IDLE);
       },
       publish: (id, next) => {
         if (owner.current === id) setState(next);
       },
-      setSection,
+      report: (id, section) => {
+        if (owner.current === id) setSelection({ by: id, section });
+      },
     }),
     []
   );
 
   const onSave = useCallback(() => actions.current?.save(), []);
   const onCancel = useCallback(() => actions.current?.cancel(), []);
-  const onSelect = useCallback((s: string) => setSection(s), []);
+  const onSelect = useCallback((s: string) => setSelection({ by: owner.current, section: s }), []);
 
+  const { section } = selection;
   const active = section !== undefined && state.sections.includes(section) ? section : state.sections[0];
   return {
     toc: { sections: state.sections, active, onSelect },
     footer: { dirty: state.dirty, saving: state.saving, disabled: !state.editable, onSave, onCancel },
     editable: state.editable,
-    [LINK]: { channel, section },
+    [LINK]: { channel, selection },
   };
 }
 
@@ -143,7 +155,14 @@ export function useSessionConnection(
   const id = useId();
 
   const latest = useRef<SessionActions & Pick<SessionState, 'editable' | 'dirty' | 'saving'>>(state);
+  // Set when an action is forwarded, released by the next commit. `saving` only
+  // reaches `latest` on that commit, so without the latch a second Save in the
+  // same tick (a double-click, a doubled shortcut) would start a second
+  // mutation. A forwarded action always commits: the form is dirty, so it has a
+  // value, so `handleSave` starts its transition; `reset` drops the draft.
+  const acted = useRef(false);
   useLayoutEffect(() => {
+    acted.current = false;
     latest.current = {
       save: state.save,
       cancel: state.cancel,
@@ -155,12 +174,15 @@ export function useSessionConnection(
 
   useLayoutEffect(() => {
     if (!channel) return undefined;
-    // Same contract as the footer: inert unless editable and dirty, locked while saving.
-    const live = () => latest.current.editable && latest.current.dirty && !latest.current.saving;
-    channel.connect(id, {
-      save: () => { if (live()) latest.current.save(); },
-      cancel: () => { if (live()) latest.current.cancel(); },
-    });
+    // Same contract as the footer: inert unless editable and dirty, locked while
+    // saving — and one action per commit (see `acted`).
+    const forward = (action: 'save' | 'cancel') => () => {
+      const { editable, dirty, saving } = latest.current;
+      if (!editable || !dirty || saving || acted.current) return;
+      acted.current = true;
+      latest.current[action]();
+    };
+    channel.connect(id, { save: forward('save'), cancel: forward('cancel') });
     return () => channel.disconnect(id);
   }, [channel, id]);
 
@@ -171,5 +193,11 @@ export function useSessionConnection(
     channel?.publish(id, { sections: JSON.parse(sectionsKey) as string[], dirty, saving, editable });
   }, [channel, id, sectionsKey, dirty, saving, editable]);
 
-  return link ? { activeSection: link.section, onActiveSectionChange: link.channel.setSection } : {};
+  const onActiveSectionChange = useCallback(
+    (section: string) => channel?.report(id, section),
+    [channel, id]
+  );
+  return link
+    ? { activeSection: link.selection.by === id ? link.selection.section : undefined, onActiveSectionChange }
+    : {};
 }
