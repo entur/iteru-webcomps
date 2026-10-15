@@ -24,4 +24,4 @@ extend input VehicleTypeInput {
   carLoading: Boolean
 }
 
-# KV ("mockery") props from mural — not modelled yet. See entur/mui-comps-nmr#9
+# KV ("mockery") props from mural — not modelled yet. See entur/iteru-webcomps#9

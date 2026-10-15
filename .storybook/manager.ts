@@ -15,7 +15,7 @@ import { version } from '../package.json';
  * because Storybook is served from `/storybook/` on Pages but from `/` in
  * `storybook dev` — only the absolute form works in both.
  */
-const GUIDE_URL = 'https://entur.github.io/mui-comps-nmr/guide.html';
+const GUIDE_URL = 'https://entur.github.io/iteru-webcomps/guide.html';
 const TEAL = '#11616f',
   RUST = '#e8663d';
 const APP_BG = '#f4f1ea',
@@ -34,7 +34,7 @@ const MONO = 'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace';
  */
 const brandTitle = `
   <span style="display:flex;flex-direction:column;line-height:1.3;font-family:${MONO};white-space:nowrap">
-    <span style="font-size:.74rem;letter-spacing:-.01em">@entur/mui-comps-nmr</span>
+    <span style="font-size:.74rem;letter-spacing:-.01em">@entur/iteru-webcomps</span>
     <span style="font-size:.64rem;color:${MUTED}">v${version} &middot; host guide &rarr;</span>
   </span>`;
 

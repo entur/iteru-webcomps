@@ -1,5 +1,5 @@
 {
-  "name": "@entur/mui-comps-nmr",
+  "name": "@entur/iteru-webcomps",
   "version": "0.9.0",
   "description": "MUI component library for Entur's hathor frontend — React, typed from the sobek GraphQL schema.",
   "license": "EUPL-1.2",

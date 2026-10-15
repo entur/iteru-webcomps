@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-`@entur/mui-comps-nmr` — small React MUI component lib for Entur's
+`@entur/iteru-webcomps` — small React MUI component lib for Entur's
 [hathor](https://github.com/entur/hathor) frontend. Types come from live
 [sobek](https://github.com/entur/sobek) GraphQL schema. Previewed w/ Storybook.
 Status: seed, unpublished. Storybook deploys to GitHub Pages.

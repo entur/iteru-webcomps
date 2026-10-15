@@ -21,7 +21,7 @@ export const MOCK_ENDPOINT = "https://mock.local/graphql";
 export const MOCK_OWNER_REF = "NOG:Authority:mock-owner";
 
 /** Marker so the patch is installed at most once per session. */
-const PATCHED = Symbol.for("mui-comps-nmr.mockFetch");
+const PATCHED = Symbol.for("iteru-webcomps.mockFetch");
 
 // Artificial latency. Without it every response resolves in the same tick, so
 // the load states the forms render for themselves — the shaped `FormSkeleton`,

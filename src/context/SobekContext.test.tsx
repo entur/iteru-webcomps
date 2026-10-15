@@ -13,7 +13,7 @@ import { SobekProvider, useSobekCtx, type SobekCtx } from './SobekContext';
 describe('useSobekCtx', () => {
   it('throws a named message when no SobekProvider is above', () => {
     expect(() => renderHook(() => useSobekCtx())).toThrow(
-      'mui-comps-nmr: this component must be rendered inside a <SobekProvider>'
+      'iteru-webcomps: this component must be rendered inside a <SobekProvider>'
     );
   });
 

@@ -171,7 +171,7 @@ describe('useEntityForm', () => {
     // that throws — before a request can be built with an undefined endpoint.
     expect(() =>
       renderHook(() => useEntityResource(mkProps(), 'VEH:1'))
-    ).toThrow('mui-comps-nmr: this component must be rendered inside a <SobekProvider>');
+    ).toThrow('iteru-webcomps: this component must be rendered inside a <SobekProvider>');
   });
 
   it('loads an entity on mount when netexId is provided', async () => {
