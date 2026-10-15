@@ -547,3 +547,38 @@ describe('patched fields', () => {
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ length: 7 }));
   });
 });
+
+describe('control width', () => {
+  /** The grid cell a labelled control sits in. */
+  const cellOf = (label: string) =>
+    screen.getByLabelText(label).closest('[data-nmr-width]')!.getAttribute('data-nmr-width');
+
+  it('gives each control its kind’s share of the row', () => {
+    render(<Host />);
+    expect(cellOf('Name')).toBe('full');
+    expect(cellOf('Length')).toBe('1/3');
+    expect(cellOf('Version')).toBe('1/3');
+  });
+
+  it('takes form-level kind widths, and a layout entry’s width over them', () => {
+    render(
+      <Host
+        widths={{ number: '1/4' }}
+        layout={{ All: ['name', 'length', { field: 'version', width: '1/2' }] }}
+      />
+    );
+    expect(cellOf('Length')).toBe('1/4');
+    expect(cellOf('Version')).toBe('1/2');
+  });
+
+  it('puts every section’s cells in one wrapping grid, in layout order', () => {
+    render(<Host layout={{ All: ['length', 'name', 'version'] }} />);
+    const cells = [...document.querySelectorAll('[data-nmr-width]')];
+    expect(new Set(cells.map(c => c.parentElement))).toHaveProperty('size', 1);
+    expect(cells.map(c => c.querySelector('label')?.textContent)).toEqual([
+      'Length',
+      'Name',
+      'Version',
+    ]);
+  });
+});

@@ -238,6 +238,16 @@ controlled `disabled`/`onClick`) and `sx` are the host's own props on
   show. Default `mark`; `plain` drops the `*` and its column; `hide` leaves them
   out like an omitted layout field (value still round-trips). Passed through
   `resolveSections`, so the skeleton and a host TOC drop the same fields.
+- **Width** (#54) — each control takes a share of a row (`FieldWidth` `'full' |
+  '1/2' | '1/3' | '1/4'`), and a section is one wrapping MUI `Grid`: fields keep
+  layout order, narrow ones pack left → right, a `full` one starts its own row.
+  Below `sm` everything is full. Resolved once in `resolveSections`: layout
+  entry `width` > form-level `widths` (per kind) > `KIND_WIDTH` (`number` 1/3;
+  `date`/`datetime`/`switch` 1/2; rest full) — zero-config forms included.
+  `ResolvedField.width` + `gridSize()` feed both form and `FormSkeleton`, so the
+  skeleton places the same cells. The `*` cell stays per control, inside its
+  grid cell. Watch long unit captions at 1/3: the temperature pair in the
+  story layout is `1/2` because it truncates in a ~620px column.
 
 ## Collection
 
@@ -412,7 +422,7 @@ about what a patched field *is* — they stay editable and round-trip through
 **The `*` marker.** Distill does read the overlay for one thing: `parsePatch`
 collects each `extend type <Entity>` and stamps `patched: true` on the derived
 `FIELDS` entries (hoisted leaves of a patched object included). Display
-metadata only — it never decides what is sent. The form draws a `*` in a column
+metadata only — it never decides what is sent. The form draws a bold `*` (`PATCH_MARK_SX`) in a column
 *after* the control, outside the input (`row()` in `abstractForm`), with a
 "not saved" hint as `title`/`aria-label`. The cell is per row (`marked` in
 `utils/sections`): only a marked control is `PATCH_MARK_COL_PX` narrower, every

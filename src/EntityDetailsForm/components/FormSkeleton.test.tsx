@@ -83,6 +83,16 @@ describe('FormSkeleton', () => {
     expect(px(grid)).toBeGreaterThan(px(text));
   });
 
+  it('places each placeholder at the width its control will take', () => {
+    const layout: Layout = { All: ['name', 'count', { field: 'active', width: '1/4' }, 'vehicles'] };
+    const { container } = render(<FormSkeleton fields={FIELDS} layout={layout} widths={{ number: '1/2' }} />);
+    const widths = [...rows(container)].map(r => r.closest('[data-nmr-width]')?.getAttribute('data-nmr-width'));
+
+    // The same `resolveSections` call the form makes — kind default, form
+    // width, entry width — so nothing here can drift from it.
+    expect(widths).toEqual(['full', '1/2', '1/4', 'full']);
+  });
+
   it('announces itself as busy, in English by default', () => {
     render(<FormSkeleton fields={FIELDS} />);
 

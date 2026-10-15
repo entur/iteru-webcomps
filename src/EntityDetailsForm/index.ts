@@ -22,6 +22,8 @@ export type {
   Layout,
   LayoutVariant,
   PatchedDisplay,
+  FieldWidth,
+  KindWidths,
   ControlSlotProps,
   RefOption,
 } from './types';

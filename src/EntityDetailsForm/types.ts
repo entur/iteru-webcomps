@@ -78,8 +78,18 @@ export interface FieldEntry<K extends string = string> {
    *  `value` = the stored string; a stored value missing from the list is still
    *  offered; omit → free text. Ignored for other kinds. */
   options?: () => RefOption[];
-  [k: string]: unknown; // future per-field overrides (e.g. width)
+  /** Share of the row this control takes from `sm` up (below it, every field is
+   *  full width). Wins over the form's `widths` and the kind default. */
+  width?: FieldWidth;
+  [k: string]: unknown; // future per-field overrides (e.g. slotProps)
 }
+
+/** Share of a form row a control takes. Consecutive narrow controls pack onto
+ *  one row; `full` always starts its own. */
+export type FieldWidth = 'full' | '1/2' | '1/3' | '1/4';
+
+/** Form-level width per control kind, over the lib's defaults (`KIND_WIDTH`). */
+export type KindWidths = Partial<Record<FieldKind, FieldWidth>>;
 
 /** A layout item is a bare field key or an entry object. */
 export type LayoutItem<K extends string = string> = K | FieldEntry<K>;
@@ -139,6 +149,9 @@ export interface EntityDetailsFormProps<E> {
   slotProps?: ControlSlotProps;
   /** How `patched` (not-yet-saved) fields are shown. Default `mark`. */
   patched?: PatchedDisplay;
+  /** Width per control kind, over the defaults (`number` 1/3; `date`,
+   *  `datetime`, `switch` 1/2; the rest full). A layout entry's `width` wins. */
+  widths?: KindWidths;
   /** Field-key → server error message (e.g. from validation). */
   errors?: Record<string, string>;
   /** Global disable (e.g. while loading or saving). */
