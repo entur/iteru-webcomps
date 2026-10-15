@@ -26,36 +26,21 @@ export interface Section {
   fields: ResolvedField[];
 }
 
-/** Width of the column holding a patched field's `*`, to the right of the
- *  control. Shared so the skeleton reserves exactly what the form will. */
+/** Width of the cell holding a patched field's `*`, to the right of the
+ *  control. Shared so the skeleton narrows a row exactly as the form will. */
 export const PATCH_MARK_COL_PX = 16;
 
 /**
- * Whether any field these sections render is `patched`. The mark column is
- * reserved for the whole form or not at all: per row, a marked control would be
- * narrower than its neighbours; per section, a tab switch would resize them.
+ * Whether a field's row carries the trailing `*` cell. Decided per row: only a
+ * marked control gives up the cell's width, every other one keeps the full row.
+ * Shared by the form and its skeleton.
  *
- * @param fields generated `FIELDS` registry for the entity
- * @param sections the sections being rendered
- * @returns `true` when the form needs the trailing mark column
- */
-export const hasPatched = (fields: Record<string, FieldSpec>, sections: Section[]): boolean =>
-  sections.some(s => s.fields.some(f => fields[f.key].patched));
-
-/**
- * Whether the form reserves the trailing mark column: only in `mark` display,
- * and only when a rendered field is patched. Shared by the form and its skeleton.
- *
- * @param fields generated `FIELDS` registry for the entity
- * @param sections the sections being rendered
+ * @param spec the field's registry entry
  * @param patched how patched fields are shown
- * @returns `true` when the form needs the trailing mark column
+ * @returns `true` when the row ends in the mark cell
  */
-export const markColumn = (
-  fields: Record<string, FieldSpec>,
-  sections: Section[],
-  patched: PatchedDisplay
-): boolean => patched === 'mark' && hasPatched(fields, sections);
+export const marked = (spec: FieldSpec, patched: PatchedDisplay): boolean =>
+  patched === 'mark' && !!spec.patched;
 
 /** Normalize a `LayoutItem` to `{ field, label?, entries?, options? }`. Also
  *  used by the collection's column whitelist, which takes the same items. */

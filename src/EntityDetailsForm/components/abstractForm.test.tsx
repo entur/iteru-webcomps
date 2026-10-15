@@ -393,10 +393,10 @@ describe('patched fields', () => {
     expect(row.firstElementChild).not.toContainElement(marks[0] as HTMLElement);
   });
 
-  it('keeps the column on unmarked rows too, so every control is the same width', () => {
+  it('narrows only the marked row — an unmarked control keeps the full width', () => {
     mount();
-    expect(rowOf('Name').children).toHaveLength(2);
-    expect(rowOf('Name').lastElementChild).toBeEmptyDOMElement();
+    expect(rowOf('Length').children).toHaveLength(2);
+    expect(rowOf('Name').children).toHaveLength(1);
   });
 
   it('adds no column when no rendered field is patched', () => {

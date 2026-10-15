@@ -3,7 +3,7 @@ import { Box, Stack, Tab, Tabs, Typography } from '@mui/material';
 import type { EntityDetailsFormProps, FieldSpec } from '../types';
 import { getPath, setPath } from '../utils/paths';
 import {
-  markColumn,
+  marked,
   PATCH_MARK_COL_PX,
   resolveSections,
   type ResolvedField,
@@ -53,22 +53,18 @@ export function createAbstractEntityDetailsForm<E>(
       onActiveChange: onActiveSectionChange,
     });
 
-    const marks = markColumn(fields, sections, patched);
-    // One row per field: the control, then — in a form with any patched field —
-    // a fixed column that holds the `*` or stays empty, so every control keeps
-    // the same width whether or not it is marked.
+    // One row per field: the control, then — on a marked row only — a fixed
+    // cell holding the `*`. Unmarked controls keep the full row width.
     const row = (key: string, control: ReactNode): ReactNode => (
       <Box key={key} sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>{control}</Box>
-        {marks && (
+        {marked(fields[key], patched) && (
           <Box
             sx={{ width: PATCH_MARK_COL_PX, flexShrink: 0, textAlign: 'right', color: 'text.secondary' }}
           >
-            {fields[key].patched && (
-              <span title={PATCH_HINT} aria-label={PATCH_HINT} data-patch-mark>
-                *
-              </span>
-            )}
+            <span title={PATCH_HINT} aria-label={PATCH_HINT} data-patch-mark>
+              *
+            </span>
           </Box>
         )}
       </Box>

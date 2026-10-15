@@ -383,10 +383,11 @@ collects each `extend type <Entity>` and stamps `patched: true` on the derived
 `FIELDS` entries (hoisted leaves of a patched object included). Display
 metadata only — it never decides what is sent. The form draws a `*` in a column
 *after* the control, outside the input (`row()` in `abstractForm`), with a
-"not saved" hint as `title`/`aria-label`. The column is reserved for the whole
-form or not at all (`markColumn` in `utils/sections`): per row a marked control
-would be narrower than its neighbours, per section a tab switch would resize
-them. `FormSkeleton` reserves the same `PATCH_MARK_COL_PX`. Derived, so the mark
+"not saved" hint as `title`/`aria-label`. The cell is per row (`marked` in
+`utils/sections`): only a marked control is `PATCH_MARK_COL_PX` narrower, every
+other control keeps the full width — chosen over a form-wide column, which
+shortened every input to line up with the few marked ones. `FormSkeleton`
+narrows the same rows by the same width. Derived, so the mark
 disappears with the `extend` line. A host can also turn it off per form with the
 `patched` prop (`plain` / `hide`), which the generated wrappers hand to both the
 presentation and the skeleton, never to the hook.
