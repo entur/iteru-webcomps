@@ -2,15 +2,13 @@ import { useMemo, useState, type FC } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   Box,
-  Divider,
   FormControlLabel,
-  IconButton,
-  List,
-  ListItemButton,
+  ListItemIcon,
   ListItemText,
-  ListSubheader,
+  MenuItem,
   Paper,
   Switch,
+  TextField,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -35,12 +33,13 @@ import { installStoriesMock, setMockLatency } from "./mockEndpoint";
 /*
  * Data-aware counterpart to the Dumb-Forms stories: mounts the real,
  * package-exported VehicleForm / VehicleTypeForm (they load + save over GraphQL)
- * against an in-browser mock endpoint. Two stacked record lists — Vehicle types
- * and Vehicles — share one detail pane: clicking an item in either list
- * activates that entity's form. Reproduces the host-guide "complete host
+ * against an in-browser mock endpoint. A toolbar row holds one record dropdown
+ * per entity — VehicleType and Vehicle — sharing one detail pane: picking a
+ * record (or "New …") in either activates that entity's form. Reproduces the
+ * host-guide "complete host
  * page" (list → select → view/edit → save), and shows the parts the guide only
  * describes in prose: `SaveSnackbar` fed from onSaved/onError. The form is
- * always in edit mode. A third column sits between the lists and the form: with
+ * always in edit mode. A column sits beside the form: with
  * `tabStyle: none` it holds a `SectionToc` wired to the stacked form's
  * `activeSection` / `onActiveSectionChange`, and always a story-only "Tune"
  * panel whose switch reveals the patched ("future") fields, hidden by default.
@@ -51,7 +50,7 @@ import { installStoriesMock, setMockLatency } from "./mockEndpoint";
 // Serve both seeds before any story renders (module scope beats effect ordering).
 installStoriesMock();
 
-const LIST_WIDTH = 260,
+const SELECT_WIDTH = 260,
   TUNE_WIDTH = 200;
 const NEW_KEY = "new";
 /** Slow enough that the skeleton and the arrival fade are actually watchable. */
@@ -134,7 +133,7 @@ type DataAwareForm = FC<{
 /** Minimal record shape the lists need from either entity. */
 type Rec = { netexId: string; name?: { value?: string | null } | null };
 
-/** Per-entity wiring: its form component, layout, seed, and list labels. */
+/** Per-entity wiring: its form component, layout, seed, and picker labels. */
 const ENTITY: Record<
   entity,
   {
@@ -142,7 +141,7 @@ const ENTITY: Record<
     fields: Record<string, FieldSpec>;
     layout: Layout;
     seed: Record<string, Rec>;
-    heading: string;
+    label: string;
     newLabel: string;
   }
 > = {
@@ -151,7 +150,7 @@ const ENTITY: Record<
     fields: vehicleTypeFields,
     layout: vehicleTypeLayout,
     seed: vehicleTypeSeed,
-    heading: "Vehicle types",
+    label: "VehicleType",
     newLabel: "New vehicle type",
   },
   vehicle: {
@@ -159,18 +158,26 @@ const ENTITY: Record<
     fields: vehicleFields,
     layout: vehicleLayout,
     seed: vehicleSeed,
-    heading: "Vehicles",
+    label: "Vehicle",
     newLabel: "New vehicle",
   },
 };
 
 const ENTITY_ORDER: entity[] = ["vehicleType", "vehicle"];
 
-/** What the page opens on: the first record of the first list, derived so it
+/** What the page opens on: the first record of the first entity, derived so it
  *  follows a reordered `ENTITY_ORDER` or a reseeded dataset. */
 const DEFAULT_SELECTION: Selection = {
   entity: ENTITY_ORDER[0],
   netexId: Object.values(ENTITY[ENTITY_ORDER[0]].seed)[0]?.netexId,
+};
+
+/** A picker's options: the seed's records, plus the current selection when the
+ *  static mock doesn't hold it (a saved "new" record comes back as an id the
+ *  seed never had), so the select never holds an out-of-range value. */
+const recordIds = (seed: Record<string, Rec>, current: string): string[] => {
+  const ids = Object.values(seed).map((r) => r.netexId);
+  return current && current !== NEW_KEY && !ids.includes(current) ? [...ids, current] : ids;
 };
 
 /** Story-adjustable props, surfaced as Storybook Controls. */
@@ -188,7 +195,7 @@ interface GqlHostPageProps {
 }
 
 /**
- * Single host screen with two stacked record lists (Vehicle types + Vehicles)
+ * Single host screen with a toolbar of record pickers (VehicleType + Vehicle)
  * feeding one detail pane. Selecting an item swaps the pane to that entity's
  * data-aware form, always in edit mode; the pane owns the host concerns —
  * new-vs-existing via `netexId`, record switch via remount `key`, and reacting
@@ -228,164 +235,151 @@ const GqlHostPage = ({ tabStyle = "none" }: GqlHostPageProps) => {
   return (
     <Paper
       elevation={0}
-      sx={{ display: "flex", minHeight: "100vh", bgcolor: "grey.100" }}
+      sx={{ display: "flex", flexDirection: "column", minHeight: "100vh", bgcolor: "grey.100" }}
     >
-      {/* Left: two stacked record lists, one per entity. */}
+      {/* Top: one record picker per entity; the active one shows the selection. */}
       <Box
         sx={{
-          width: LIST_WIDTH,
-          flexShrink: 0,
-          borderRight: 1,
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 2,
+          px: 2,
+          py: 1.5,
+          borderBottom: 1,
           borderColor: "divider",
           bgcolor: "background.paper",
-          // The page scrolls with the form, so the lists are pinned to the
-          // viewport and scroll on their own when they outgrow it.
-          position: "sticky",
-          top: 0,
-          alignSelf: "flex-start",
-          height: "100vh",
-          overflowY: "auto",
         }}
       >
+        <Typography variant="overline" color="text.secondary">
+          Select form and mock data
+        </Typography>
         {ENTITY_ORDER.map((entity) => {
           const cfg = ENTITY[entity];
+          const current = selection?.entity === entity ? (selection.netexId ?? NEW_KEY) : "";
+          const name = (id: string) => cfg.seed[id]?.name?.value ?? id;
           return (
-            <Box key={entity}>
-              <List
-                dense
-                subheader={
-                  // 2-col header: title (left) + new-button (right).
-                  <ListSubheader
-                    disableSticky
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      pr: 1,
-                    }}
-                  >
-                    {cfg.heading}
-                    <IconButton
-                      size="small"
-                      edge="end"
-                      aria-label={cfg.newLabel}
-                      title={cfg.newLabel}
-                      onClick={() => selectRecord(entity)}
-                    >
-                      <AddIcon fontSize="small" />
-                    </IconButton>
-                  </ListSubheader>
-                }
-              >
-                {Object.values(cfg.seed).map((r) => (
-                  <ListItemButton
-                    key={r.netexId}
-                    selected={
-                      selection?.entity === entity &&
-                      selection?.netexId === r.netexId
-                    }
-                    onClick={() => selectRecord(entity, r.netexId)}
-                  >
-                    <ListItemText
-                      primary={r.name?.value ?? r.netexId}
-                      secondary={r.netexId}
-                    />
-                  </ListItemButton>
-                ))}
-              </List>
-              <Divider />
-            </Box>
+            <TextField
+              key={entity}
+              select
+              size="small"
+              label={cfg.label}
+              value={current}
+              onChange={(e) =>
+                selectRecord(entity, e.target.value === NEW_KEY ? undefined : e.target.value)
+              }
+              slotProps={{
+                select: {
+                  renderValue: (v) => (v === NEW_KEY ? cfg.newLabel : name(v as string)),
+                },
+              }}
+              sx={{ width: SELECT_WIDTH }}
+            >
+              <MenuItem value={NEW_KEY}>
+                <ListItemIcon>
+                  <AddIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary={cfg.newLabel} />
+              </MenuItem>
+              {recordIds(cfg.seed, current).map((id) => (
+                <MenuItem key={id} value={id}>
+                  <ListItemText primary={name(id)} secondary={id} />
+                </MenuItem>
+              ))}
+            </TextField>
           );
         })}
       </Box>
 
-      {/* Middle: always there for the Tune panel; the table of contents joins
-          it above when the stacked form has sections to navigate. */}
-      <Box
-        sx={{
-          width: TUNE_WIDTH,
-          flexShrink: 0,
-          borderRight: 1,
-          borderColor: "divider",
-          bgcolor: "background.paper",
-        }}
-      >
-        {/* The page scrolls, not the column, so the content is pinned inside it. */}
-        <Box sx={{ position: "sticky", top: 0, p: 2 }}>
-          {tocSections.length > 0 && (
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="overline" color="text.secondary">
-                Sections
-              </Typography>
-              <SectionToc
-                sections={tocSections}
-                active={section ?? tocSections[0]}
-                onSelect={setSection}
-              />
-            </Box>
-          )}
-          <Typography variant="overline" color="text.secondary" component="div">
-            Tune
-          </Typography>
-          <FormControlLabel
-            // Nothing to reveal on an entity with no patched fields.
-            disabled={!hasFuture}
-            control={
-              <Switch
-                size="small"
-                checked={showFuture}
-                onChange={(e) => setShowFuture(e.target.checked)}
-              />
-            }
-            label="Show future fields (*)"
-            slotProps={{ typography: { variant: "body2" } }}
-            sx={{ ml: 0, gap: 0.5 }}
-          />
-        </Box>
-      </Box>
-
-      {/* Right: the selected entity's data-aware form + host chrome. */}
-      <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, sm: 4 } }}>
-        {selection && active && Form ? (
-          <>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              {selection.netexId ?? active.newLabel}
+      <Box sx={{ display: "flex", flex: 1 }}>
+        {/* Left: always there for the Tune panel; the table of contents joins
+            it above when the stacked form has sections to navigate. */}
+        <Box
+          sx={{
+            width: TUNE_WIDTH,
+            flexShrink: 0,
+            borderRight: 1,
+            borderColor: "divider",
+            bgcolor: "background.paper",
+          }}
+        >
+          {/* The page scrolls, not the column, so the content is pinned inside it. */}
+          <Box sx={{ position: "sticky", top: 0, p: 2 }}>
+            {tocSections.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="overline" color="text.secondary">
+                  Sections
+                </Typography>
+                <SectionToc
+                  sections={tocSections}
+                  active={section ?? tocSections[0]}
+                  onSelect={setSection}
+                />
+              </Box>
+            )}
+            <Typography variant="overline" color="text.secondary" component="div">
+              Tune
             </Typography>
+            <FormControlLabel
+              // Nothing to reveal on an entity with no patched fields.
+              disabled={!hasFuture}
+              control={
+                <Switch
+                  size="small"
+                  checked={showFuture}
+                  onChange={(e) => setShowFuture(e.target.checked)}
+                />
+              }
+              label="Show future fields (*)"
+              slotProps={{ typography: { variant: "body2" } }}
+              sx={{ ml: 0, gap: 0.5 }}
+            />
+          </Box>
+        </Box>
 
-            <Paper
-              variant="outlined"
-              sx={{ p: { xs: 2, sm: 3 }, maxWidth: 680 }}
-            >
-              <Form
-                // New key ⇒ remount, for switching entity/record only. Discarding
-                // edits no longer needs one: the footer's Cancel restores the
-                // hook's baseline in place, with no second round trip.
-                key={`${selection.entity}:${selection.netexId ?? NEW_KEY}`}
-                netexId={selection.netexId}
-                mode="edit"
-                variant={variant}
-                slotProps={slotProps}
-                layout={layout}
-                activeSection={section}
-                onActiveSectionChange={setSection}
-                onSaved={(id) => {
-                  setSelection({ entity: selection.entity, netexId: id });
-                  setToast({ msg: `Saved ${id}`, severity: "success" });
-                }}
-                onError={(msgs) =>
-                  setToast({
-                    msg: msgs.join("\n") || "Save failed",
-                    severity: "error",
-                  })
-                }
-              />
-            </Paper>
-          </>
-        ) : (
-          <Typography color="text.secondary">
-            Select a record to view or edit.
-          </Typography>
-        )}
+        {/* Right: the selected entity's data-aware form + host chrome. */}
+        <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, sm: 4 } }}>
+          {selection && active && Form ? (
+            <>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                {selection.netexId ?? active.newLabel}
+              </Typography>
+
+              <Paper
+                variant="outlined"
+                sx={{ p: { xs: 2, sm: 3 }, maxWidth: 680 }}
+              >
+                <Form
+                  // New key ⇒ remount, for switching entity/record only. Discarding
+                  // edits no longer needs one: the footer's Cancel restores the
+                  // hook's baseline in place, with no second round trip.
+                  key={`${selection.entity}:${selection.netexId ?? NEW_KEY}`}
+                  netexId={selection.netexId}
+                  mode="edit"
+                  variant={variant}
+                  slotProps={slotProps}
+                  layout={layout}
+                  activeSection={section}
+                  onActiveSectionChange={setSection}
+                  onSaved={(id) => {
+                    setSelection({ entity: selection.entity, netexId: id });
+                    setToast({ msg: `Saved ${id}`, severity: "success" });
+                  }}
+                  onError={(msgs) =>
+                    setToast({
+                      msg: msgs.join("\n") || "Save failed",
+                      severity: "error",
+                    })
+                  }
+                />
+              </Paper>
+            </>
+          ) : (
+            <Typography color="text.secondary">
+              Select a record to view or edit.
+            </Typography>
+          )}
+        </Box>
       </Box>
 
       <SaveSnackbar toast={toast} onClose={() => setToast(null)} />
@@ -417,7 +411,7 @@ const meta: Meta<typeof GqlHostPage> = {
     readDelayMs: {
       control: { type: "range", min: 0, max: 3000, step: 100 },
       description:
-        "Mock read latency. Raise it to watch the shaped skeleton and the arrival fade; 0 resolves in the same tick, so neither is visible. Select a record in either list to re-trigger a load.",
+        "Mock read latency. Raise it to watch the shaped skeleton and the arrival fade; 0 resolves in the same tick, so neither is visible. Pick a record in either dropdown to re-trigger a load.",
     },
   },
 };
