@@ -25,6 +25,12 @@ Each of these is a minor:
 - new built-in UI that also changes behaviour (e.g. Save inert on an unchanged
   form).
 
+**Relic tags.** `v0.1.0`–`v0.9.0` on the remote are left over from the
+pre-rename `mui-comps-nmr` releases, which were deleted; they carry no release
+and no asset. Ignore them as history — releases start fresh from the rename —
+but the names are taken: `git push origin v<new>` is rejected for any of them,
+so the first `iteru-webcomps` release is `0.10.0` or later.
+
 ## Steps
 
 Run from a clean, synced `main`.
