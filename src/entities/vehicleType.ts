@@ -83,6 +83,7 @@ export const FIELDS = {
   range: { kind: 'number', path: ['range'], patched: true },
   rollResistanceCoefficient: { kind: 'number', path: ['rollResistanceCoefficient'] },
   roofEquipment: { kind: 'number', path: ['roofEquipment'], patched: true },
+  sections: { kind: 'grid', path: ['sections'], patched: true },
   selfPropelled: { kind: 'switch', path: ['selfPropelled'] },
   shortName: { kind: 'name', path: ['shortName'] },
   transportMode: { kind: 'enum', path: ['transportMode'], options: Object.values(TransportMode) },

@@ -4,19 +4,27 @@
  * their `options` closures. Split out of `initDataSets` so presentation config
  * (how fields are grouped) lives apart from the entity data (what's in them).
  */
-import type { VehicleLayout, VehicleTypeLayout, RefOption } from "../index";
+import type { LayoutItem, VehicleLayout, VehicleTypeLayout, RefOption } from "../index";
 
 // ── 3D geometry ─────────────────────────────────────────────────────────────
 
 /** The overlay's 3D-geometry fields (entur/iteru-webcomps#51), on both entities:
  *  metres in the form, converted to mm only when the 3D input is built. Units
- *  ride as a label suffix. `sections` has no control yet (an id-less list), so
- *  it is not listed — it still round-trips. */
-const geometry = [
+ *  ride as a label suffix. `sections` is a read-only grid, front to rear. */
+const geometry: LayoutItem<"tyreDiameter" | "roofEquipment" | "baseColor" | "sections">[] = [
   { field: "tyreDiameter", label: "Tyre diameter (m)" },
   { field: "roofEquipment", label: "Roof equipment (m)" },
   { field: "baseColor", label: "Base colour (hex)" },
-] as const;
+  {
+    field: "sections",
+    entries: [
+      { field: "length", label: "Length (m)" },
+      { field: "axles", label: "Axles (m)" },
+      { field: "bellowsAhead", label: "Bellows ahead (m)" },
+      { field: "windowCount", label: "Windows" },
+    ],
+  },
+];
 
 // ── reference option-lists ────────────────────────────────────────────────
 // In a real app these come from a query; here they are static. A layout entry's

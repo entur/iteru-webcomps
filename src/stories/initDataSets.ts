@@ -26,6 +26,8 @@ export const vehicleTypeSample: VehicleType = {
   lowFloor: true,
   dataOwnerRef: "",
   vehicles: sampleVehicles,
+  // Overlay 3D geometry (#51), metres, front to rear.
+  sections: [{ id: "S1", length: 26.4, axles: [2.6, 23.8], windowCount: 10 }],
 };
 
 /**
@@ -43,6 +45,7 @@ export const vehicleTypeSeed: Record<string, VehicleType> = {
     length: 23.0,
     lowFloor: false,
     vehicles: [],
+    sections: [{ id: "S1", length: 23.0, axles: [2.5, 20.5], windowCount: 8 }],
   },
   "VEH:VehicleType:3": {
     ...vehicleTypeSample,
@@ -52,6 +55,11 @@ export const vehicleTypeSeed: Record<string, VehicleType> = {
     length: 32.0,
     lowFloor: true,
     vehicles: [],
+    // Articulated: the trailer section carries its bellows.
+    sections: [
+      { id: "S1", length: 16.2, axles: [2.4, 12.9], windowCount: 6 },
+      { id: "S2", length: 15.2, axles: [10.6], bellowsAhead: 0.6, windowCount: 5 },
+    ],
   },
 };
 

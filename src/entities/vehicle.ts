@@ -39,6 +39,7 @@ export const FIELDS = {
   registrationDate: { kind: 'date', path: ['registrationDate'] },
   registrationNumber: { kind: 'text', path: ['registrationNumber'] },
   roofEquipment: { kind: 'number', path: ['roofEquipment'], patched: true },
+  sections: { kind: 'grid', path: ['sections'], patched: true },
   transportType: { kind: 'reference', path: ['transportType', 'netexId'] },
   tyreDiameter: { kind: 'number', path: ['tyreDiameter'], patched: true },
   version: { kind: 'text', path: ['version'], serverManaged: true },
