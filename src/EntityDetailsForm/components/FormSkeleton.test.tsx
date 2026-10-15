@@ -37,6 +37,13 @@ describe('FormSkeleton', () => {
     expect(rows(container)).toHaveLength(1);
   });
 
+  it("drops a patched field's placeholder when the form hides it", () => {
+    const patchedFields = { ...FIELDS, count: { ...FIELDS.count, patched: true } };
+    const { container } = render(<FormSkeleton fields={patchedFields} patched="hide" />);
+
+    expect(rows(container)).toHaveLength(Object.keys(FIELDS).length - 1);
+  });
+
   it('stands in for the tab bar, showing only the active section’s rows', () => {
     const { container } = render(<FormSkeleton fields={FIELDS} layout={TWO_SECTIONS} />);
 

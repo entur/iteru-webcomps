@@ -51,7 +51,7 @@ export interface VehicleFormProps
    *  the two buttons. The dirty/saving state stays the hook's. */
   footerProps?: EditFooterHostProps;
   /** Label and styling for the loading skeleton this renders. Its *shape* is
-   *  derived from `FIELDS` + `layout` + `variant` and is not overridable —
+   *  derived from `FIELDS` + `layout` + `variant` + `patched` and is not overridable —
    *  that is what keeps it from drifting out of step with the form. */
   skeletonProps?: FormSkeletonHostProps;
 }
@@ -72,6 +72,7 @@ export function VehicleForm({ skeletonProps, ...rest }: VehicleFormProps) {
           fields={FIELDS}
           layout={rest.layout}
           variant={rest.variant}
+          patched={rest.patched}
         />
       }
     >
@@ -90,6 +91,7 @@ function VehicleFormRecord(
     layout,
     variant,
     slotProps,
+    patched,
     activeSection,
     onActiveSectionChange,
     netexId,
@@ -131,6 +133,7 @@ function VehicleFormRecord(
           layout={layout}
           variant={variant}
           slotProps={slotProps}
+          patched={patched}
           activeSection={activeSection}
           onActiveSectionChange={onActiveSectionChange}
           errors={errors}

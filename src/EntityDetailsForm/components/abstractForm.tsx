@@ -3,7 +3,7 @@ import { Box, Stack, Tab, Tabs, Typography } from '@mui/material';
 import type { EntityDetailsFormProps, FieldSpec } from '../types';
 import { getPath, setPath } from '../utils/paths';
 import {
-  hasPatched,
+  markColumn,
   PATCH_MARK_COL_PX,
   resolveSections,
   type ResolvedField,
@@ -33,6 +33,7 @@ export function createAbstractEntityDetailsForm<E>(
     layout,
     variant = 'tabs',
     slotProps,
+    patched = 'mark',
     errors,
     disabled: disabledProp,
     activeSection,
@@ -41,7 +42,7 @@ export function createAbstractEntityDetailsForm<E>(
     const [active, setActive] = useState(0);
     // Empty sections are dropped by `resolveSections` itself, so the skeleton
     // and the form always agree on how many there are.
-    const sections = resolveSections(fields, layout);
+    const sections = resolveSections(fields, layout, patched);
     const current = Math.min(active, Math.max(0, sections.length - 1));
     // Only the stacked variant is a scroll surface; flat and tabs have no
     // section to scroll to, so the spy stays off for them.
@@ -52,7 +53,7 @@ export function createAbstractEntityDetailsForm<E>(
       onActiveChange: onActiveSectionChange,
     });
 
-    const marks = hasPatched(fields, sections);
+    const marks = markColumn(fields, sections, patched);
     // One row per field: the control, then — in a form with any patched field —
     // a fixed column that holds the `*` or stays empty, so every control keeps
     // the same width whether or not it is marked.

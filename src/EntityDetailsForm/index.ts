@@ -19,6 +19,7 @@ export type {
   LayoutItem,
   Layout,
   LayoutVariant,
+  PatchedDisplay,
   ControlSlotProps,
   RefOption,
 } from './types';

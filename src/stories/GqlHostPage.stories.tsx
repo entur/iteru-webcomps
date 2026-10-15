@@ -38,7 +38,7 @@ import { installStoriesMock, setMockLatency } from "./mockEndpoint";
  * host-guide "complete host
  * page" (list → select → view/edit → save), and shows the parts the guide only
  * describes in prose: `SaveSnackbar` fed from onSaved/onError. The form's own
- * props (`mode`, `variant`, `footerProps`, `skeletonProps`) are story args, so
+ * props (`mode`, `variant`, `patched`, `footerProps`, `skeletonProps`) are story args, so
  * they are driven from Storybook Controls rather than page chrome. A stacked
  * form with several sections gets a column beside it holding a `SectionToc`
  * wired to its `activeSection` / `onActiveSectionChange`.
@@ -99,7 +99,10 @@ type entity = "vehicleType" | "vehicle";
 type Selection = { entity: entity; netexId?: string };
 
 /** The form props surfaced as story args. VehicleForm takes the same ones. */
-type FormArgs = Pick<VehicleTypeFormProps, "mode" | "variant" | "footerProps" | "skeletonProps">;
+type FormArgs = Pick<
+  VehicleTypeFormProps,
+  "mode" | "variant" | "patched" | "footerProps" | "skeletonProps"
+>;
 
 /** The data-aware form props this page drives — VehicleForm and VehicleTypeForm
  *  share one shape (layout is the base `Layout`, not entity-specific). */
@@ -191,6 +194,7 @@ const GqlHostPage = ({
   mode = "edit",
   variant = "stacked",
   tabStyle = "one-line",
+  patched = "mark",
   footerProps,
   skeletonProps,
 }: GqlHostPageProps) => {
@@ -213,9 +217,11 @@ const GqlHostPage = ({
   // Same call the form makes, so the list is what the form renders — and only
   // a stacked form with several sections has anything to navigate.
   const tocSections = useMemo(() => {
-    const labels = active ? resolveSections(active.fields, layout).map((s) => s.label) : [];
+    const labels = active
+      ? resolveSections(active.fields, layout, patched).map((s) => s.label)
+      : [];
     return variant === "stacked" && labels.length > 1 ? labels : [];
-  }, [active, layout, variant]);
+  }, [active, layout, variant, patched]);
 
   return (
     <Paper
@@ -323,6 +329,7 @@ const GqlHostPage = ({
                   mode={mode}
                   variant={variant}
                   slotProps={slotProps}
+                  patched={patched}
                   layout={layout}
                   footerProps={footerProps}
                   skeletonProps={skeletonProps}
@@ -371,6 +378,7 @@ const meta: Meta<typeof GqlHostPage> = {
     mode: "edit",
     variant: "stacked",
     tabStyle: "one-line",
+    patched: "mark",
     // The footer's English defaults, spelled out so the control shows what to edit.
     footerProps: {
       labels: {
@@ -402,6 +410,12 @@ const meta: Meta<typeof GqlHostPage> = {
       if: { arg: "variant", eq: "tabs" },
       description:
         "Story-only: the tab bar's `slotProps`. one-line = scrollable tab row, pills = wrapping pill tabs.",
+    },
+    patched: {
+      control: "inline-radio",
+      options: ["mark", "plain", "hide"],
+      description:
+        "Form `patched`: how fields from the schema patch overlay (not saved yet) show. mark = trailing *, plain = no *, hide = left out (values still round-trip). Only VehicleType has any.",
     },
     footerProps: {
       control: "object",

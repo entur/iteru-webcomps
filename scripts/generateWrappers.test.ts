@@ -73,7 +73,7 @@ describe('renderWrapperSource', () => {
     // has to sit inside the boundary, which is why the wrapper splits in two.
     expect(src).toMatch(/import \{ Suspense \} from 'react';/);
     expect(src).toMatch(
-      /<Suspense\s+fallback=\{\s+<FormSkeleton\s+\{\.\.\.skeletonProps\}\s+fields=\{FIELDS\}\s+layout=\{rest\.layout\}\s+variant=\{rest\.variant\}\s+\/>\s+\}\s+>\s+<VehicleFormRecord \{\.\.\.rest\} resource=\{resource\} \/>\s+<\/Suspense>/
+      /<Suspense\s+fallback=\{\s+<FormSkeleton\s+\{\.\.\.skeletonProps\}\s+fields=\{FIELDS\}\s+layout=\{rest\.layout\}\s+variant=\{rest\.variant\}\s+patched=\{rest\.patched\}\s+\/>\s+\}\s+>\s+<VehicleFormRecord \{\.\.\.rest\} resource=\{resource\} \/>\s+<\/Suspense>/
     );
   });
 
@@ -84,6 +84,13 @@ describe('renderWrapperSource', () => {
     // sticky` for the length of the fade.
     expect(src).toMatch(/<FormArrival>\s+<VehicleFormPresentation/);
     expect(src).toMatch(/<\/FormArrival>\s+\{\/\* Inert until/);
+  });
+
+  it('hands the patched display to the presentation, not to the hook', () => {
+    // Left in `...rest` it would be spread into `useEntityForm` and never reach
+    // the form that draws (or hides) the patched fields.
+    expect(src).toMatch(/\n    slotProps,\n    patched,\n/);
+    expect(src).toMatch(/slotProps=\{slotProps\}\s+patched=\{patched\}/);
   });
 
   it('hands the section-navigation pair to the presentation, not to the hook', () => {

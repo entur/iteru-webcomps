@@ -13,8 +13,8 @@
 import type { ReactNode } from 'react';
 import { Box, Skeleton, Stack } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material/styles';
-import type { FieldKind, FieldSpec, Layout, LayoutVariant } from '../types';
-import { hasPatched, PATCH_MARK_COL_PX, resolveSections } from '../utils/sections';
+import type { FieldKind, FieldSpec, Layout, LayoutVariant, PatchedDisplay } from '../types';
+import { markColumn, PATCH_MARK_COL_PX, resolveSections } from '../utils/sections';
 
 // Placeholder geometry. Row heights track the controls they stand in for, so
 // the layout does not jump when the real inputs land.
@@ -48,6 +48,9 @@ export interface FormSkeletonProps {
   layout?: Layout;
   /** Same presentation the form will use, for ≥2 sections. */
   variant?: LayoutVariant;
+  /** Same patched-field display the form will use: `hide` drops their rows,
+   *  anything but `mark` drops the mark column. */
+  patched?: PatchedDisplay;
   /** Announced by screen readers. English default — localization is the host's
    *  job, this library carries no i18n runtime. */
   ariaLabel?: string;
@@ -60,7 +63,7 @@ export interface FormSkeletonProps {
  * rendered for it — by a data-aware wrapper, which derives the rest from the
  * entity registry and the props already passed to the form.
  */
-export type FormSkeletonHostProps = Omit<FormSkeletonProps, 'fields' | 'layout' | 'variant'>;
+export type FormSkeletonHostProps = Omit<FormSkeletonProps, 'fields' | 'layout' | 'variant' | 'patched'>;
 
 /**
  * Draw the placeholder standing in for an entity form mid-load.
@@ -72,16 +75,17 @@ export function FormSkeleton({
   fields,
   layout,
   variant = 'tabs',
+  patched = 'mark',
   ariaLabel = DEFAULT_ARIA_LABEL,
   sx,
 }: FormSkeletonProps) {
-  const sections = resolveSections(fields, layout);
+  const sections = resolveSections(fields, layout, patched);
   // Mirror the form: a tab bar shows one panel at a time, stacked shows all.
   const tabbed = sections.length > 1 && variant === 'tabs';
   const shown = tabbed ? sections.slice(0, 1) : sections;
   // The form keeps a column for patched-field marks; leave it empty here too,
   // so the arriving controls are exactly as wide as their placeholders.
-  const markCol = hasPatched(fields, sections) ? PATCH_MARK_COL_PX : 0;
+  const markCol = markColumn(fields, sections, patched) ? PATCH_MARK_COL_PX : 0;
 
   return (
     <Box

@@ -210,6 +210,10 @@ own chrome from `onSaved`/`onError`) uses the same pieces.
   (`text|number|name|enum|date|datetime`) take TextField `slotProps` (merged over
   the label-shrink default); `enumMulti`→Autocomplete, `switch`→`SwitchProps`,
   `grid`→`{ dataGrid }`. Per-field override is a planned later addition.
+- `patched?` `'mark' | 'plain' | 'hide'` — how patched (not-yet-saved) fields
+  show. Default `mark`; `plain` drops the `*` and its column; `hide` leaves them
+  out like an omitted layout field (value still round-trips). Passed through
+  `resolveSections`, so the skeleton and a host TOC drop the same fields.
 
 ## Collection
 
@@ -380,10 +384,12 @@ collects each `extend type <Entity>` and stamps `patched: true` on the derived
 metadata only — it never decides what is sent. The form draws a `*` in a column
 *after* the control, outside the input (`row()` in `abstractForm`), with a
 "not saved" hint as `title`/`aria-label`. The column is reserved for the whole
-form or not at all (`hasPatched` in `utils/sections`): per row a marked control
+form or not at all (`markColumn` in `utils/sections`): per row a marked control
 would be narrower than its neighbours, per section a tab switch would resize
 them. `FormSkeleton` reserves the same `PATCH_MARK_COL_PX`. Derived, so the mark
-disappears with the `extend` line.
+disappears with the `extend` line. A host can also turn it off per form with the
+`patched` prop (`plain` / `hide`), which the generated wrappers hand to both the
+presentation and the skeleton, never to the hook.
 Residue: `Types.<Entity>Input` in `sobekTypes.ts` stays patched, so the
 *variables type* still permits those keys at compile time — only the runtime
 mask stops them.
