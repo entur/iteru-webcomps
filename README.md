@@ -127,6 +127,10 @@ Key points:
 
   `value` in each option is the referenced entity's `netexId`; `label` is
   display-only.
+- **Code lists on `text` fields** (e.g. `VehicleType.euroClass`) — the same
+  `options` closure turns a free-text field into a select over host-supplied
+  code values; `value` is the code written into the field. A stored value
+  missing from the list is still offered, so it shows and survives a save.
 - **Grid fields** — array-of-identity relations (e.g. `VehicleType.vehicles`)
   render as a read-only `ObjectGrid`. Use `entries` to fix columns:
 
@@ -224,20 +228,20 @@ export { FIELDS as vehicleFields } from './vehicle';
 
 `schema/sobek.patch.graphqls` is a committed SDL overlay applied before codegen
 runs, carrying fields the domain needs but the live sobek schema has not shipped
-yet:
+yet (excerpt):
 
 ```graphql
+enum AccessEquipment { KNEELING RAMP LIFT HOIST }
+
 extend type VehicleType {
   manufacturer: String
-  range: Float
   fullCharge: Float
-  carLoading: Boolean
+  accessEquipment: [AccessEquipment]
 }
 extend input VehicleTypeInput {
   manufacturer: String
-  range: Float
   fullCharge: Float
-  carLoading: Boolean
+  accessEquipment: [AccessEquipment]
 }
 ```
 

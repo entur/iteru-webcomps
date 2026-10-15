@@ -219,6 +219,10 @@ controlled `disabled`/`onClick`) and `sx` are the host's own props on
   entry `options` (`() => { value, label }[]`, value = referenced netexId) →
   single-select Autocomplete; omit (incl. zero-config) → free-text id field.
   Selection writes the `netexId` leaf; round-trips as the full relation object.
+- `text` fields with a layout entry `options` → a select over host-supplied code
+  values (e.g. `euroClass` over sobek's `EMISSION_STANDARD` list); writes the
+  code itself, `None` clears. A stored value missing from the list is offered
+  as its own option, so it shows and survives a save.
 - `date` / `datetime` render native `<input type=date|datetime-local>` (no date
   dep). `datetime` value is the stored ISO sliced to `YYYY-MM-DDTHH:mm`.
 - `slotProps?` (form-level) — per-`kind` MUI overrides. TextField-backed kinds
@@ -365,12 +369,15 @@ per-entity modules.
 ### Patch overlay
 
 `schema/sobek.patch.graphqls` — committed SDL overlay applied before codegen,
-for fields the live schema hasn't shipped. Currently `manufacturer`, `range`,
-`fullCharge`, `carLoading` on VehicleType, and the 3D geometry inputs
-(`sections`, `tyreDiameter`, `baseColor`, `roofEquipment`, metres; #51) on both
-VehicleType and Vehicle — `sections` is a list of a new overlay type
-(`BusSection`) that carries an `id`, so distill makes it a read-only `grid`
-like `vehicles`. Extends **both** `type VehicleType`
+for fields the live schema hasn't shipped. Currently the hathor#191 group (#50):
+VehicleModel props, accessibility/facilities, operating temperatures on
+VehicleType; completion date, validity, comms ids and `lifecycleStatus` on
+Vehicle — plus the 3D geometry inputs (`sections`, `tyreDiameter`, `baseColor`,
+`roofEquipment`, metres; #51) on both. The overlay declares its own types,
+which distill handles by its ordinary rules: enums → `enum`/`enumMulti`,
+`ValidBetween` → hoisted `fromDate`/`toDate` (`datetime`), the id-less
+`KeyValue` list → no `FIELDS` entry, and `BusSection` (it carries an `id`) → a
+read-only `grid` like `vehicles`. Extends **both** `type VehicleType`
 and `input VehicleTypeInput`: the read half satisfies distill's "Input ⊆ Entity"
 check, the input half keeps the field out of `serverManaged` (derived = on
 `Entity`, not on `Input`) — read-only extend ⇒ permanently locked control. When

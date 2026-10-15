@@ -5,7 +5,7 @@
  * to the Actions panel, so the component is exercised directly.
  *
  * The filter popover offers only what sobek's `VehicleTypeFilter` accepts;
- * other fields are listed disabled. Patched fields (`manufacturer`, `range`,
+ * other fields are listed disabled. Patched fields (`manufacturer`,
  * `fullCharge`, `carLoading`) are generated below but never shown: the
  * collection excludes them.
  */
@@ -116,7 +116,7 @@ const genVehicleTypes = (n: number, seed: number): VehicleType[] => {
       width: num(2.4, 3.2, 2),
       height: num(3, 4.5, 2),
       weight: num(12, 95),
-      range: num(180, 1200, 0),
+      maximumRange: num(180, 1200, 0),
       fullCharge: num(40, 600, 0),
       lowFloor: rnd() > 0.4,
       carLoading: rnd() > 0.8,

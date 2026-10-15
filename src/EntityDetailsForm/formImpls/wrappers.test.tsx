@@ -18,6 +18,7 @@ import type { ComponentType, ReactElement, ReactNode } from 'react';
 import { SobekProvider } from '../../context/SobekContext';
 import { humanize } from '../../shared/humanize';
 import type { FieldSpec } from '../types';
+import { setPath } from '../utils/paths';
 import * as forms from './index';
 import * as entities from '../../entities';
 import * as inputKeys from '../../generated/operations/inputKeys';
@@ -230,15 +231,16 @@ describe.each(manifest.map(e => [e.entity, e] as const))(
     // Fields these tests can seed and then edit — the footer is inert until the
     // form is dirty, so anything that clicks Save has to move a control first.
     const editable = Object.keys(fields).filter(k => isDrivable(fields[k]));
-    const seed = (keys: string[]) =>
-      Object.fromEntries(
-        keys.map(k => {
-          const { kind, path } = fields[k];
-          // Non-drivable kinds are only ever seeded, never edited, so any
-          // non-empty value will do for them.
-          return [path[0], isDrivableKind(kind) ? LOADED[kind] : 'x'];
-        })
-      );
+    // Written at the field's full path, so leaves hoisted out of one value
+    // object (`validBetween.fromDate` / `.toDate`) land side by side in it.
+    const seed = (keys: string[]): Record<string, unknown> =>
+      keys.reduce<Record<string, unknown>>((row, k) => {
+        const { kind, path } = fields[k];
+        // Non-drivable kinds are only ever seeded, never edited, so any
+        // non-empty value of the right shape will do for them.
+        const v = isDrivableKind(kind) ? LOADED[kind] : kind === 'enumMulti' ? ['x'] : 'x';
+        return setPath(row, path, v);
+      }, {});
 
     /** Narrow a field the caller believes is drivable, or say so out loud. */
     const drivable = (key: string): FieldSpec & { kind: Drivable } => {
