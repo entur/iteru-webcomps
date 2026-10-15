@@ -4,7 +4,28 @@
  * their `options` closures. Split out of `initDataSets` so presentation config
  * (how fields are grouped) lives apart from the entity data (what's in them).
  */
-import type { VehicleLayout, VehicleTypeLayout, RefOption } from "../index";
+import type { LayoutItem, VehicleLayout, VehicleTypeLayout, RefOption } from "../index";
+
+// ── 3D geometry ─────────────────────────────────────────────────────────────
+
+/** The overlay's 3D-geometry fields (entur/iteru-webcomps#51), on both entities:
+ *  metres in the form, converted to mm only when the 3D input is built. Units
+ *  ride as a label suffix. `sections` is a read-only grid, front to rear. */
+const geometry: LayoutItem<"tyreDiameter" | "roofEquipment" | "baseColor" | "sections">[] = [
+  // First: the sections define most of the rendered bus.
+  {
+    field: "sections",
+    entries: [
+      { field: "length", label: "Length (m)" },
+      { field: "axles", label: "Axles (m)" },
+      { field: "bellowsAhead", label: "Bellows ahead (m)" },
+      { field: "windowCount", label: "Windows" },
+    ],
+  },
+  { field: "tyreDiameter", label: "Tyre diameter (m)" },
+  { field: "roofEquipment", label: "Roof equipment (m)" },
+  { field: "baseColor", label: "Base colour (hex)" },
+];
 
 // ── reference option-lists ────────────────────────────────────────────────
 // In a real app these come from a query; here they are static. A layout entry's
@@ -13,9 +34,9 @@ import type { VehicleLayout, VehicleTypeLayout, RefOption } from "../index";
 
 /** Candidate VehicleTypes for `Vehicle.transportType`. */
 export const vehicleTypeRefs: RefOption[] = [
-  { value: "VEH:VehicleType:1", label: "Class 70 EMU" },
-  { value: "VEH:VehicleType:2", label: "Class 80 DMU" },
-  { value: "VEH:VehicleType:3", label: "Articulated Tram" },
+  { value: "VEH:VehicleType:1", label: "Volvo 8900 LE 12.4 m" },
+  { value: "VEH:VehicleType:2", label: "BusNordic I:15 DD" },
+  { value: "VEH:VehicleType:3", label: "Mercedes-Benz Citaro G" },
 ];
 
 /** Candidate DeckPlans for `VehicleType.deckPlan`. */
@@ -40,6 +61,7 @@ export const vehicleTypeLayout: VehicleTypeLayout = {
     "fullCharge",
   ],
   Dimensions: ["length", "width", "height", "weight"],
+  Geometry: [...geometry],
   Accessibility: ["lowFloor"],
   Environment: [
     "selfPropelled",
@@ -74,9 +96,9 @@ export const vehicleTypeLayout: VehicleTypeLayout = {
 
 // ── Vehicle ───────────────────────────────────────────────────────────────
 
-// Single flat section (its label is unused when alone). `transportType` is a
-// distilled `reference`; `buildDate` / `registrationDate` are `date` controls;
-// the meta timestamps are `datetime`.
+// General, then the 3D geometry overrides (a set value beats the type's).
+// `transportType` is a distilled `reference`; `buildDate` / `registrationDate`
+// are `date` controls; the meta timestamps are `datetime`.
 export const vehicleLayout: VehicleLayout = {
   General: [
     "name",
@@ -88,4 +110,5 @@ export const vehicleLayout: VehicleLayout = {
     "registrationDate",
     "description",
   ],
+  Geometry: [...geometry],
 };

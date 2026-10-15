@@ -1,7 +1,8 @@
 /**
  * Read-only grid for an array-of-objects relation (a `grid` field — see
- * `FieldKind`). Columns are derived at runtime from the row data: scalar leaves
- * and `MultilingualString` values are shown; nested objects/arrays are skipped.
+ * `FieldKind`). Columns are derived at runtime from the row data: scalar leaves,
+ * `MultilingualString` values and lists of scalars (joined, e.g. axle positions)
+ * are shown; nested objects and lists of objects are skipped.
  * Always presentational — relations are `serverManaged`, never edited here.
  */
 import { useMemo } from "react";
@@ -26,6 +27,7 @@ export interface ColumnSpec {
 \* ------------------------------------------------------------------ */
 
 const ID_KEYS = ["netexId", "id"] as const; // first present → row id
+const LIST_SEP = ", "; // between the items of a list-of-scalars cell
 const ROW_H = 40,
   HEAD_H = 48,
   PAD = 4,
@@ -50,9 +52,12 @@ const isMls = (v: unknown): v is { value?: unknown } =>
   isObj(v) && "value" in v;
 const isScalar = (v: unknown): boolean =>
   v == null || ["string", "number", "boolean"].includes(typeof v);
-/** Renderable in a flat cell: scalar or MultilingualString (shown as `.value`). */
-const renderable = (v: unknown): boolean => isScalar(v) || isMls(v);
-const cell = (v: unknown): unknown => (isMls(v) ? (v.value ?? "") : v);
+const isScalarList = (v: unknown): v is unknown[] => Array.isArray(v) && v.every(isScalar);
+/** Renderable in a flat cell: scalar, MultilingualString (shown as `.value`), or
+ *  a list of scalars (shown joined). */
+const renderable = (v: unknown): boolean => isScalar(v) || isMls(v) || isScalarList(v);
+const cell = (v: unknown): unknown =>
+  isMls(v) ? (v.value ?? "") : isScalarList(v) ? v.filter((x) => x != null).join(LIST_SEP) : v;
 
 /**
  * Pick the columns to show: the union of row keys, minus any key that carries a

@@ -210,8 +210,10 @@ controlled `disabled`/`onClick`) and `sx` are the host's own props on
 - Labels default to humanized key. Override per-field `{ field, label }`. No i18n
   dep — localization is client's job.
 - `grid` fields render array-of-obj relations as a read-only table; cols
-  auto-derived from row data. Layout entry `entries` (`{ field, label }[]`, `field`
-  = row-obj key) fixes col order + labels. Grid omits its own caption when alone
+  auto-derived from row data (scalars, MultilingualStrings, and lists of scalars
+  joined with ", " — e.g. axle positions; nested objects are skipped). Layout
+  entry `entries` (`{ field, label }[]`, `field` = row-obj key) fixes col order
+  + labels. Grid omits its own caption when alone
   in a section (tab/heading names it), shows it when beside other fields.
 - `reference` fields edit a single relation by its identity leaf. With a layout
   entry `options` (`() => { value, label }[]`, value = referenced netexId) →
@@ -364,7 +366,11 @@ per-entity modules.
 
 `schema/sobek.patch.graphqls` — committed SDL overlay applied before codegen,
 for fields the live schema hasn't shipped. Currently `manufacturer`, `range`,
-`fullCharge`, `carLoading` on VehicleType. Extends **both** `type VehicleType`
+`fullCharge`, `carLoading` on VehicleType, and the 3D geometry inputs
+(`sections`, `tyreDiameter`, `baseColor`, `roofEquipment`, metres; #51) on both
+VehicleType and Vehicle — `sections` is a list of a new overlay type
+(`BusSection`) that carries an `id`, so distill makes it a read-only `grid`
+like `vehicles`. Extends **both** `type VehicleType`
 and `input VehicleTypeInput`: the read half satisfies distill's "Input ⊆ Entity"
 check, the input half keeps the field out of `serverManaged` (derived = on
 `Entity`, not on `Input`) — read-only extend ⇒ permanently locked control. When
