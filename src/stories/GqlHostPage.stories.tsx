@@ -48,6 +48,7 @@ import {
 } from "../index";
 import { vehicleSeed, vehicleTypeSeed } from "./initDataSets";
 import { BusView, type BusViewMode } from "./BusView";
+import type { BusMotion } from "./busMotion";
 import { vehicleLayout, vehicleTypeLayout } from "./initLayouts";
 import { installStoriesMock, setMockLatency } from "./mockEndpoint";
 import { captionSlots, formLookArgs, formLookArgTypes, widthsOf, type FormLookArgs } from "./formControls";
@@ -291,6 +292,8 @@ interface GqlHostPageProps extends FormArgs, FormLookArgs {
   toolbar?: ToolbarState;
   /** Initial 3D preview mode (#60); the column's own toggle takes it from there. */
   busView?: BusViewMode;
+  /** Initial camera of the live 3D view: the reader's, or the ∞ flight. */
+  busMotion?: BusMotion;
 }
 
 /**
@@ -310,6 +313,7 @@ const GqlHostPage = ({
   skeletonProps,
   toolbar = "collapsed",
   busView = "3d",
+  busMotion = "animate",
   ...look
 }: GqlHostPageProps) => {
   // The host picks the TOC's look — it knows the room it gives it; SectionToc
@@ -332,6 +336,17 @@ const GqlHostPage = ({
   const [liveValue, setLiveValue] = useState<Rec | undefined>(undefined);
   const [busMode, setBusMode] = useState<BusViewMode>(busView);
   useEffect(() => setBusMode(busView), [busView]);
+  // Page state, so the camera mode survives a record switch (BusView remounts).
+  // Under reduced motion the page never starts a flight by itself; the reader
+  // still can, and then its eases are cuts.
+  const [motion, setMotion] = useState<BusMotion>(() =>
+    matchMedia("(prefers-reduced-motion: reduce)").matches ? "orbit" : busMotion,
+  );
+  const firstMotion = useRef(true);
+  useEffect(() => {
+    if (firstMotion.current) firstMotion.current = false;
+    else setMotion(busMotion); // a changed control is an explicit choice
+  }, [busMotion]);
   // From lg up the preview is a column of its own; below, it sits under the form.
   const busColumn = useMediaQuery(useTheme().breakpoints.up("lg"));
   const [toast, setToast] = useState<SaveToast | null>(null);
@@ -410,6 +425,8 @@ const GqlHostPage = ({
       }
       mode={busMode}
       onModeChange={setBusMode}
+      motion={motion}
+      onMotionChange={setMotion}
     />
   );
   const toggle = (
@@ -711,6 +728,7 @@ const meta: Meta<typeof GqlHostPage> = {
     readDelayMs: DEFAULT_READ_DELAY_MS,
     toolbar: "collapsed",
     busView: "3d",
+    busMotion: "animate",
     ...formLookArgs,
   },
   argTypes: {
@@ -766,6 +784,13 @@ const meta: Meta<typeof GqlHostPage> = {
       options: ["3d", "bitmap"],
       description:
         "Story-only: initial mode of the 3D preview column (#60); its own toggle takes it from there. bitmap = a PNG from mkStageShot, 3d = the live three.js canvas from mkStage.",
+    },
+    busMotion: {
+      control: "inline-radio",
+      options: ["animate", "orbit"],
+      if: { arg: "busView", eq: "3d" },
+      description:
+        "Story-only: initial camera of the live 3D view. animate = flies an ∞ around the bus, easing in from and back out to the resting view; orbit = yours to drag. The control inside the canvas switches; grabbing the canvas while it flies hands it over on the spot.",
     },
     toolbar: {
       control: "inline-radio",

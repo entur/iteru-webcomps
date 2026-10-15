@@ -14,7 +14,9 @@ import {
   Typography,
   useTheme,
 } from "@mui/material";
+import AnimationIcon from "@mui/icons-material/Animation";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
+import ThreeSixtyIcon from "@mui/icons-material/ThreeSixty";
 import ViewInArIcon from "@mui/icons-material/ViewInAr";
 import {
   MM,
@@ -30,6 +32,7 @@ import {
 import type { BusInput, BusInputResult } from "../index";
 import { humanize } from "../shared/humanize";
 import { UNIT_LABELS } from "./initLayouts";
+import { mkMotion, type BusMotion } from "./busMotion";
 
 /** `bitmap` = a PNG of the scene; `3d` = the live, orbitable canvas. */
 export type BusViewMode = "bitmap" | "3d";
@@ -40,6 +43,9 @@ const ASPECT = "16 / 10", SETTLE_MS = 250, LENGTH_TOLERANCE_MM = 10;
 // A PNG is shot at the box's device pixels, capped so a 4K screen stays cheap.
 const MAX_DPR = 2;
 const VIEW = "quarter";
+// The in-canvas camera control: inset from the corner (px) and how much of the
+// scene shows through it.
+const CONTROL_INSET = 8, CONTROL_OPACITY = 0.92;
 /** Shown in place of the bus when the browser gives no WebGL context (off, or
  *  out of contexts): the preview fails alone, never the page around it. */
 const NO_WEBGL = "No 3D here: the browser could not create a WebGL context.";
@@ -81,15 +87,29 @@ type Scene = {
   stage: ReturnType<typeof mkStage>;
   go: ReturnType<typeof mkViews>;
   cur: { group: BusGroup | null; len: number };
+  motion: ReturnType<typeof mkMotion>;
   framed: boolean;
   live: boolean;
 };
 
-/** The live canvas: one stage for the component's life, the bus swapped per input. */
-const Live = ({ inp }: { inp: BusInput }) => {
+interface LiveProps {
+  inp: BusInput;
+  motion: BusMotion;
+  onMotionChange: (motion: BusMotion) => void;
+}
+
+/**
+ * The live canvas: one stage for the component's life, the bus swapped per
+ * input. Over it, top right, the Orbit | Animate control; a grab on the canvas
+ * itself ends the flight at once and hands the camera over where it is.
+ */
+const Live = ({ inp, motion, onMotionChange }: LiveProps) => {
   const box = useRef<HTMLDivElement>(null);
   const scene = useRef<Scene | null>(null);
   const [failed, setFailed] = useState(false);
+  // Read from the stage's own listener, so a new callback needs no re-attach.
+  const report = useRef(onMotionChange);
+  report.current = onMotionChange;
 
   useEffect(() => {
     let stage: Scene["stage"];
@@ -100,10 +120,18 @@ const Live = ({ inp }: { inp: BusInput }) => {
       return;
     }
     const cur: Scene["cur"] = { group: null, len: 0 };
-    const s: Scene = { stage, go: mkViews(stage, () => s.cur), cur, framed: false, live: true };
+    const s: Scene = {
+      stage,
+      go: mkViews(stage, () => s.cur),
+      cur,
+      motion: mkMotion(stage, { onTakeOver: () => report.current("orbit") }),
+      framed: false,
+      live: true,
+    };
     scene.current = s;
     return () => {
       s.live = false;
+      s.motion.dispose();
       stage.dispose();
       scene.current = null;
     };
@@ -123,10 +151,37 @@ const Live = ({ inp }: { inp: BusInput }) => {
     };
   }, [inp]);
 
+  // After the framing above, so a flight starts from the framed view.
+  useEffect(() => scene.current?.motion.set(motion), [motion]);
+
+  if (failed) return <Alert severity="error">{NO_WEBGL}</Alert>;
   return (
-    <Box ref={box} data-bus-view="3d" sx={{ position: "absolute", inset: 0 }}>
-      {failed && <Alert severity="error">{NO_WEBGL}</Alert>}
-    </Box>
+    <>
+      <Box ref={box} data-bus-view="3d" data-motion={motion} sx={{ position: "absolute", inset: 0 }} />
+      <ToggleButtonGroup
+        exclusive
+        size="small"
+        value={motion}
+        onChange={(_e, v: BusMotion | null) => v && onMotionChange(v)}
+        aria-label="Camera"
+        sx={{
+          position: "absolute",
+          top: CONTROL_INSET,
+          right: CONTROL_INSET,
+          bgcolor: "background.paper",
+          opacity: CONTROL_OPACITY,
+        }}
+      >
+        <ToggleButton value="orbit" aria-label="Orbit">
+          <ThreeSixtyIcon fontSize="small" sx={{ mr: 0.5 }} />
+          Orbit
+        </ToggleButton>
+        <ToggleButton value="animate" aria-label="Animate">
+          <AnimationIcon fontSize="small" sx={{ mr: 0.5 }} />
+          Animate
+        </ToggleButton>
+      </ToggleButtonGroup>
+    </>
   );
 };
 
@@ -192,6 +247,9 @@ export interface BusViewProps {
   missingWhere?: string;
   mode: BusViewMode;
   onModeChange: (mode: BusViewMode) => void;
+  /** The live canvas's camera: the reader's (`orbit`) or the ∞ flight. */
+  motion: BusMotion;
+  onMotionChange: (motion: BusMotion) => void;
 }
 
 /**
@@ -201,7 +259,15 @@ export interface BusViewProps {
  * @param props see {@link BusViewProps}
  * @returns an outlined panel as wide as its parent
  */
-export function BusView({ result, lengthM, missingWhere, mode, onModeChange }: BusViewProps) {
+export function BusView({
+  result,
+  lengthM,
+  missingWhere,
+  mode,
+  onModeChange,
+  motion,
+  onMotionChange,
+}: BusViewProps) {
   const bg = useTheme().palette.background.paper;
   // Keystrokes reach here through the form's onChange; let them settle, and
   // key on content so an equal input never rebuilds the bus.
@@ -277,7 +343,11 @@ export function BusView({ result, lengthM, missingWhere, mode, onModeChange }: B
 
       {inp && !errors.length && (
         <Box ref={boxRef} sx={{ position: "relative", width: "100%", aspectRatio: ASPECT }}>
-          {mode === "3d" ? <Live inp={inp} /> : <Shot inp={inp} w={size.w} h={size.h} bg={bg} />}
+          {mode === "3d" ? (
+            <Live inp={inp} motion={motion} onMotionChange={onMotionChange} />
+          ) : (
+            <Shot inp={inp} w={size.w} h={size.h} bg={bg} />
+          )}
         </Box>
       )}
     </Paper>

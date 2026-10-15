@@ -395,6 +395,12 @@ The Fullpage story's preview (`src/stories/BusView.tsx`) is column 3 from `lg`
 250 ms, keyed on content). One live stage per mount, the bus swapped per input,
 framed once per record (BusView is keyed by record). No WebGL (off, or out of
 contexts) → an alert in the column; it must never throw into the page.
+Camera (`src/stories/busMotion.ts`, unit-tested without WebGL): `orbit` | 
+`animate`, switched by a control inside the canvas. `animate` flies an ∞ (1:2
+Lissajous on the viewing sphere) around the resting pose, run from the stage's
+`ticks`; a weight eases path *and* speed in from rest and back out to exactly
+that pose (5 s). A grab on the canvas (OrbitControls `start`) ends a flight on
+the spot, camera where it is. Reduced motion: never starts by itself, eases cut.
 `.npmrc` `allow-remote=root`: npm ≥ 12 refuses the GitHub Release tarball URL
 otherwise. 3dbus is private while this repo is public — the URL 404s until it
 is made public; until then unpack the release tarball into `node_modules` by

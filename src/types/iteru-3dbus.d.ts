@@ -23,7 +23,24 @@ declare module '@entur/iteru-3dbus' {
   export interface BusGroup {
     position: { x: number };
   }
+  /** The slice of a three.js `Vector3` used here. */
+  export interface Vec3 {
+    x: number;
+    y: number;
+    z: number;
+    set(x: number, y: number, z: number): Vec3;
+  }
   export interface Stage {
+    /** The perspective camera; only its position is moved here. */
+    cam: { position: Vec3 };
+    /** three's `OrbitControls`: `start` fires when the reader grabs the view. */
+    ctl: {
+      target: Vec3;
+      addEventListener(type: 'start', fn: () => void): void;
+      removeEventListener(type: 'start', fn: () => void): void;
+    };
+    /** Run before every frame, in order (live stage only; a shot stage has none). */
+    ticks: (() => void)[];
     add(g: BusGroup): void;
     drop(g: BusGroup): void;
     dispose(): void;
