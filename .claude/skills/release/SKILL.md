@@ -1,14 +1,14 @@
 ---
 name: release
-description: Use when bumping the version or cutting a release of @entur/iteru-webcomps — which files carry version refs, why the tag must follow the version commit, and the live-schema gotcha that makes a green local build no guarantee. Triggers on "bump the version", "release v0.x.0", "cut a release", "publish the tarball".
+description: 'Use when bumping the version, tagging, or cutting a release of @entur/iteru-webcomps, or when the release workflow fails on a tag push. Triggers on "bump the version", "release v0.x.0", "cut a release", "publish the tarball", "release build failed".'
 ---
 
 # Releasing `@entur/iteru-webcomps`
 
-Not published to a registry. Hosts install from a **GitHub Release tarball URL**,
-so the release artifact and the docs that point at it are the whole product
-surface. `.github/workflows/release.yml` does the packing and publishing; your
-job is the version commit and the tag.
+Not published to a registry. Hosts install from a **GitHub Release tarball URL**
+(the host guide gives it as a `<version>` template), so the release artifact is
+the whole product surface. `.github/workflows/release.yml` does the packing and
+publishing; your job is the version commit and the tag.
 
 ## Deciding the number
 
