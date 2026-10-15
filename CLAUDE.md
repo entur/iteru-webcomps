@@ -364,7 +364,10 @@ per-entity modules.
 
 `schema/sobek.patch.graphqls` — committed SDL overlay applied before codegen,
 for fields the live schema hasn't shipped. Currently `manufacturer`, `range`,
-`fullCharge`, `carLoading` on VehicleType. Extends **both** `type VehicleType`
+`fullCharge`, `carLoading` on VehicleType, and the 3D geometry inputs
+(`sections`, `tyreDiameter`, `baseColor`, `roofEquipment`, metres; #51) on both
+VehicleType and Vehicle — `sections` is a new overlay type (`BusSection`), an
+id-less list, so it round-trips with no control. Extends **both** `type VehicleType`
 and `input VehicleTypeInput`: the read half satisfies distill's "Input ⊆ Entity"
 check, the input half keeps the field out of `serverManaged` (derived = on
 `Entity`, not on `Input`) — read-only extend ⇒ permanently locked control. When

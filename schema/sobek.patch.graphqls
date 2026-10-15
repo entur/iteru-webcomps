@@ -25,3 +25,43 @@ extend input VehicleTypeInput {
 }
 
 # KV ("mockery") props from mural — not modelled yet. See entur/iteru-webcomps#9
+
+# 3D geometry — inputs that drive @entur/iteru-3dbus geometry and have no NeTEx
+# counterpart yet (entur/iteru-webcomps#51). Metres here; the 3D adapter converts
+# to the bus input's mm. On both entities: a Vehicle value, when set, overrides
+# its type's at render. `sections` is an id-less object list, so distill gives
+# it no control — it round-trips until a list control exists.
+type BusSection {
+  length: Float
+  axles: [Float]
+  bellowsAhead: Float
+}
+input BusSectionInput {
+  length: Float
+  axles: [Float]
+  bellowsAhead: Float
+}
+extend type VehicleType {
+  sections: [BusSection]
+  tyreDiameter: Float
+  baseColor: String
+  roofEquipment: Float
+}
+extend input VehicleTypeInput {
+  sections: [BusSectionInput]
+  tyreDiameter: Float
+  baseColor: String
+  roofEquipment: Float
+}
+extend type Vehicle {
+  sections: [BusSection]
+  tyreDiameter: Float
+  baseColor: String
+  roofEquipment: Float
+}
+extend input VehicleInput {
+  sections: [BusSectionInput]
+  tyreDiameter: Float
+  baseColor: String
+  roofEquipment: Float
+}

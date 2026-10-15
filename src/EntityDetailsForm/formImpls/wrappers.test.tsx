@@ -273,8 +273,9 @@ describe.each(manifest.map(e => [e.entity, e] as const))(
     });
 
     // Typing drivable fields only: a switch toggled twice is back at its loaded
-    // value, which reads as clean, so it cannot show which edit was sent.
-    const typedKey = editable.find(k => drivable(k).kind !== 'switch');
+    // value, which reads as clean, so it cannot show which edit was sent. And a
+    // field that is actually sent: a patched one is stripped at the wire edge.
+    const typedKey = editable.find(k => drivable(k).kind !== 'switch' && fields[k].path[0] in mask);
 
     it.runIf(typedKey !== undefined)('saves the latest edit through the host footer', async () => {
       const key = typedKey as string;

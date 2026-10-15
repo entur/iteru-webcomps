@@ -6,6 +6,18 @@
  */
 import type { VehicleLayout, VehicleTypeLayout, RefOption } from "../index";
 
+// ── 3D geometry ─────────────────────────────────────────────────────────────
+
+/** The overlay's 3D-geometry fields (entur/iteru-webcomps#51), on both entities:
+ *  metres in the form, converted to mm only when the 3D input is built. Units
+ *  ride as a label suffix. `sections` has no control yet (an id-less list), so
+ *  it is not listed — it still round-trips. */
+const geometry = [
+  { field: "tyreDiameter", label: "Tyre diameter (m)" },
+  { field: "roofEquipment", label: "Roof equipment (m)" },
+  { field: "baseColor", label: "Base colour (hex)" },
+] as const;
+
 // ── reference option-lists ────────────────────────────────────────────────
 // In a real app these come from a query; here they are static. A layout entry's
 // `options` closure captures one — selecting writes `value` (a netexId) into the
@@ -40,6 +52,7 @@ export const vehicleTypeLayout: VehicleTypeLayout = {
     "fullCharge",
   ],
   Dimensions: ["length", "width", "height", "weight"],
+  Geometry: [...geometry],
   Accessibility: ["lowFloor"],
   Environment: [
     "selfPropelled",
@@ -74,9 +87,9 @@ export const vehicleTypeLayout: VehicleTypeLayout = {
 
 // ── Vehicle ───────────────────────────────────────────────────────────────
 
-// Single flat section (its label is unused when alone). `transportType` is a
-// distilled `reference`; `buildDate` / `registrationDate` are `date` controls;
-// the meta timestamps are `datetime`.
+// General, then the 3D geometry overrides (a set value beats the type's).
+// `transportType` is a distilled `reference`; `buildDate` / `registrationDate`
+// are `date` controls; the meta timestamps are `datetime`.
 export const vehicleLayout: VehicleLayout = {
   General: [
     "name",
@@ -88,4 +101,5 @@ export const vehicleLayout: VehicleLayout = {
     "registrationDate",
     "description",
   ],
+  Geometry: [...geometry],
 };
