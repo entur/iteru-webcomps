@@ -7,7 +7,7 @@
  * fills the session through `useSessionConnection`, keyed by a symbol this
  * module never exports, so hosts can read the session but not write to it.
  */
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 /** Key for the wrapper's connection channel. Exported only so the declaration
  *  of `FormSession` can name it (TS4033 otherwise); never re-exported from the
@@ -142,11 +142,11 @@ export function useSessionConnection(
   const id = useId();
 
   const latest = useRef<SessionActions>(state);
-  useEffect(() => {
+  useLayoutEffect(() => {
     latest.current = { save: state.save, cancel: state.cancel };
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!channel) return undefined;
     channel.connect(id, { save: () => latest.current.save(), cancel: () => latest.current.cancel() });
     return () => channel.disconnect(id);
@@ -155,7 +155,7 @@ export function useSessionConnection(
   // JSON, not a delimiter: a layout key is any string.
   const sectionsKey = JSON.stringify(state.sections);
   const { dirty, saving, editable } = state;
-  useEffect(() => {
+  useLayoutEffect(() => {
     channel?.publish(id, { sections: JSON.parse(sectionsKey) as string[], dirty, saving, editable });
   }, [channel, id, sectionsKey, dirty, saving, editable]);
 

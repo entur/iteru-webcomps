@@ -1,5 +1,5 @@
-import { StrictMode, useState, type ReactNode } from 'react';
-import { act, render } from '@testing-library/react';
+import { StrictMode, Suspense, use, useState, type ReactNode } from 'react';
+import { act, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import {
   useFormSession,
@@ -167,5 +167,48 @@ describe('useFormSession', () => {
     };
     render(<Alone />);
     expect(nav).toEqual({});
+  });
+
+  it('goes idle while a connected form is hidden by Suspense, and reconnects when it reveals', async () => {
+    const Record = ({ session, promise }: { session: FormSession; promise: Promise<void> }) => {
+      use(promise);
+      useSessionConnection(session, { ...LIVE, save: () => {}, cancel: () => {} });
+      return null;
+    };
+    const tree = (promise: Promise<void>) => (
+      <Host>
+        {s => (
+          <Suspense fallback={null}>
+            <Record session={s} promise={promise} />
+          </Suspense>
+        )}
+      </Host>
+    );
+    const resolved = () => {
+      const p = Promise.resolve();
+      return p;
+    };
+    const first = resolved();
+    let view!: ReturnType<typeof render>;
+    await act(async () => {
+      view = render(tree(first));
+      await first;
+    });
+    await waitFor(() => expect(latest.editable).toBe(true));
+    expect(latest.footer.disabled).toBe(false);
+
+    await act(async () => {
+      view.rerender(tree(new Promise<void>(() => {})));
+    });
+    expect(latest.editable).toBe(false);
+    expect(latest.footer.disabled).toBe(true);
+    expect(latest.toc.sections).toEqual([]);
+
+    const again = resolved();
+    await act(async () => {
+      view.rerender(tree(again));
+      await again;
+    });
+    await waitFor(() => expect(latest.editable).toBe(true));
   });
 });
