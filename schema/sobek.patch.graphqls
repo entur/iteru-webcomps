@@ -30,16 +30,20 @@ extend input VehicleTypeInput {
 # counterpart yet (entur/iteru-webcomps#51). Metres here; the 3D adapter converts
 # to the bus input's mm. On both entities: a Vehicle value, when set, overrides
 # its type's at render. `sections` is an id-less object list, so distill gives
-# it no control — it round-trips until a list control exists.
+# it no control — it round-trips until a list control exists. `windowCount` is
+# 3dbus `windows_hint.count`: side windows on the entry side, door glass
+# excluded; empty = the band is filled with panes of about the same width.
 type BusSection {
   length: Float
   axles: [Float]
   bellowsAhead: Float
+  windowCount: Int
 }
 input BusSectionInput {
   length: Float
   axles: [Float]
   bellowsAhead: Float
+  windowCount: Int
 }
 extend type VehicleType {
   sections: [BusSection]
