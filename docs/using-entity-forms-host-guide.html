@@ -76,7 +76,7 @@
 <div class="wrap">
 
 <header class="doc">
-  <p class="kicker">Host integration guide · @entur/mui-comps-nmr</p>
+  <p class="kicker">Host integration guide · @entur/iteru-webcomps</p>
   <h1>Dropping <code>VehicleForm</code> into your app</h1>
   <p class="sub">A practical walkthrough for the app embedding these components: installing the package, wiring the session provider and auth, and handling <strong>new</strong> / <strong>edit + save</strong> / <strong>cancel</strong>. Everything here is about what you pass in and the callbacks you receive — nothing about how the component works inside.</p>
 </header>
@@ -102,9 +102,9 @@
 
 <div class="callout good"><strong>Install from a GitHub Release.</strong> The repo is public, so the tarball URL needs no token:</div>
 
-<pre><code>npm i https://github.com/entur/mui-comps-nmr/releases/download/v0.9.0/entur-mui-comps-nmr-0.9.0.tgz</code></pre>
+<pre><code>npm i https://github.com/entur/iteru-webcomps/releases/download/v0.9.0/entur-iteru-webcomps-0.9.0.tgz</code></pre>
 
-<p>Releases are listed at <a href="https://github.com/entur/mui-comps-nmr/releases">github.com/entur/mui-comps-nmr/releases</a>. Each carries one <code>.tgz</code> asset plus a note recording which sobek schema it was built against. The package is <em>not</em> on the npm registry — <code>npm i @entur/mui-comps-nmr</code> returns a 404.</p>
+<p>Releases are listed at <a href="https://github.com/entur/iteru-webcomps/releases">github.com/entur/iteru-webcomps/releases</a>. Each carries one <code>.tgz</code> asset plus a note recording which sobek schema it was built against. The package is <em>not</em> on the npm registry — <code>npm i @entur/iteru-webcomps</code> returns a 404.</p>
 
 <div class="callout warn"><strong>Upgrading means editing the URL.</strong> A URL install pins that exact URL in your <code>package-lock.json</code>, so <code>^0.9.0</code> ranges don't work and <code>npm outdated</code> will never tell you a new version exists. Watch the Releases page and bump the URL by hand. This is the cost of not being on a registry — the version scheme is already registry-ready, so if that changes, the install command is the only thing that changes.</div>
 
@@ -126,8 +126,8 @@
 <h2 id="import"><span class="num">2</span>Import &amp; the shape of a form</h2>
 <p>Both components are named exports. They render the fields plus — in edit mode — their own <strong>Save/Cancel footer</strong>. You place the component wherever you want the form to appear, anywhere below a <code>SobekProvider</code>.</p>
 <pre><code>// VehiclePane.tsx
-import { SobekProvider, VehicleForm } from '@entur/mui-comps-nmr';
-import type { SobekCtx } from '@entur/mui-comps-nmr';
+import { SobekProvider, VehicleForm } from '@entur/iteru-webcomps';
+import type { SobekCtx } from '@entur/iteru-webcomps';
 
 const session: SobekCtx = { endpoint, getHeaders: authHeaders, dataOwnerRef };
 
@@ -138,7 +138,7 @@ export const VehiclePane = () =&gt; (
 );</code></pre>
 
 <div class="callout"><strong>Wrapping a form in your own component?</strong> The props types are exported too, so you can extend them instead of reconstructing them with <code>ComponentProps&lt;typeof VehicleForm&gt;</code>:
-<pre><code>import type { VehicleFormProps } from '@entur/mui-comps-nmr';
+<pre><code>import type { VehicleFormProps } from '@entur/iteru-webcomps';
 
 type PaneProps = VehicleFormProps &amp; { title?: string };</code></pre></div>
 
@@ -164,12 +164,12 @@ type PaneProps = VehicleFormProps &amp; { title?: string };</code></pre></div>
 <div class="callout"><strong>A failed load reaches <code>onError</code> too.</strong> Both halves fail alike: the load hands you the server's own messages, falling back to <code>['Failed to load']</code> when the payload carries no GraphQL errors. It fires <em>once per record</em>, and never for a load the form has already moved on from — so a retry button, a redirect or a log line can hang off the callback rather than off your own detection. The same messages are rendered in place of the form, joined into one line.</div>
 
 <h2 id="auth"><span class="num">3</span>Session &amp; auth — the <code>SobekProvider</code></h2>
-<p>One provider, mounted once near the top of your app, supplies every form below it with the endpoint, the credentials, and the organisation whose data you're working on. It is <strong>mandatory</strong>: a data-aware form with no provider above it throws with <code>mui-comps-nmr: this component must be rendered inside a &lt;SobekProvider&gt;</code>.</p>
+<p>One provider, mounted once near the top of your app, supplies every form below it with the endpoint, the credentials, and the organisation whose data you're working on. It is <strong>mandatory</strong>: a data-aware form with no provider above it throws with <code>iteru-webcomps: this component must be rendered inside a &lt;SobekProvider&gt;</code>.</p>
 
 <pre><code>// Session.tsx
 import type { ReactNode } from 'react';
-import { SobekProvider } from '@entur/mui-comps-nmr';
-import type { SobekCtx } from '@entur/mui-comps-nmr';
+import { SobekProvider } from '@entur/iteru-webcomps';
+import type { SobekCtx } from '@entur/iteru-webcomps';
 
 const session: SobekCtx = {
   endpoint: 'https://sobek.example/graphql',
@@ -294,8 +294,8 @@ The dirty/saving state itself is not reachable through <code>footerProps</code> 
 <h3>A header that tracks typing</h3>
 <p><code>onChange</code> fires whenever the value moves — on the initial load, on every edit, and again after a save refetches. Because it fires on the load, a title fed from it is correct before the user touches anything:</p>
 <pre><code>import { useState } from 'react';
-import { VehicleForm } from '@entur/mui-comps-nmr';
-import type { Vehicle } from '@entur/mui-comps-nmr';
+import { VehicleForm } from '@entur/iteru-webcomps';
+import type { Vehicle } from '@entur/iteru-webcomps';
 
 export function TitledVehicle({ id }: { id: string }) {
   const [live, setLive] = useState&lt;Vehicle | undefined&gt;();
@@ -333,8 +333,8 @@ useEffect(() =&gt; {
 <h2 id="full"><span class="num">8</span>A complete host page</h2>
 <p>List on the left, form on the right. Session from the provider, auth from your app's hook, <code>key</code> for clean switching, a live title, and a view↔edit toggle that refuses to leave with unsaved work. Save and Cancel are the form's own — the page never renders them.</p>
 <pre><code>import { useState } from 'react';
-import { SobekProvider, VehicleForm } from '@entur/mui-comps-nmr';
-import type { Vehicle } from '@entur/mui-comps-nmr';
+import { SobekProvider, VehicleForm } from '@entur/iteru-webcomps';
+import type { Vehicle } from '@entur/iteru-webcomps';
 import { useAuth } from './auth';
 
 const ENDPOINT = 'https://sobek.example/graphql';
@@ -405,7 +405,7 @@ export function VehiclesPage({ vehicles, refetchList, dataOwnerRef }: VehiclesPa
 
 <h2 id="checklist"><span class="num">9</span>Checklist</h2>
 <ul class="tight">
-  <li><span class="pill">install</span> <code>npm i https://github.com/entur/mui-comps-nmr/releases/download/v0.9.0/entur-mui-comps-nmr-0.9.0.tgz</code> — no token. Upgrades are manual URL edits. Host supplies React 19 / MUI 7 / x-data-grid 8 / Emotion 11 / graphql-request 7.</li>
+  <li><span class="pill">install</span> <code>npm i https://github.com/entur/iteru-webcomps/releases/download/v0.9.0/entur-iteru-webcomps-0.9.0.tgz</code> — no token. Upgrades are manual URL edits. Host supplies React 19 / MUI 7 / x-data-grid 8 / Emotion 11 / graphql-request 7.</li>
   <li><span class="pill">provider</span> <code>SobekProvider</code> is mandatory and carries the whole session — <code>endpoint</code>, <code>dataOwnerRef</code>, <code>headers</code>, <code>getHeaders</code>. None of them are form props any more; a form with no provider above it throws.</li>
   <li><span class="pill">auth</span> Token → <code>getHeaders</code> (may be async); constants → <code>headers</code>. Both allowed.</li>
   <li><span class="pill">org</span> <code>dataOwnerRef</code> filters loads, is stamped onto every save from the provider, and renders as a locked field the user can't edit.</li>
@@ -422,7 +422,7 @@ export function VehiclesPage({ vehicles, refetchList, dataOwnerRef }: VehiclesPa
 </ul>
 
 <footer class="doc">
-  Host integration guide for <code>SobekProvider</code> + <code>VehicleForm</code> / <code>VehicleTypeForm</code> as exported from <code>@entur/mui-comps-nmr</code> v0.9.0. Presentation props (<code>layout</code>, <code>variant</code>, <code>slotProps</code>) are documented separately in the README.
+  Host integration guide for <code>SobekProvider</code> + <code>VehicleForm</code> / <code>VehicleTypeForm</code> as exported from <code>@entur/iteru-webcomps</code> v0.9.0. Presentation props (<code>layout</code>, <code>variant</code>, <code>slotProps</code>) are documented separately in the README.
 </footer>
 
 </div>

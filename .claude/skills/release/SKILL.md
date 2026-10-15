@@ -1,9 +1,9 @@
 ---
 name: release
-description: Use when bumping the version or cutting a release of @entur/mui-comps-nmr — which files carry version refs, why the tag must follow the version commit, and the live-schema gotcha that makes a green local build no guarantee. Triggers on "bump the version", "release v0.x.0", "cut a release", "publish the tarball".
+description: Use when bumping the version or cutting a release of @entur/iteru-webcomps — which files carry version refs, why the tag must follow the version commit, and the live-schema gotcha that makes a green local build no guarantee. Triggers on "bump the version", "release v0.x.0", "cut a release", "publish the tarball".
 ---
 
-# Releasing `@entur/mui-comps-nmr`
+# Releasing `@entur/iteru-webcomps`
 
 Not published to a registry. Hosts install from a **GitHub Release tarball URL**,
 so the release artifact and the docs that point at it are the whole product
@@ -42,12 +42,12 @@ Run from a clean, synced `main`.
    - the install `<pre>` — download URL + `.tgz` filename
    - the "Upgrading means editing the URL" callout — the `^<version>` range in prose
    - the cheat-sheet `<li>` — same URL + filename
-   - the footer — "as exported from `@entur/mui-comps-nmr` v<version>"
+   - the footer — "as exported from `@entur/iteru-webcomps` v<version>"
 
    One sed over the file handles all four:
 
    ```bash
-   sed -i "s/v$OLD/v$NEW/g; s/entur-mui-comps-nmr-$OLD\.tgz/entur-mui-comps-nmr-$NEW.tgz/g; s/\^$OLD/^$NEW/g" \
+   sed -i "s/v$OLD/v$NEW/g; s/entur-iteru-webcomps-$OLD\.tgz/entur-iteru-webcomps-$NEW.tgz/g; s/\^$OLD/^$NEW/g" \
      docs/using-entity-forms-host-guide.html
    ```
 
@@ -112,7 +112,7 @@ Consequences worth remembering:
 npm test && npm run build                          # before pushing
 node -p "require('./package.json').version"        # must equal the tag, minus 'v'
 gh run list --workflow release.yml --limit 1       # after the tag push
-gh release view v<new>                             # asset entur-mui-comps-nmr-<new>.tgz attached
+gh release view v<new>                             # asset entur-iteru-webcomps-<new>.tgz attached
 ```
 
 The doc edit opens a 404 window: the install URLs name a release that does not
@@ -121,8 +121,8 @@ anyone to upgrade.
 
 ```bash
 curl -sL -o /dev/null -w "%{http_code}\n" \
-  "https://github.com/entur/mui-comps-nmr/releases/download/v<new>/entur-mui-comps-nmr-<new>.tgz"
-curl -s https://entur.github.io/mui-comps-nmr/guide.html | grep -c "v<new>"
+  "https://github.com/entur/iteru-webcomps/releases/download/v<new>/entur-iteru-webcomps-<new>.tgz"
+curl -s https://entur.github.io/iteru-webcomps/guide.html | grep -c "v<new>"
 ```
 
 ## Sequencing a release that documents new behaviour

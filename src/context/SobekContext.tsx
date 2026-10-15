@@ -52,7 +52,7 @@ export function useSobekCtx(): SobekCtx {
   const ctx = useContext(SobekContext);
   if (ctx === undefined) {
     throw new Error(
-      'mui-comps-nmr: this component must be rendered inside a <SobekProvider>'
+      'iteru-webcomps: this component must be rendered inside a <SobekProvider>'
     );
   }
   return ctx;

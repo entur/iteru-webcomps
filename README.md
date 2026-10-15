@@ -1,4 +1,4 @@
-# @entur/mui-comps-nmr
+# @entur/iteru-webcomps
 
 A small React MUI component library for Entur's
 [hathor](https://github.com/entur/hathor) frontend. Components are built on
@@ -23,7 +23,7 @@ Session inputs (endpoint, headers, tenant) are **not** props — they come from 
 mandatory `SobekProvider` above the form; see [Session context](#session-context).
 
 ```tsx
-import { SobekProvider, VehicleForm, type VehicleLayout } from '@entur/mui-comps-nmr';
+import { SobekProvider, VehicleForm, type VehicleLayout } from '@entur/iteru-webcomps';
 
 const layout: VehicleLayout = {
   Edit: ['name', 'registrationNumber', 'operationalNumber'],
