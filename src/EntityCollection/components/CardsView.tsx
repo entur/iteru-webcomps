@@ -3,12 +3,16 @@
  * only — the rows it gets are already filtered, sorted, paged and keyed.
  * Imports nothing from `@mui/x-data-grid`, so a cards-only host never loads it.
  */
-import { Fragment } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { Box, Card, CardContent, Chip, Typography, type CardProps, type TypographyProps } from '@mui/material';
 import type { CollectionLabels, Column, KeyedRow, ResolvedCard } from '../types';
 import { displayValue, EMPTY_TEXT, fullTitle, valueList } from '../utils/values';
 
-const CARD_MIN_PX = 260; // a card never gets narrower; the row wraps instead
+// A card never gets narrower than its size's minimum (or the whole row, on a
+// screen narrower than that); the row wraps instead.
+const CARD_MIN_PX = { sm: 260, big: 400 } as const;
+// The picture area a big card leaves at its top: the 3D preview's box shape.
+const MEDIA_ASPECT = '16 / 10';
 const CHIP_KINDS: readonly Column['spec']['kind'][] = ['enum', 'enumMulti'];
 
 /** One value as text: the shown form as a card reads it, the full one on hover, a dash when empty. */
@@ -36,13 +40,39 @@ const CardValue = ({ row, col, labels }: { row: unknown; col: Column; labels: Co
   );
 };
 
+/** `sm`: text only. `big`: wider, with a picture area above the text. */
+export type CardSize = keyof typeof CARD_MIN_PX;
+
 export interface CardsViewProps {
   /** The visible page, keyed (`keyRows`). */
   rows: readonly KeyedRow[];
   card: ResolvedCard;
   labels: CollectionLabels;
+  /** Default `sm`. */
+  size?: CardSize;
+  /** `big` only: what fills a row's picture area; blank when omitted. */
+  media?: (row: unknown) => ReactNode;
   cardProps?: CardProps;
 }
+
+/** The picture area at the top of a big card: always there, so every card has
+ *  the same shape whether or not the host fills it. */
+const CardMediaArea = ({ children }: { children?: ReactNode }) => (
+  <Box
+    data-card-media=""
+    aria-hidden={children == null || children === false ? true : undefined}
+    sx={{
+      aspectRatio: MEDIA_ASPECT,
+      bgcolor: 'action.hover',
+      borderBottom: 1,
+      borderColor: 'divider',
+      overflow: 'hidden',
+      '& > img': { display: 'block', width: '100%', height: '100%', objectFit: 'contain' },
+    }}
+  >
+    {children}
+  </Box>
+);
 
 /**
  * Render rows as a wrapping grid of cards.
@@ -50,17 +80,21 @@ export interface CardsViewProps {
  * @param rows      the visible page, keyed
  * @param card      resolved title, subtitle and body fields
  * @param labels    yes/no wording for switches
+ * @param size      `sm` (default) or `big`: wider, with a picture area on top
+ * @param media     `big` only: fills a row's picture area
  * @param cardProps spread onto every `Card`
  * @returns the card list
  */
-export function CardsView({ rows, card, labels, cardProps }: CardsViewProps): React.ReactNode {
+export function CardsView({ rows, card, labels, size = 'sm', media, cardProps }: CardsViewProps): React.ReactNode {
   return (
     <Box
       role="list"
-      sx={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN_PX}px, 1fr))`, gap: 2 }}
+      data-card-size={size}
+      sx={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${CARD_MIN_PX[size]}px, 100%), 1fr))`, gap: 2 }}
     >
       {rows.map(({ key, entity: row }) => (
         <Card key={key} role="listitem" variant="outlined" {...cardProps}>
+          {size === 'big' ? <CardMediaArea>{media?.(row)}</CardMediaArea> : null}
           <CardContent>
             {card.title ? (
               <ValueText row={row} col={card.title} labels={labels} variant="subtitle1" component="div" />

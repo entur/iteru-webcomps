@@ -140,7 +140,7 @@ const genVehicleTypes = (n: number, seed: number): VehicleType[] => {
    Stories
 \* ------------------------------------------------------------------ */
 
-const VIEWS: CollectionView[] = ["grid", "cards"];
+const VIEWS: CollectionView[] = ["grid", "cards-sm", "cards-big"];
 const TOOLS: CollectionTool[] = [...ALL_TOOLS];
 const FILTER_MODES = ["client", "server"] as const;
 
@@ -203,6 +203,7 @@ export default meta;
 type Story = StoryObj<typeof VehicleTypeCollection>;
 
 export const Grid: Story = {};
-export const Cards: Story = { args: { view: "cards" } };
+export const CardsSm: Story = { args: { view: "cards-sm" } };
+export const CardsBig: Story = { args: { view: "cards-big" } };
 export const SearchOnly: Story = { args: { tools: ["search"] } };
 export const NoTools: Story = { args: { tools: [] } };

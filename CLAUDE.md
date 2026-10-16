@@ -278,12 +278,17 @@ parameter while another is given). One `CollectionQuery` (`filters`, `search`, `
 visible**. Both views render its output: `GridView` runs the DataGrid with
 `sortingMode`/`paginationMode="server"` and `disableColumnFilter`, so the grid
 never filters, sorts or pages on its own — that is what keeps `view: 'grid' |
-'cards'` interchangeable. The toolbar is the collection's own for the same
+'cards-sm' | 'cards-big'` interchangeable. The toolbar is the collection's own for the same
 reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
 
 - `view` is a prop; the lib ships no toggle. The story
   (`VehicleTypeCollection.stories.tsx`) renders the bare component and drives
   `view` / `tools` / `filterMode` from Storybook controls — no wrapper chrome.
+- Two card sizes, one `CardsView` (`size`): `cards-sm` is text only (min
+  260px); `cards-big` is wider (min 400px, capped at the row on a phone) and
+  leaves a 16:10 picture area at the top of every card, filled per row by the
+  host's `cardMedia(row)` — an `<img>` there is scaled to fit. Unfilled, the
+  area stays blank and `aria-hidden`, so every card keeps the same shape.
 - `tools` whitelists `search | filter | sort | columns | density`; the last two
   render in grid view only. No CSV/Print.
 - The toolbar is one row when it fits; on narrower screens the tools after the

@@ -59,6 +59,7 @@ export function createEntityCollection<F extends Record<string, FieldSpec>>(
     view = 'grid',
     columns,
     card,
+    cardMedia,
     tools,
     actions,
     query: controlled,
@@ -168,7 +169,14 @@ export function createEntityCollection<F extends Record<string, FieldSpec>>(
                 {L.empty}
               </Typography>
             ) : (
-              <CardsView rows={keyed} card={resolvedCard} labels={L} cardProps={slotProps?.card} />
+              <CardsView
+                rows={keyed}
+                card={resolvedCard}
+                labels={L}
+                size={view === 'cards-big' ? 'big' : 'sm'}
+                media={cardMedia as ((row: unknown) => ReactNode) | undefined}
+                cardProps={slotProps?.card}
+              />
             )}
             <TablePagination
               component="div"

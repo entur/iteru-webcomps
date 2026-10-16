@@ -64,8 +64,8 @@ describe('CollectionToolbar', () => {
     expect(screen.getByRole('button', { name: 'Host action' })).toBeTruthy();
   });
 
-  it('drops the grid-only tools in cards view', () => {
-    mount({ view: 'cards' });
+  it.each(['cards-sm', 'cards-big'] as const)('drops the grid-only tools in %s view', view => {
+    mount({ view });
     expect(screen.queryByRole('button', { name: 'Columns' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Density' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Filters' })).toBeTruthy();

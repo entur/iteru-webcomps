@@ -7,7 +7,9 @@ import type { CardProps } from '@mui/material';
 import type { DataGridProps, GridDensity } from '@mui/x-data-grid';
 import type { FieldEntry, FieldSpec } from '../EntityDetailsForm/types';
 
-export type CollectionView = 'grid' | 'cards';
+/** `cards-sm`: compact text cards. `cards-big`: wider cards with room for a
+ *  picture at the top (`cardMedia`). */
+export type CollectionView = 'grid' | 'cards-sm' | 'cards-big';
 export type CollectionTool = 'search' | 'filter' | 'sort' | 'columns' | 'density';
 export type FilterOp = 'contains' | 'anyOf';
 
@@ -90,6 +92,10 @@ export interface EntityCollectionProps<E, K extends string = string> {
   columns?: readonly (K | FieldEntry<K>)[];
   /** Omit → `name` as title plus the first columns. */
   card?: CardSpec<K>;
+  /** `cards-big` only: what fills the picture area at the top of a row's card
+   *  (an `<img>` fills it, scaled to fit). Omit, or return nothing, and the
+   *  area is left blank, so every card keeps the same height. */
+  cardMedia?: (row: E) => ReactNode;
   /** Toolbar whitelist; `false` hides the toolbar's tools. Default: all. */
   tools?: readonly CollectionTool[] | false;
   /** Host buttons at the end of the toolbar. */

@@ -84,7 +84,7 @@ export interface CollectionToolbarProps {
  * Render the toolbar.
  *
  * @param tools        which tools to show
- * @param view         active view; grid-only tools drop out in `'cards'`
+ * @param view         active view; grid-only tools drop out in either cards view
  * @param columns      resolved columns
  * @param filterColumns what the filter reaches (shown columns + filterable others)
  * @param filterFields the entity's generated `<Entity>FilterFields`

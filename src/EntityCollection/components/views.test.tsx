@@ -4,7 +4,7 @@ import type { FieldSpec } from '../../EntityDetailsForm/types';
 import { DEFAULT_LABELS, defaultCollectionQuery } from '../types';
 import { resolveCard, resolveColumns } from '../utils/columns';
 import { keyRows } from '../utils/values';
-import { CardsView } from './CardsView';
+import { CardsView, type CardsViewProps } from './CardsView';
 import { GridView } from './GridView';
 
 // The grid is lazily imported. Load its module once up front, so the first
@@ -28,8 +28,9 @@ const ROWS = [
 ];
 
 /** Cards for `rows`, keyed as the collection keys them. */
-const renderCards = (rows: unknown[]) =>
-  render(<CardsView rows={keyRows(rows)} card={resolveCard(FIELDS, COLS)} labels={DEFAULT_LABELS} />);
+const renderCards = (rows: unknown[], over: Partial<CardsViewProps> = {}) =>
+  render(<CardsView rows={keyRows(rows)} card={resolveCard(FIELDS, COLS)} labels={DEFAULT_LABELS} {...over} />);
+const mediaAreas = (el: HTMLElement) => el.querySelectorAll('[data-card-media]');
 
 /** A grid for `rows` (rendered inside an awaited act: the grid loads lazily). */
 const renderGrid = async (
@@ -58,6 +59,30 @@ const renderGrid = async (
 
 describe('CardsView', () => {
   const mount = () => renderCards(ROWS);
+
+  it('leaves no picture area on a small card', () => {
+    const { container } = mount();
+    expect(mediaAreas(container)).toHaveLength(0);
+  });
+
+  it('leaves a picture area at the top of every big card, blank and hidden when unfilled', () => {
+    const { container } = renderCards(ROWS, { size: 'big' });
+    const items = screen.getAllByRole('listitem');
+    expect(mediaAreas(container)).toHaveLength(items.length);
+    for (const item of items) {
+      const area = item.querySelector('[data-card-media]')!;
+      expect(item.firstElementChild).toBe(area);
+      expect(area.childNodes).toHaveLength(0);
+      expect(area.getAttribute('aria-hidden')).toBe('true');
+    }
+  });
+
+  it("puts the host's media in a big card's picture area, exposed", () => {
+    renderCards(ROWS, { size: 'big', media: row => <img alt={(row as { netexId: string }).netexId} /> });
+    const [first, second] = screen.getAllByRole('listitem');
+    expect(within(first).getByRole('img', { name: 'T:1' }).parentElement?.hasAttribute('aria-hidden')).toBe(false);
+    expect(within(second).getByRole('img', { name: 'T:2' })).toBeTruthy();
+  });
 
   it('renders one list item per row with its title', () => {
     mount();
