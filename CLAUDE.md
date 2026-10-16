@@ -152,8 +152,8 @@ each entry as a skeleton wrapping its own label (the dropdown: wrapping the
 field), so the loaded TOC lands where its placeholder stood. The fallback
 leaves in the commit the record connects in (unmount cleanups run before new
 layout effects), so there is never a second live form. `session.loading` /
-`toc.loading` is that flag — a direct load signal for the host, unlike
-inferring one from a missing `onChange` value,
+`toc.loading` is that flag — a direct load signal for the host (the Fullpage
+3D preview uses it), unlike inferring one from a missing `onChange` value,
 which cannot tell a slow record from a missing one. When Suspense hides an
 already-mounted record (netexId / org change without a key remount), the
 record disconnects and the fallback reconnects in its stead.

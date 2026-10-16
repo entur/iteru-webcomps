@@ -406,9 +406,9 @@ const GqlHostPage = ({
     <BusView
       key={recordKey}
       result={busResult}
-      // An existing record with nothing from the form yet is mid-load (the
-      // form shows its skeleton); a new one has nothing to load.
-      loading={!!selection?.netexId && !liveValue}
+      // Straight from the session: the form's fallback holds it while the
+      // record loads, so a missing record is never taken for a slow one.
+      loading={session.loading}
       mode={busMode}
       onModeChange={setBusMode}
       motion={motion}
