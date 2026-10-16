@@ -289,6 +289,15 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   leaves a 16:10 picture area at the top of every card, filled per row by the
   host's `cardMedia(row)` — an `<img>` there is scaled to fit. Unfilled, the
   area stays blank and `aria-hidden`, so every card keeps the same shape.
+  The story fills it: a bus row → `BusShot` (`src/stories/BusShot.tsx`: a
+  wave skeleton, then its 3dbus PNG), anything else → the generic picture
+  (`src/stories/assets/no-render-data.png`, 640×400 like the shots), which a bus that can't be drawn also shows, captioned
+  "No 3D preview" with the reason as `title`. Every card shares **one**
+  off-screen stage (`src/stories/shotQueue.ts`: serial, cached by input, LRU,
+  released after 2 s idle, started a microtask late so one render's cards fail
+  together without WebGL) — a page of live stages would run out of contexts.
+  Bus rows of the story's generator (`genVehicleTypes.ts`) carry geometry
+  inside 3dbus's limits; a test runs the real `validate` over every one.
 - `tools` whitelists `search | filter | sort | columns | density`; the last two
   render in grid view only. No CSV/Print.
 - The toolbar is one row when it fits; on narrower screens the tools after the
