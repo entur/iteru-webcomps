@@ -38,7 +38,7 @@ import {
 } from "@entur/iteru-3dbus";
 import type { BusInput, BusInputResult, MissingField } from "../index";
 import { humanize } from "../shared/humanize";
-import { REDUCED_MOTION_MEDIA } from "../shared/motion";
+import { STILL_SKELETONS } from "../shared/motion";
 import { UNIT_LABELS } from "./initLayouts";
 import { mkMotion, type BusMotion } from "./busMotion";
 import { useSize } from "./hooks";
@@ -293,8 +293,7 @@ export function BusView({ result, loading = false, mode, onModeChange, motion, o
           role="status"
           aria-busy="true"
           aria-label={LOADING_LABEL}
-          // MUI's wave ships no reduced-motion guard of its own.
-          sx={{ [REDUCED_MOTION_MEDIA]: { "& .MuiSkeleton-root": { animation: "none" } } }}
+          sx={STILL_SKELETONS}
         >
           <Skeleton
             variant="rectangular"
