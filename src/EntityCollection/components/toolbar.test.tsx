@@ -25,11 +25,12 @@ const mount = (
     hidden?: Record<string, boolean>;
   } = {}
 ) => {
-  const onQuery = vi.fn(), onDensity = vi.fn(), onHidden = vi.fn();
+  const onQuery = vi.fn(), onDensity = vi.fn(), onHidden = vi.fn(), onView = vi.fn();
   render(
     <CollectionToolbar
       tools={over.tools ?? ALL_TOOLS}
       view={over.view ?? 'grid'}
+      onView={onView}
       columns={COLS}
       filterColumns={COLS}
       filterFields={FF}
@@ -43,7 +44,7 @@ const mount = (
       actions={<button>Host action</button>}
     />
   );
-  return { onQuery, onDensity, onHidden };
+  return { onQuery, onDensity, onHidden, onView };
 };
 
 describe('CollectionToolbar', () => {
@@ -153,11 +154,36 @@ describe('CollectionToolbar', () => {
     expect(onDensity).toHaveBeenCalledWith('compact');
   });
 
+  it.each(['grid', 'cards-sm', 'cards-big'] as const)('offers the three views in %s view, the current one pressed', view => {
+    mount({ view });
+    const group = screen.getByRole('group', { name: 'View' });
+    const buttons = within(group).getAllByRole('button');
+    expect(buttons.map(b => b.getAttribute('aria-label'))).toEqual(['Table', 'Small cards', 'Large cards']);
+    expect(buttons.filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.getAttribute('aria-label'))).toEqual([
+      DEFAULT_LABELS.views[view],
+    ]);
+  });
+
+  it('reports a picked view, and nothing for a click on the current one', () => {
+    const { onView } = mount({ view: 'grid' });
+    fireEvent.click(screen.getByRole('button', { name: 'Large cards' }));
+    expect(onView).toHaveBeenCalledWith('cards-big');
+    onView.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Table' }));
+    expect(onView).not.toHaveBeenCalled();
+  });
+
+  it('leaves the view switch out when it is not whitelisted', () => {
+    mount({ tools: ['search', 'sort'] });
+    expect(screen.queryByRole('group', { name: 'View' })).toBeNull();
+  });
+
   it('names densities through labels', () => {
     render(
       <CollectionToolbar
         tools={['density']}
         view="grid"
+        onView={vi.fn()}
         columns={COLS}
         filterColumns={COLS}
         filterFields={FF}

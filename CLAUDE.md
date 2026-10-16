@@ -281,9 +281,13 @@ never filters, sorts or pages on its own — that is what keeps `view: 'grid' |
 'cards-sm' | 'cards-big'` interchangeable. The toolbar is the collection's own for the same
 reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
 
-- `view` is a prop; the lib ships no toggle. The story
+- `view` is switched from the toolbar's `view` tool (icons: table / small
+  cards / large cards, at the end before `actions`; names in `labels.views`).
+  Controlled like `query`: pass `view` + `onViewChange`, or omit `view` and the
+  collection keeps its own (starts on `grid`). The story
   (`VehicleTypeCollection.stories.tsx`) renders the bare component and drives
-  `view` / `tools` / `filterMode` from Storybook controls — no wrapper chrome.
+  `view` / `tools` / `filterMode` from Storybook controls — no wrapper chrome;
+  its `render` writes the switch's pick back to the `view` arg (`useArgs`).
 - Two card sizes, one `CardsView` (`size`): `cards-sm` is text only (min
   260px); `cards-big` is wider (min 320px — the shot width — capped at the row on a phone) and
   leaves a 16:10 picture area at the top of every card, with the card's title
@@ -301,10 +305,10 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   together without WebGL) — a page of live stages would run out of contexts.
   Bus rows of the story's generator (`genVehicleTypes.ts`) carry geometry
   inside 3dbus's limits; a test runs the real `validate` over every one.
-- `tools` whitelists `search | filter | sort | columns | density`; the last two
-  render in grid view only. No CSV/Print.
+- `tools` whitelists `search | filter | sort | columns | density | view`;
+  `columns` and `density` render in grid view only. No CSV/Print.
 - The toolbar is one row when it fits; on narrower screens the tools after the
-  query field (sort, columns, density, actions) wrap onto the next line —
+  query field (sort, columns, density, view, actions) wrap onto the next line —
   deliberate, chosen over folding them into a "More" menu. Filters never add a
   row. Search and filter are one internal subcomponent,
   `QueryField` (`components/QueryField.tsx`): active filters sit as chips at

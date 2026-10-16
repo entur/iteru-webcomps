@@ -112,6 +112,23 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
     expect(screen.queryAllByRole('img')).toHaveLength(0);
   });
 
+  it('switches view from the toolbar on its own when uncontrolled', async () => {
+    const onViewChange = vi.fn();
+    await mount({ onViewChange });
+    expect(await gridRows()).toBe(ROW_COUNT);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Small cards' })));
+    expect(onViewChange).toHaveBeenCalledWith('cards-sm');
+    expect(screen.getAllByRole('listitem')).toHaveLength(ROW_COUNT);
+  });
+
+  it('only reports a picked view when controlled — the host decides', async () => {
+    const onViewChange = vi.fn();
+    await mount({ view: 'cards-sm', onViewChange });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Large cards' })));
+    expect(onViewChange).toHaveBeenCalledWith('cards-big');
+    expect(screen.getByRole('button', { name: 'Small cards' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('shows the same rows in the grid', async () => {
     await mount({ view: 'grid' });
     expect(await gridRows()).toBe(ROW_COUNT);

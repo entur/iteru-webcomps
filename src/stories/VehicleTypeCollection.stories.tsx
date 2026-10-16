@@ -13,6 +13,7 @@
  * at a time on a shared off-screen stage); other modes show a generic picture.
  */
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useArgs } from "storybook/preview-api";
 import {
   createEntityCollection,
   vehicleTypeFields,
@@ -56,6 +57,20 @@ const cardMedia = (row: unknown) => {
 const meta: Meta<typeof VehicleTypeCollection> = {
   title: "Collection/VehicleType",
   component: VehicleTypeCollection,
+  // `view` is an arg, so the collection is controlled: the toolbar's switch
+  // writes its pick back to the arg, keeping it and the control in step.
+  render: function Render(args) {
+    const [, updateArgs] = useArgs();
+    return (
+      <VehicleTypeCollection
+        {...args}
+        onViewChange={view => {
+          args.onViewChange?.(view);
+          updateArgs({ view });
+        }}
+      />
+    );
+  },
   args: {
     rows: genVehicleTypes(ROW_COUNT, SEED),
     view: "grid",
@@ -98,6 +113,7 @@ const meta: Meta<typeof VehicleTypeCollection> = {
     tools: { control: "check", options: TOOLS },
     filterMode: { control: "inline-radio", options: FILTER_MODES },
     onQueryChange: { action: "queryChange" },
+    onViewChange: { action: "viewChange" },
     // 250 row objects are not worth a JSON editor; `query` left unset keeps
     // the component uncontrolled, which is the mode worth clicking through.
     rows: { control: false },
