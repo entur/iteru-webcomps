@@ -9,13 +9,16 @@
  * call — it knows the space it gives the TOC; this component measures nothing.
  */
 import type { FC } from 'react';
-import { Box, List, ListItemButton, ListItemText, MenuItem, TextField } from '@mui/material';
+import { Box, List, ListItemButton, ListItemText, MenuItem, Skeleton, TextField } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material';
+import { REDUCED_MOTION_MEDIA } from '../shared/motion';
 
 /** Width of the rail marking the active entry; the idle rail is the same width,
  *  so selecting an entry never shifts its text. */
 const RAIL_PX = 2;
 const DEFAULT_LABEL = 'Sections';
+// MUI's wave ships no reduced-motion guard of its own.
+const STILL_WAVE = { [REDUCED_MOTION_MEDIA]: { '& .MuiSkeleton-root': { animation: 'none' } } };
 
 /** `list`: one entry per section, the active one railed. `dropdown`: a select
  *  whose value is the active section. */
@@ -33,6 +36,10 @@ export interface SectionTocProps {
   /** Accessible name of the `<nav>` landmark, and the dropdown's field label
    *  (English default, no i18n runtime). */
   label?: string;
+  /** The sections are known (from the layout) but the record is still
+   *  loading: each entry is drawn as a skeleton the size of the real one, so
+   *  the TOC keeps its shape instead of collapsing; nothing is pickable. */
+  loading?: boolean;
   /** Applied to the `<nav>` root, after the defaults. */
   sx?: SxProps<Theme>;
 }
@@ -58,6 +65,7 @@ const ITEM_SX = {
  * @param props.onSelect called with the picked section
  * @param props.variant `list` (default) or `dropdown`
  * @param props.label accessible name of the landmark; default `'Sections'`
+ * @param props.loading draw each entry as a skeleton of itself, unpickable
  * @param props.sx styling for the `<nav>` root
  * @returns the navigation landmark, or `null` when there are no sections
  */
@@ -67,9 +75,42 @@ export const SectionToc: FC<SectionTocProps> = ({
   onSelect,
   variant = 'list',
   label = DEFAULT_LABEL,
+  loading = false,
   sx,
 }) =>
-  sections.length === 0 ? null : (
+  sections.length === 0 ? null : loading ? (
+    <Box
+      component="nav"
+      aria-label={label}
+      aria-busy="true"
+      data-nmr-skeleton="toc"
+      sx={[STILL_WAVE, ...(Array.isArray(sx) ? sx : [sx])]}
+    >
+      {/* Each skeleton wraps the real control, so it takes that control's size:
+          the loaded TOC lands exactly where its placeholder stood. */}
+      {variant === 'dropdown' ? (
+        <Skeleton variant="rounded" animation="wave" width="100%">
+          <TextField size="small" fullWidth label={label} />
+        </Skeleton>
+      ) : (
+        <List dense disablePadding aria-hidden>
+          {sections.map(section => (
+            <ListItemButton key={section} component="div" role="presentation" tabIndex={-1} disableRipple sx={ITEM_SX}>
+              <ListItemText
+                // In a span: Skeleton hides element children, not bare text.
+                primary={
+                  <Skeleton animation="wave">
+                    <span>{section}</span>
+                  </Skeleton>
+                }
+                slotProps={{ primary: { variant: 'body2', noWrap: true } }}
+              />
+            </ListItemButton>
+          ))}
+        </List>
+      )}
+    </Box>
+  ) : (
     <Box component="nav" aria-label={label} sx={sx}>
       {variant === 'dropdown' ? (
         <TextField

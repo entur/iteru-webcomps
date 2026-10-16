@@ -87,3 +87,30 @@ describe("SectionToc variant='dropdown'", () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe('SectionToc loading', () => {
+  it('keeps one placeholder per section, as large as its label, and offers nothing to pick', () => {
+    const onSelect = vi.fn();
+    render(<SectionToc sections={sections} onSelect={onSelect} loading />);
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    expect(nav).toHaveAttribute('aria-busy', 'true');
+    // The skeleton wraps the label itself, so it takes the label's size.
+    const bones = [...nav.querySelectorAll('.MuiSkeleton-root')];
+    expect(bones.map(b => b.textContent)).toEqual(sections);
+    expect(screen.queryAllByRole('button')).toEqual([]);
+    fireEvent.click(bones[1]);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('draws the dropdown as a skeleton of the field', () => {
+    render(<SectionToc sections={sections} onSelect={() => {}} variant="dropdown" loading />);
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    expect(nav.querySelector('.MuiSkeleton-root .MuiTextField-root')).not.toBeNull();
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
+  it('still renders nothing without sections', () => {
+    const { container } = render(<SectionToc sections={[]} onSelect={() => {}} loading />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});

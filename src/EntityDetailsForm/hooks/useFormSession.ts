@@ -15,11 +15,13 @@ import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from '
 export const LINK = Symbol('FormSession.link');
 const WARN_SECOND = '[FormSession] a second form connected while one is live; the later one wins';
 
-/** `SectionToc`'s required props. */
+/** `SectionToc`'s required props, plus its `loading`. */
 export interface FormSessionToc {
   sections: string[];
   active?: string;
   onSelect: (section: string) => void;
+  /** The record is still loading: `sections` are the layout's, not yet a record's. */
+  loading: boolean;
 }
 
 /** `EditFooter`'s state props; `labels`, `slotProps` and `sx` stay the host's own. */
@@ -31,12 +33,14 @@ export interface FormSessionFooter {
   onCancel: () => void;
 }
 
-/** What a connected form publishes. */
+/** What a connected form publishes. While its record loads, the wrapper's
+ *  fallback publishes for it: the layout's sections, `loading`, nothing to save. */
 export interface SessionState {
   sections: string[];
   dirty: boolean;
   saving: boolean;
   editable: boolean;
+  loading: boolean;
 }
 
 /** The connected form's actions. */
@@ -75,11 +79,13 @@ export interface FormSession {
   footer: FormSessionFooter;
   /** A form is connected, showing its record, and in edit mode. */
   editable: boolean;
+  /** A form is connected and its record is still loading. */
+  loading: boolean;
   /** Wrapper-only channel; not part of the host API. */
   readonly [LINK]: { channel: Channel; selection: Selection };
 }
 
-const IDLE: SessionState = { sections: [], dirty: false, saving: false, editable: false };
+const IDLE: SessionState = { sections: [], dirty: false, saving: false, editable: false, loading: false };
 
 /**
  * Create a session for one data-aware form and the chrome placed around it.
@@ -127,9 +133,10 @@ export function useFormSession(): FormSession {
   const { section } = selection;
   const active = section !== undefined && state.sections.includes(section) ? section : state.sections[0];
   return {
-    toc: { sections: state.sections, active, onSelect },
+    toc: { sections: state.sections, active, onSelect, loading: state.loading },
     footer: { dirty: state.dirty, saving: state.saving, disabled: !state.editable, onSave, onCancel },
     editable: state.editable,
+    loading: state.loading,
     [LINK]: { channel, selection },
   };
 }
@@ -188,10 +195,10 @@ export function useSessionConnection(
 
   // JSON, not a delimiter: a layout key is any string.
   const sectionsKey = JSON.stringify(state.sections);
-  const { dirty, saving, editable } = state;
+  const { dirty, saving, editable, loading } = state;
   useLayoutEffect(() => {
-    channel?.publish(id, { sections: JSON.parse(sectionsKey) as string[], dirty, saving, editable });
-  }, [channel, id, sectionsKey, dirty, saving, editable]);
+    channel?.publish(id, { sections: JSON.parse(sectionsKey) as string[], dirty, saving, editable, loading });
+  }, [channel, id, sectionsKey, dirty, saving, editable, loading]);
 
   const onActiveSectionChange = useCallback(
     (section: string) => channel?.report(id, section),
