@@ -1,2 +1,2 @@
-export { toBusInput, doorHints } from './toBusInput';
-export type { BusInput, BusInputResult, BusInputSection, DoorHint } from './toBusInput';
+export { toBusInput } from './toBusInput';
+export type { BusInput, BusInputResult, BusInputSection, DoorHint, LengthDrift, MissingField } from './toBusInput';

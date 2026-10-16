@@ -10,6 +10,7 @@
  * offset from the rest pose, so going in or out is continuous — no jump.
  */
 import type { Stage, Vec3 } from "@entur/iteru-3dbus";
+import { REDUCED_MOTION_QUERY } from "../shared/motion";
 
 /** `orbit` = the reader drives the camera; `animate` = it flies the ∞. */
 export type BusMotion = "orbit" | "animate";
@@ -63,7 +64,10 @@ export interface MotionOpts {
  */
 export function mkMotion(stage: Pick<Stage, "cam" | "ctl" | "ticks">, opts: MotionOpts) {
   const now = opts.now ?? (() => performance.now());
-  const reduced = opts.reduced ?? (() => matchMedia("(prefers-reduced-motion: reduce)").matches);
+  // One MediaQueryList for the controller's life, made on first use and read
+  // per frame — not a new query each tick of an ease.
+  let mq: MediaQueryList | undefined;
+  const reduced = opts.reduced ?? (() => (mq ??= matchMedia(REDUCED_MOTION_QUERY)).matches);
   let w = 0, phase = 0, last = now();
   let base: Sph | null = null; // the rest pose, while the ∞ is (partly) on
   let tween: { from: number; to: number; t0: number } | null = null;

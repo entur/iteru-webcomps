@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -49,6 +48,8 @@ import {
 import { vehicleSeed, vehicleTypeSeed } from "./initDataSets";
 import { BusView, type BusViewMode } from "./BusView";
 import type { BusMotion } from "./busMotion";
+import { useSettledState, useSize } from "./hooks";
+import { REDUCED_MOTION_QUERY } from "../shared/motion";
 import { vehicleLayout, vehicleTypeLayout } from "./initLayouts";
 import { installStoriesMock, setMockLatency } from "./mockEndpoint";
 import { captionSlots, formLookArgs, formLookArgTypes, widthsOf, type FormLookArgs } from "./formControls";
@@ -85,6 +86,8 @@ const PICKERS_ID = "fullpage-record-pickers";
 /** Gap between the pinned header and the collapsed bar floating below it, px. */
 const FLOAT_GAP_PX = 16,
   FLOAT_MAX_WIDTH = 220;
+/** How long the form's value must hold before the 3D preview follows it. */
+const PREVIEW_SETTLE_MS = 250;
 /** Theme spacing above the 3D column: the form's heading (h6, 32px) plus its
  *  margin, so the two panels start level. */
 const BUS_COLUMN_TOP = 6;
@@ -203,24 +206,6 @@ const recordIds = (seed: Record<string, Rec>, current: string): string[] => {
   return current && current !== NEW_KEY && !ids.includes(current) ? [...ids, current] : ids;
 };
 
-/**
- * Live border-box height of the element the returned ref lands on — the pinned
- * header wraps onto a second row on narrow screens, so offsets below it can't
- * be a constant. React 19 runs the ref's returned cleanup on detach.
- *
- * @returns a callback ref and the current height in px (0 until measured)
- */
-const useHeight = (): [(el: HTMLElement | null) => (() => void) | undefined, number] => {
-  const [height, setHeight] = useState(0);
-  const ref = useCallback((el: HTMLElement | null) => {
-    if (!el) return undefined;
-    const ro = new ResizeObserver(([e]) => setHeight(e.borderBoxSize[0].blockSize));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  return [ref, height];
-};
-
 /** Whether the record pickers show (`expanded`) or fold into a toggle bar. */
 type ToolbarState = "expanded" | "collapsed";
 
@@ -322,7 +307,9 @@ const GqlHostPage = ({
   const toc = tocVariant === "auto" ? (narrow ? "dropdown" : "list") : tocVariant;
   // Toolbar + (narrow) TOC dropdown stay pinned, so the TOC's scroll feedback
   // stays in sight; the list column and scrolled-to sections sit below it.
-  const [headerRef, headerHeight] = useHeight();
+  // The pinned header wraps onto a second row on narrow screens, so offsets
+  // below it can't be a constant.
+  const [headerRef, { h: headerHeight }] = useSize();
   const { captions } = look;
   const slotProps = useMemo(
     () => ({ ...captionSlots(captions), ...tabSlotProps(variant, tabStyle) }),
@@ -332,21 +319,25 @@ const GqlHostPage = ({
   const widths = widthsOf(look);
   const [selection, setSelection] = useState<Selection | null>(DEFAULT_SELECTION);
   // The open record as the form holds it — load, edits and refetch — so the
-  // preview follows unsaved edits. Cleared on a record switch.
-  const [liveValue, setLiveValue] = useState<Rec | undefined>(undefined);
+  // preview follows unsaved edits. Settled here, at the source: a keystroke
+  // re-renders nothing until the typing pauses, and the preview gets one
+  // committed value to derive everything from. A load's arrival (from nothing)
+  // and a record switch commit at once.
+  const [liveValue, setLiveValue] = useSettledState<Rec | undefined>(undefined, PREVIEW_SETTLE_MS);
+  // Preview mode and camera: page state, so both survive a record switch
+  // (BusView remounts). Each arg seeds its state, and a changed arg re-seeds
+  // it, as `toolbar` below. Under reduced motion the page never starts a
+  // flight by itself; the reader still can, and then its eases are cuts.
   const [busMode, setBusMode] = useState<BusViewMode>(busView);
-  useEffect(() => setBusMode(busView), [busView]);
-  // Page state, so the camera mode survives a record switch (BusView remounts).
-  // Under reduced motion the page never starts a flight by itself; the reader
-  // still can, and then its eases are cuts.
   const [motion, setMotion] = useState<BusMotion>(() =>
-    matchMedia("(prefers-reduced-motion: reduce)").matches ? "orbit" : busMotion,
+    matchMedia(REDUCED_MOTION_QUERY).matches ? "orbit" : busMotion,
   );
-  const firstMotion = useRef(true);
-  useEffect(() => {
-    if (firstMotion.current) firstMotion.current = false;
-    else setMotion(busMotion); // a changed control is an explicit choice
-  }, [busMotion]);
+  const [busSeed, setBusSeed] = useState({ busView, busMotion });
+  if (busSeed.busView !== busView || busSeed.busMotion !== busMotion) {
+    if (busSeed.busView !== busView) setBusMode(busView);
+    if (busSeed.busMotion !== busMotion) setMotion(busMotion);
+    setBusSeed({ busView, busMotion });
+  }
   // From lg up the preview is a column of its own; below, it sits under the form.
   const busColumn = useMediaQuery(useTheme().breakpoints.up("lg"));
   const [toast, setToast] = useState<SaveToast | null>(null);
@@ -386,7 +377,7 @@ const GqlHostPage = ({
   };
 
   const selectRecord = (entity: entity, netexId?: string) => {
-    setLiveValue(undefined);
+    setLiveValue(undefined, true);
     setSelection({ entity, netexId });
   };
 
@@ -403,29 +394,21 @@ const GqlHostPage = ({
   const tocDropdown = toc === "dropdown" && session.toc.sections.length > 0;
   const recordKey = selection ? `${selection.entity}:${selection.netexId ?? NEW_KEY}` : "";
   // A Vehicle is drawn over the type it references, served from the same seed
-  // the mock answers with.
-  const busType =
-    selection?.entity === "vehicle"
-      ? vehicleTypeSeed[(liveValue as Vehicle | undefined)?.transportType?.netexId ?? ""]
-      : (liveValue as VehicleType | undefined);
-  const busResult: BusInputResult | null = !selection
-    ? null
-    : selection.entity === "vehicle" && !busType
-      ? { ok: false, missing: ["transportType"] }
-      : toBusInput(busType ?? {}, selection.entity === "vehicle" ? (liveValue as Vehicle) : undefined);
+  // the mock answers with. Memoised on the committed value, so an unrelated
+  // page render hands the preview the same input and never rebuilds the bus.
+  const busResult = useMemo((): BusInputResult | null => {
+    if (!selection) return null;
+    if (selection.entity === "vehicleType") return toBusInput(liveValue as VehicleType | undefined);
+    const vehicle = (liveValue ?? {}) as Vehicle;
+    return toBusInput(vehicleTypeSeed[vehicle.transportType?.netexId ?? ""], vehicle);
+  }, [selection, liveValue]);
   const preview = (
     <BusView
       key={recordKey}
       result={busResult}
-      lengthM={busType?.length}
       // An existing record with nothing from the form yet is mid-load (the
       // form shows its skeleton); a new one has nothing to load.
       loading={!!selection?.netexId && !liveValue}
-      missingWhere={
-        selection?.entity === "vehicle" && busType
-          ? `on this Vehicle or its VehicleType ${busType.netexId}`
-          : undefined
-      }
       mode={busMode}
       onModeChange={setBusMode}
       motion={motion}
@@ -630,7 +613,7 @@ const GqlHostPage = ({
                     layout={layout}
                     skeletonProps={skeletonProps}
                     session={session}
-                    onChange={setLiveValue}
+                    onChange={(v) => setLiveValue(v, liveValue === undefined)}
                     onSaved={(id) => {
                       setSelection({ entity: selection.entity, netexId: id });
                       setToast({ msg: `Saved ${id}`, severity: "success" });

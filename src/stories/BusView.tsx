@@ -3,6 +3,10 @@
  * PNG shot (`mkStageShot`) and a live three.js canvas (`mkStage`), over a box
  * that fills the width it is given. The input comes from `toBusInput`; what it
  * lacks, or what 3dbus rejects, is listed instead of drawing a bus.
+ *
+ * Takes the result as given: the host settles its edits before handing them
+ * over, and the result carries its own length check, so nothing here can pair
+ * an input with a length from another record.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -29,20 +33,22 @@ import {
   total,
   validate,
   type BusGroup,
+  type ShotStage,
+  type Stage,
 } from "@entur/iteru-3dbus";
-import type { BusInput, BusInputResult } from "../index";
+import type { BusInput, BusInputResult, MissingField } from "../index";
 import { humanize } from "../shared/humanize";
+import { REDUCED_MOTION_MEDIA } from "../shared/motion";
 import { UNIT_LABELS } from "./initLayouts";
 import { mkMotion, type BusMotion } from "./busMotion";
+import { useSize } from "./hooks";
 
 /** `bitmap` = a PNG of the scene; `3d` = the live, orbitable canvas. */
 export type BusViewMode = "bitmap" | "3d";
 
-// Box shape, edit settle time, and how far the type's own length may sit from
-// the sections' sum (rounding of metres) before it is flagged.
-const ASPECT = "16 / 10", SETTLE_MS = 250, LENGTH_TOLERANCE_MM = 10;
-// A PNG is shot at the box's device pixels, capped so a 4K screen stays cheap.
-const MAX_DPR = 2;
+// Box shape, and how long a resize must hold before the PNG is shot again
+// (each shot is a fresh WebGL context, so not one per pixel of a drag).
+const ASPECT = "16 / 10", RESHOOT_MS = 250;
 const VIEW = "quarter";
 // The in-canvas camera control: inset from the corner (px) and how much of the
 // scene shows through it.
@@ -51,33 +57,6 @@ const CONTROL_INSET = 8, CONTROL_OPACITY = 0.92;
  *  out of contexts): the preview fails alone, never the page around it. */
 const NO_WEBGL = "No 3D here: the browser could not create a WebGL context.";
 const LOADING_LABEL = "Loading preview";
-// MUI's wave ships no reduced-motion guard of its own (as in FormSkeleton).
-const REDUCED = "@media (prefers-reduced-motion: reduce)";
-
-/** A value that only follows `v` once it has held still for `ms`. */
-const useSettled = <T,>(v: T, ms: number): T => {
-  const [settled, setSettled] = useState(v);
-  useEffect(() => {
-    const t = setTimeout(() => setSettled(v), ms);
-    return () => clearTimeout(t);
-  }, [v, ms]);
-  return settled;
-};
-
-/** The element's content size, kept current. */
-const useSize = (): [(el: HTMLDivElement | null) => void, { w: number; h: number }] => {
-  const [el, setEl] = useState<HTMLDivElement | null>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
-  useEffect(() => {
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) =>
-      setSize({ w: Math.round(e.contentRect.width), h: Math.round(e.contentRect.height) }),
-    );
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [el]);
-  return [setEl, size];
-};
 
 /** Centre a fresh bus on the origin (3dbus puts the front at x = 0). */
 const build = (inp: BusInput): { group: BusGroup; len: number } => {
@@ -86,14 +65,12 @@ const build = (inp: BusInput): { group: BusGroup; len: number } => {
   return { group, len };
 };
 
-/** One live stage, the bus it shows, and whether it is still undisposed. */
+/** One live stage and the bus it shows (`cur.group` null until the first). */
 type Scene = {
-  stage: ReturnType<typeof mkStage>;
+  stage: Stage;
   go: ReturnType<typeof mkViews>;
   cur: { group: BusGroup | null; len: number };
   motion: ReturnType<typeof mkMotion>;
-  framed: boolean;
-  live: boolean;
 };
 
 interface LiveProps {
@@ -116,26 +93,24 @@ const Live = ({ inp, motion, onMotionChange }: LiveProps) => {
   report.current = onMotionChange;
 
   useEffect(() => {
-    let stage: Scene["stage"];
+    let stage: Stage;
     try {
       stage = mkStage(box.current!);
     } catch {
       setFailed(true);
       return;
     }
-    const cur: Scene["cur"] = { group: null, len: 0 };
     const s: Scene = {
       stage,
       go: mkViews(stage, () => s.cur),
-      cur,
+      cur: { group: null, len: 0 },
       motion: mkMotion(stage, { onTakeOver: () => report.current("orbit") }),
-      framed: false,
-      live: true,
     };
     scene.current = s;
     return () => {
-      s.live = false;
       s.motion.dispose();
+      // `dispose` frees everything but a model still added: drop it first.
+      if (s.cur.group) stage.drop(s.cur.group);
       stage.dispose();
       scene.current = null;
     };
@@ -144,15 +119,13 @@ const Live = ({ inp, motion, onMotionChange }: LiveProps) => {
   useEffect(() => {
     const s = scene.current;
     if (!s) return;
+    const prev = s.cur.group;
+    if (prev) s.stage.drop(prev);
     const bus = build(inp);
     s.cur = bus;
     s.stage.add(bus.group);
     // Frame the first bus only: an edit keeps whatever view the reader orbited to.
-    if (!s.framed) s.go(VIEW, true);
-    s.framed = true;
-    return () => {
-      if (s.live) s.stage.drop(bus.group);
-    };
+    if (!prev) s.go(VIEW, true);
   }, [inp]);
 
   // After the framing above, so a flight starts from the framed view.
@@ -189,17 +162,20 @@ const Live = ({ inp, motion, onMotionChange }: LiveProps) => {
   );
 };
 
-/** The PNG: a throwaway shot stage per input and size, disposed once it has shot. */
-const Shot = ({ inp, w, h, bg }: { inp: BusInput; w: number; h: number; bg: string }) => {
+/**
+ * The PNG: a throwaway shot stage per input and (settled) size, disposed once
+ * it has shot. Sized in CSS px — 3dbus applies the device pixel ratio itself.
+ */
+const Shot = ({ inp, bg }: { inp: BusInput; bg: string }) => {
+  const [boxRef, { w, h }] = useSize(RESHOOT_MS);
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     if (!w || !h) return;
     let current = true, made: string | null = null;
-    const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
-    let stage: ReturnType<typeof mkStageShot>;
+    let stage: ShotStage;
     try {
-      stage = mkStageShot({ w: Math.round(w * dpr), h: Math.round(h * dpr), bg });
+      stage = mkStageShot({ w, h, bg });
     } catch {
       setFailed(true);
       return;
@@ -227,30 +203,36 @@ const Shot = ({ inp, w, h, bg }: { inp: BusInput; w: number; h: number; bg: stri
   }, [inp, w, h, bg]);
 
   if (failed) return <Alert severity="error">{NO_WEBGL}</Alert>;
-  return url ? (
-    <Box
-      component="img"
-      src={url}
-      alt="Bus, three-quarter view"
-      data-bus-view="bitmap"
-      sx={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-    />
-  ) : null;
+  return (
+    <Box ref={boxRef} sx={{ position: "absolute", inset: 0 }}>
+      {url && (
+        <Box
+          component="img"
+          src={url}
+          alt="Bus, three-quarter view"
+          data-bus-view="bitmap"
+          sx={{ width: "100%", height: "100%", display: "block" }}
+        />
+      )}
+    </Box>
+  );
 };
 
 const labelOf = (key: string): string =>
   (UNIT_LABELS as Record<string, string>)[key] ?? humanize(key);
 
+/** "on the VehicleType: Manufacturer; on the Vehicle: Base colour" — grouped
+ *  by the form that fills them, in the order they were reported. */
+const phrase = (missing: MissingField[]): string =>
+  [...new Set(missing.map(m => m.on))]
+    .map(on => `on the ${on}: ${missing.filter(m => m.on === on).map(m => labelOf(m.key)).join(", ")}`)
+    .join("; ");
+
 export interface BusViewProps {
   /** `toBusInput`'s result for the open record; `null` = nothing selected. */
   result: BusInputResult | null;
-  /** The type's own `length` in metres, checked against the sections' sum. */
-  lengthM?: number | null;
   /** The record is still loading: a skeleton stands in, not a missing-data note. */
   loading?: boolean;
-  /** Where the missing values live, when that is not the open form — a
-   *  Vehicle is drawn over its type, so most of them are the type's. */
-  missingWhere?: string;
   mode: BusViewMode;
   onModeChange: (mode: BusViewMode) => void;
   /** The live canvas's camera: the reader's (`orbit`) or the ∞ flight. */
@@ -265,41 +247,12 @@ export interface BusViewProps {
  * @param props see {@link BusViewProps}
  * @returns an outlined panel as wide as its parent
  */
-export function BusView({
-  result,
-  lengthM,
-  loading = false,
-  missingWhere,
-  mode,
-  onModeChange,
-  motion,
-  onMotionChange,
-}: BusViewProps) {
+export function BusView({ result, loading = false, mode, onModeChange, motion, onMotionChange }: BusViewProps) {
   const bg = useTheme().palette.background.paper;
-  // Keystrokes reach here through the form's onChange; let them settle, and
-  // key on content so an equal input never rebuilds the bus. Everything that
-  // is shown together settles together — the input, the type's length, the
-  // loading flag — or a flip of the type would check the new length against
-  // the old sections for a frame. A load that has just landed shows at once.
-  const [view, setView] = useState({ key: "", loading });
-  const settledKey = useSettled(
-    JSON.stringify({ result, lengthM: lengthM ?? null, loading }),
-    view.loading ? 0 : SETTLE_MS,
-  );
-  const settled = useMemo(
-    () =>
-      JSON.parse(settledKey) as { result: BusInputResult | null; lengthM: number | null; loading: boolean },
-    [settledKey],
-  );
-  if (view.key !== settledKey) setView({ key: settledKey, loading: settled.loading });
-  const res = settled.loading ? null : settled.result;
+  const res = loading ? null : result;
   const inp = res?.ok ? res.inp : null;
   const errors = useMemo(() => (inp ? validate(inp) : []), [inp]);
-  const [boxRef, size] = useSize();
-
-  const len = settled.lengthM;
-  const sum = inp && !errors.length ? total(inp) : null;
-  const drift = sum !== null && len !== null && Math.abs(len * 1000 - sum) > LENGTH_TOLERANCE_MM;
+  const drift = res?.ok && !errors.length ? res.lengthDrift : undefined;
 
   return (
     <Paper variant="outlined" sx={{ minWidth: 0, overflow: "hidden" }}>
@@ -335,12 +288,13 @@ export function BusView({
         </ToggleButtonGroup>
       </Box>
 
-      {settled.loading && (
+      {loading && (
         <Box
           role="status"
           aria-busy="true"
           aria-label={LOADING_LABEL}
-          sx={{ [REDUCED]: { "& .MuiSkeleton-root": { animation: "none" } } }}
+          // MUI's wave ships no reduced-motion guard of its own.
+          sx={{ [REDUCED_MOTION_MEDIA]: { "& .MuiSkeleton-root": { animation: "none" } } }}
         >
           <Skeleton
             variant="rectangular"
@@ -352,8 +306,7 @@ export function BusView({
       )}
       {res && !res.ok && (
         <Alert severity="info" sx={{ m: 2 }}>
-          Fill in to draw the bus: {res.missing.map(labelOf).join(", ")}
-          {missingWhere ? ` (${missingWhere})` : ""}.
+          Fill in to draw the bus — {phrase(res.missing)}.
         </Alert>
       )}
       {errors.length > 0 && (
@@ -368,21 +321,21 @@ export function BusView({
       )}
       {drift && (
         <Alert severity="warning" sx={{ mx: 2, mt: 2 }}>
-          Length is {len} m, but the sections add up to {sum! / 1000} m.
+          Length is {drift.stated} m, but the sections add up to {drift.sections} m.
         </Alert>
       )}
-      {!settled.loading && !res && (
+      {!loading && !res && (
         <Typography color="text.secondary" sx={{ m: 2 }}>
           Select a record to preview it.
         </Typography>
       )}
 
       {inp && !errors.length && (
-        <Box ref={boxRef} sx={{ position: "relative", width: "100%", aspectRatio: ASPECT }}>
+        <Box sx={{ position: "relative", width: "100%", aspectRatio: ASPECT }}>
           {mode === "3d" ? (
             <Live inp={inp} motion={motion} onMotionChange={onMotionChange} />
           ) : (
-            <Shot inp={inp} w={size.w} h={size.h} bg={bg} />
+            <Shot inp={inp} bg={bg} />
           )}
         </Box>
       )}

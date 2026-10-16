@@ -13,6 +13,9 @@ const SCHEMA_VERSION = '2.0';
 const MM_PER_M = 1000;
 /** At most this many door hints per section (`doors_hint.maxItems`). */
 const MAX_DOORS = 4;
+/** How far the type's own `length` may sit from its sections' sum (metres
+ *  rounded to mm on both sides) before it is reported as drift. */
+const LENGTH_TOLERANCE_MM = 10;
 /** `meta.netex_vehicle_type_ref` pattern; an id that does not match is left out. */
 const TYPE_REF = /^[A-Z]{3}:VehicleType:[A-Za-z0-9_-]+$/;
 
@@ -60,12 +63,25 @@ export type BusInput = {
   meta?: { netex_vehicle_type_ref?: string; fleet_number?: string };
 };
 
-/** Either a bus input ready for `validate`, or the registry keys it still needs. */
-export type BusInputResult = { ok: true; inp: BusInput } | { ok: false; missing: string[] };
+/** A required value with no source: its registry key, and the entity whose
+ *  form fills it — a Vehicle's own geometry wins over its type's, so for a
+ *  Vehicle render those keys are the Vehicle's to fill. */
+export type MissingField = { key: string; on: 'VehicleType' | 'Vehicle' };
+
+/** The type's stated `length` against the sum of its sections and bellows, in
+ *  metres — set only when they disagree. */
+export type LengthDrift = { stated: number; sections: number };
+
+/** Either a bus input ready for `validate` (with any length drift beside it),
+ *  or what it still needs. One value, so a view can never pair an input with
+ *  a length from a different record. */
+export type BusInputResult =
+  | { ok: true; inp: BusInput; lengthDrift?: LengthDrift }
+  | { ok: false; missing: MissingField[] };
 
 const mm = (m: number): number => Math.round(m * MM_PER_M);
 const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
-const text = (s: string | null | undefined): string | undefined => (s?.trim() ? s.trim() : undefined);
+const text = (s: string | null | undefined): string | undefined => s?.trim() || undefined;
 /** Drop the `undefined` members: 3dbus rejects unknown keys and `undefined` values alike. */
 const defined = <T extends object>(o: T): T =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
@@ -89,14 +105,27 @@ export function doorHints(doors: number | null | undefined, axles: number): Door
   return slots.slice(0, Math.min(doors, MAX_DOORS)).map(s => ({ ...s, leaves }));
 }
 
-const toSection = (s: BusSection): BusInputSection =>
-  defined({
+const toSection = (s: BusSection): BusInputSection => {
+  const axles = (s.axles ?? []).filter(isNum);
+  return defined({
     length_mm: mm(s.length ?? 0),
-    axles_mm: (s.axles ?? []).filter(isNum).map(mm),
+    axles_mm: axles.map(mm),
     bellows_ahead_mm: isNum(s.bellowsAhead) ? mm(s.bellowsAhead) : undefined,
     windows_hint: isNum(s.windowCount) ? { count: s.windowCount } : undefined,
-    doors_hint: doorHints(s.doors, (s.axles ?? []).filter(isNum).length),
+    doors_hint: doorHints(s.doors, axles.length),
   });
+};
+
+/** Sections plus bellows, in mm — what 3dbus `total` measures. */
+const sumMm = (sections: BusInputSection[]): number =>
+  sections.reduce((n, s) => n + s.length_mm + (s.bellows_ahead_mm ?? 0), 0);
+
+const driftOf = (length: unknown, sections: BusInputSection[]): LengthDrift | undefined => {
+  const sum = sumMm(sections);
+  return isNum(length) && Math.abs(mm(length) - sum) > LENGTH_TOLERANCE_MM
+    ? { stated: length, sections: sum / MM_PER_M }
+    : undefined;
+};
 
 /**
  * Build the 3dbus input for a VehicleType, or for a Vehicle drawn over its type.
@@ -105,13 +134,17 @@ const toSection = (s: BusSection): BusInputSection =>
  * name; `width_mm` / `height_mm` from the type; `tyre`, `base_color`,
  * `roof_equipment_mm` and `sections` from the Vehicle when set, else the type;
  * `front_display` = the drawn entity's name; `body` from the section count.
- * Required values with no source come back in `missing`, as registry keys.
+ * Required values with no source come back in `missing`, each with the
+ * entity whose form fills it; a Vehicle with no type lacks `transportType`.
+ * The type's `length` is checked against the sections it is drawn with.
  *
- * @param vt the VehicleType (for a Vehicle render: the one it references)
+ * @param vt the VehicleType (for a Vehicle render: the one it references, or
+ *   `undefined` when there is none)
  * @param v  the Vehicle, when drawing one; its geometry wins over `vt`'s
- * @returns the input, or the keys still to fill
+ * @returns the input and any length drift, or what is still to fill
  */
-export function toBusInput(vt: Partial<VehicleType>, v?: Partial<Vehicle>): BusInputResult {
+export function toBusInput(vt: Partial<VehicleType> | undefined, v?: Partial<Vehicle>): BusInputResult {
+  if (!vt) return v ? { ok: false, missing: [{ key: 'transportType', on: 'Vehicle' }] } : toBusInput({});
   const sections = (v?.sections?.length ? v.sections : vt.sections)?.filter((s): s is BusSection => !!s) ?? [];
   const tyre = v?.tyreDiameter ?? vt.tyreDiameter;
   const roof = v?.roofEquipment ?? vt.roofEquipment;
@@ -119,21 +152,30 @@ export function toBusInput(vt: Partial<VehicleType>, v?: Partial<Vehicle>): BusI
   const brand = text(vt.manufacturer);
   const model = text(vt.modelName) ?? text(vt.name?.value);
 
-  const missing = [
-    !brand && 'manufacturer',
-    !model && 'modelName',
-    !isNum(vt.width) && 'width',
-    !isNum(vt.height) && 'height',
-    !isNum(tyre) && 'tyreDiameter',
-    !hex && 'baseColor',
-    !sections.length && 'sections',
-  ].filter((k): k is string => !!k);
+  // Type-only values are the type's to fill; the overridable geometry is the
+  // drawn entity's.
+  const own = v ? 'Vehicle' : 'VehicleType';
+  const missing = (
+    [
+      [!brand, 'manufacturer', 'VehicleType'],
+      [!model, 'modelName', 'VehicleType'],
+      [!isNum(vt.width), 'width', 'VehicleType'],
+      [!isNum(vt.height), 'height', 'VehicleType'],
+      [!isNum(tyre), 'tyreDiameter', own],
+      [!hex, 'baseColor', own],
+      [!sections.length, 'sections', own],
+    ] as const
+  )
+    .filter(([lacks]) => lacks)
+    .map(([, key, on]): MissingField => ({ key, on }));
   if (missing.length) return { ok: false, missing };
 
   const fleet = text(v?.operationalNumber);
   const ref = vt.netexId && TYPE_REF.test(vt.netexId) ? vt.netexId : undefined;
-  return {
-    ok: true,
+  const busSections = sections.map(toSection);
+  return defined({
+    ok: true as const,
+    lengthDrift: driftOf(vt.length, busSections),
     inp: defined({
       schema_version: SCHEMA_VERSION,
       brand: brand!,
@@ -147,8 +189,8 @@ export function toBusInput(vt: Partial<VehicleType>, v?: Partial<Vehicle>): BusI
       tyre: { diameter_mm: mm(tyre!) },
       base_color: { hex: hex! },
       front_display: text((v ?? vt).name?.value),
-      sections: sections.map(toSection),
+      sections: busSections,
       meta: ref || fleet ? defined({ netex_vehicle_type_ref: ref, fleet_number: fleet }) : undefined,
     }),
-  };
+  });
 }

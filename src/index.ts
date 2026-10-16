@@ -45,8 +45,8 @@ export type { Section, ResolvedField } from './EntityDetailsForm/utils/sections'
 export * from './EntityDetailsForm/formImpls';
 // VehicleType / Vehicle → @entur/iteru-3dbus input. Pure: the package itself is
 // not imported, so a host that draws no bus pulls in no three.js.
-export { toBusInput, doorHints } from './BusInput';
-export type { BusInput, BusInputResult, BusInputSection, DoorHint } from './BusInput';
+export { toBusInput } from './BusInput';
+export type { BusInput, BusInputResult, BusInputSection, DoorHint, LengthDrift, MissingField } from './BusInput';
 export type {
   EntityDetailsFormProps,
   EntityDetailsForm,

@@ -32,7 +32,17 @@ describe('toBusInput — seeds', () => {
   });
 
   it('reports a missing make instead of inventing one', () => {
-    expect(toBusInput({ ...BUSNORDIC, manufacturer: undefined })).toEqual({ ok: false, missing: ['manufacturer'] });
+    expect(toBusInput({ ...BUSNORDIC, manufacturer: undefined })).toEqual({
+      ok: false,
+      missing: [{ key: 'manufacturer', on: 'VehicleType' }],
+    });
+  });
+
+  it('reports no length drift for any seed — each states the length its sections add up to', () => {
+    for (const vt of Object.values(vehicleTypeSeed)) {
+      const r = toBusInput(vt);
+      expect(r.ok && r.lengthDrift).toBeUndefined();
+    }
   });
 });
 
@@ -90,13 +100,40 @@ describe('toBusInput — mapping', () => {
     expect(inp).not.toHaveProperty('meta');
   });
 
-  it('lists every required source that is empty, as registry keys', () => {
-    expect(toBusInput({})).toEqual({
-      ok: false,
-      missing: ['manufacturer', 'modelName', 'width', 'height', 'tyreDiameter', 'baseColor', 'sections'],
-    });
+  it('lists every required source that is empty, with the form that fills it', () => {
+    const keys = ['manufacturer', 'modelName', 'width', 'height', 'tyreDiameter', 'baseColor', 'sections'];
+    expect(toBusInput({})).toEqual({ ok: false, missing: keys.map(key => ({ key, on: 'VehicleType' })) });
     // A name stands in for a model name; blank text counts as empty.
-    expect(toBusInput({ ...VOLVO, modelName: ' ', baseColor: '' })).toEqual({ ok: false, missing: ['baseColor'] });
+    expect(toBusInput({ ...VOLVO, modelName: ' ', baseColor: '' })).toEqual({
+      ok: false,
+      missing: [{ key: 'baseColor', on: 'VehicleType' }],
+    });
+  });
+
+  it("puts a Vehicle's own geometry on the Vehicle, and type-only values on its type", () => {
+    const bare = { ...VOLVO, manufacturer: undefined, baseColor: undefined };
+    expect(toBusInput(bare, {})).toEqual({
+      ok: false,
+      missing: [
+        { key: 'manufacturer', on: 'VehicleType' },
+        { key: 'baseColor', on: 'Vehicle' },
+      ],
+    });
+  });
+
+  it('asks a Vehicle with no type for one', () => {
+    expect(toBusInput(undefined, { name: { value: 'Unit 9' } })).toEqual({
+      ok: false,
+      missing: [{ key: 'transportType', on: 'Vehicle' }],
+    });
+  });
+
+  it("reports drift between the type's length and its sections, in metres", () => {
+    const r = toBusInput({ ...CITARO, length: 20 });
+    expect(r.ok && r.lengthDrift).toEqual({ stated: 20, sections: 18.2 });
+    // A Vehicle's own sections are what the type's length is checked against.
+    const v = toBusInput(VOLVO, { sections: [{ length: 10, axles: [2, 8] }] });
+    expect(v.ok && v.lengthDrift).toEqual({ stated: 12.396, sections: 10 });
   });
 });
 

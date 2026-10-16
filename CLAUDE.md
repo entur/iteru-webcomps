@@ -380,7 +380,11 @@ Vehicle's `tyreDiameter` / `baseColor` / `roofEquipment` / `sections` win over
 the type's; `brand`/`model`/`width`/`height` are the type's; `front_display`
 is the drawn entity's name; `body` from the section count. **Nothing that
 changes the render is invented**: a required value with no source comes back
-as `{ ok: false, missing: [registry keys] }`. Unset keys are left out, never
+as `{ ok: false, missing: [{ key, on }] }` — `on` the form that fills it (a
+Vehicle's own geometry is the Vehicle's; `vt: undefined` with a Vehicle →
+`transportType`). An ok result carries `lengthDrift` (metres) when the type's
+`length` disagrees with the sections it is drawn with — one value, so a view
+can never pair an input with another record's length. Unset keys are left out, never
 `undefined` (3dbus rejects unknown root keys). `BusSection.doors` (a count) →
 `doors_hint` via `doorHints`: slots front overhang → each axle gap → rear
 overhang, first N; one door single-leaf, more double; glazed/bias default.
@@ -391,13 +395,16 @@ which caps the bus at 9.5 m rigid) — entur/iteru-3dbus#39. Tests run the real
 
 The Fullpage story's preview (`src/stories/BusView.tsx`) is column 3 from `lg`
 (under the form below it): header toggle bitmap (`mkStageShot` → PNG) | 3D
-(`mkStage`), fed by the form's `onChange`, so unsaved edits redraw (settled
-250 ms, keyed on content). **Everything shown together settles together** —
-the input, the type's length and the loading flag go through one settle, or a
-flip of a Vehicle's type checks the new length against the old sections for a
-frame (pinned by `BusView.test.tsx`, 3dbus mocked). An existing record with no
-value from the form yet is loading: a wave skeleton the canvas's shape, not a
-missing-data note; its arrival skips the settle. One live stage per mount, the bus swapped per input,
+(`mkStage`), fed by the form's `onChange`, so unsaved edits redraw. **Settled
+at the source**: the page commits the form's value after 250 ms
+(`useSettledState`, `src/stories/hooks.ts`; a load's arrival and a record
+switch commit at once), so a keystroke re-renders nothing, and the result is
+memoised on that committed value — BusView takes it as given and settles
+nothing itself. An existing record with no value yet is loading: a wave
+skeleton the canvas's shape, not a missing-data note. The bitmap measures its
+own box (`useSize`, settled, so a resize drag re-shoots once) in CSS px —
+3dbus applies the pixel ratio. Unmount drops the bus before `dispose` (which
+frees all but a model still added). `BusView.test.tsx` pins these, 3dbus mocked. One live stage per mount, the bus swapped per input,
 framed once per record (BusView is keyed by record). No WebGL (off, or out of
 contexts) → an alert in the column; it must never throw into the page.
 Camera (`src/stories/busMotion.ts`, unit-tested without WebGL): `orbit` | 
