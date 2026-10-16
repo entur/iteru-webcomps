@@ -24,7 +24,7 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import StorageIcon from "@mui/icons-material/Storage";
 import {
   EditFooter,
   SaveSnackbar,
@@ -216,6 +216,8 @@ type ToolbarState = "expanded" | "collapsed";
 
 /**
  * Disclosure button for the record pickers, named by the action it takes.
+ * Folded, it is the floated bar's only way back to the mock data, so it shows
+ * a database icon there; open, the chevron that folds the pickers away.
  *
  * @param props.expanded whether the pickers currently show
  * @param props.onToggle flips the state
@@ -240,7 +242,7 @@ const ToolbarToggle = ({
     title={expanded ? "Hide record pickers" : "Show record pickers"}
     onClick={onToggle}
   >
-    {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+    {expanded ? <ExpandLessIcon /> : <StorageIcon />}
   </IconButton>
 );
 
@@ -295,7 +297,7 @@ const GqlHostPage = ({
   patched = "mark",
   footerProps,
   skeletonProps,
-  toolbar = "expanded",
+  toolbar = "collapsed",
   ...look
 }: GqlHostPageProps) => {
   // The host picks the TOC's look — it knows the room it gives it; SectionToc
@@ -638,7 +640,7 @@ const meta: Meta<typeof GqlHostPage> = {
     },
     skeletonProps: { ariaLabel: "Loading form" },
     readDelayMs: DEFAULT_READ_DELAY_MS,
-    toolbar: "expanded",
+    toolbar: "collapsed",
     ...formLookArgs,
   },
   argTypes: {
@@ -693,7 +695,7 @@ const meta: Meta<typeof GqlHostPage> = {
       control: "inline-radio",
       options: ["expanded", "collapsed"],
       description:
-        "Story-only: initial toolbar state; the toggle in the page flips it. collapsed = the record pickers fold into a small bar right of the form (wide) or a slim pinned row with the TOC dropdown (below md).",
+        "Story-only: initial toolbar state (default collapsed); the toggle in the page flips it. collapsed = the record pickers fold into a small floated bar right of the form (wide) or a slim pinned row with the TOC dropdown (below md), and the toggle shows a database icon; expanded = the full pickers row.",
     },
   },
 };

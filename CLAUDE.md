@@ -203,7 +203,8 @@ controlled `disabled`/`onClick`) and `sx` are the host's own props on
   in one header whose measured height is both the list column's sticky `top`
   and `html { scroll-padding-top }`, so `scrollIntoView` clears it; the
   toolbar collapses (#55) to a bar in the gutter right of the form, or below
-  `md` to one slim row beside the dropdown, and that height follows).
+  `md` to one slim row beside the dropdown, and that height follows; it starts
+  collapsed, and folded its toggle is a database icon).
 - `serverManaged` fields (`version`, `created`, `changed`, `changedBy`) hidden
   from editable model: locked even in edit, surfaced only to *see* meta/semantic
   context. Backend-owned — **not round-tripped**, never in write payload, don't
