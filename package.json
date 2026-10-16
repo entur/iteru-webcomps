@@ -56,6 +56,7 @@
     "@graphql-codegen/typed-document-node": "^7.1.0",
     "@graphql-codegen/typescript": "^6.0.2",
     "@graphql-codegen/typescript-operations": "^6.1.2",
+    "@microsoft/api-extractor": "^7.59.4",
     "@mui/icons-material": "^7.0.2",
     "@mui/material": "^7.0.2",
     "@mui/x-data-grid": "^8.29.1",
