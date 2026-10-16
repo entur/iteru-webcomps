@@ -11,14 +11,12 @@
 import type { FC } from 'react';
 import { Box, List, ListItemButton, ListItemText, MenuItem, Skeleton, TextField } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material';
-import { REDUCED_MOTION_MEDIA } from '../shared/motion';
+import { STILL_SKELETONS } from '../shared/motion';
 
 /** Width of the rail marking the active entry; the idle rail is the same width,
  *  so selecting an entry never shifts its text. */
 const RAIL_PX = 2;
 const DEFAULT_LABEL = 'Sections';
-// MUI's wave ships no reduced-motion guard of its own.
-const STILL_WAVE = { [REDUCED_MOTION_MEDIA]: { '& .MuiSkeleton-root': { animation: 'none' } } };
 
 /** `list`: one entry per section, the active one railed. `dropdown`: a select
  *  whose value is the active section. */
@@ -84,7 +82,7 @@ export const SectionToc: FC<SectionTocProps> = ({
       aria-label={label}
       aria-busy="true"
       data-nmr-skeleton="toc"
-      sx={[STILL_WAVE, ...(Array.isArray(sx) ? sx : [sx])]}
+      sx={[STILL_SKELETONS, ...(Array.isArray(sx) ? sx : [sx])]}
     >
       {/* Each skeleton wraps the real control, so it takes that control's size:
           the loaded TOC lands exactly where its placeholder stood. */}

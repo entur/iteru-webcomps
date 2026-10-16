@@ -128,7 +128,7 @@ arriving form fades in via `FormArrival`, which wraps the **presentation only**
 — its keyframe animates `transform`, and a transformed ancestor becomes a
 containing block, which would break any sticky descendant for the
 length of the fade. Both honour `prefers-reduced-motion` (the guard also kills
-MUI's `wave`, which ships none). Host reach is `skeletonProps`
+MUI's `wave`, which ships none — `STILL_SKELETONS` in `src/shared/motion.ts`, root *and* `::after`, where the wave runs). Host reach is `skeletonProps`
 (`FormSkeletonHostProps` = `ariaLabel` + `sx`); the shape is deliberately not
 overridable. `Not found` and the load-error branch stay plain text — a skeleton
 means "content is coming", which misreads on a terminal state.
