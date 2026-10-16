@@ -71,10 +71,31 @@ describe('CardsView', () => {
     expect(mediaAreas(container)).toHaveLength(items.length);
     for (const item of items) {
       const area = item.querySelector('[data-card-media]')!;
-      expect(item.firstElementChild).toBe(area);
+      expect(item.firstElementChild?.contains(area)).toBe(true);
       expect(area.childNodes).toHaveLength(0);
       expect(area.getAttribute('aria-hidden')).toBe('true');
     }
+  });
+
+  it('lays a big card\'s title and subtitle over its picture, outside the hidden media', () => {
+    const card = resolveCard(FIELDS, COLS, { title: 'name', subtitle: 'transportMode', fields: ['lowFloor'] });
+    renderCards(ROWS, { size: 'big', card });
+    const first = screen.getAllByRole('listitem')[0];
+    const top = first.firstElementChild!;
+    const heading = top.querySelector('[data-card-heading]')!;
+    expect(within(heading as HTMLElement).getByText('Flirt')).toBeTruthy();
+    expect(within(heading as HTMLElement).getByText('rail')).toBeTruthy();
+    expect(heading.closest('[aria-hidden]')).toBeNull();
+    // Once, in the picture: the text below starts with the fields.
+    expect(within(first).getAllByText('Flirt')).toHaveLength(1);
+    expect(first.querySelector('.MuiCardContent-root')?.firstElementChild?.tagName).toBe('DL');
+  });
+
+  it('keeps a small card\'s heading in its text', () => {
+    renderCards(ROWS);
+    const first = screen.getAllByRole('listitem')[0];
+    expect(first.querySelector('[data-card-heading]')).toBeNull();
+    expect(within(first.querySelector('.MuiCardContent-root') as HTMLElement).getByText('Flirt')).toBeTruthy();
   });
 
   it("puts the host's media in a big card's picture area, exposed", () => {
