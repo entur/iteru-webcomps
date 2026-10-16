@@ -11,7 +11,7 @@ import { toBusInput, type BusInput, type VehicleType } from "../index";
 import { STILL_SKELETONS } from "../shared/motion";
 import { phrase } from "./busScene";
 import { NoWebGL, shotQueueFor } from "./shotQueue";
-import genericVehicle from "./assets/no-render-data.png";
+import genericVehicle from "./assets/no-render-data_320.png";
 
 const LOADING_LABEL = "Rendering preview";
 const NO_PREVIEW = "No 3D preview";

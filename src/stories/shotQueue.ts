@@ -12,7 +12,7 @@ import { build, VIEW } from "./busScene";
 // Shot size in CSS px (3dbus applies the pixel ratio): 16:10, the cards-big
 // picture area's shape. DETAIL is a third of the texture density, about twice
 // as fast, which a card-sized picture doesn't miss.
-export const SHOT_W = 640, SHOT_H = 400;
+export const SHOT_W = 320, SHOT_H = 200;
 const DETAIL = 0.35;
 // Release the stage (its WebGL context) after this long with nothing queued.
 const IDLE_MS = 2_000;

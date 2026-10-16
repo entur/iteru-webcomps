@@ -285,13 +285,13 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   (`VehicleTypeCollection.stories.tsx`) renders the bare component and drives
   `view` / `tools` / `filterMode` from Storybook controls — no wrapper chrome.
 - Two card sizes, one `CardsView` (`size`): `cards-sm` is text only (min
-  260px); `cards-big` is wider (min 400px, capped at the row on a phone) and
+  260px); `cards-big` is wider (min 320px — the shot width — capped at the row on a phone) and
   leaves a 16:10 picture area at the top of every card, filled per row by the
   host's `cardMedia(row)` — an `<img>` there is scaled to fit. Unfilled, the
   area stays blank and `aria-hidden`, so every card keeps the same shape.
   The story fills it: a bus row → `BusShot` (`src/stories/BusShot.tsx`: a
   wave skeleton, then its 3dbus PNG), anything else → the generic picture
-  (`src/stories/assets/no-render-data.png`, 640×400 like the shots), which a bus that can't be drawn also shows, captioned
+  (`src/stories/assets/no-render-data_320.png`, 320×200 like the shots), which a bus that can't be drawn also shows, captioned
   "No 3D preview" with the reason as `title`. Every card shares **one**
   off-screen stage (`src/stories/shotQueue.ts`: serial, cached by input, LRU,
   released after 2 s idle, started a microtask late so one render's cards fail

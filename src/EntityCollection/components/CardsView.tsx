@@ -10,7 +10,7 @@ import { displayValue, EMPTY_TEXT, fullTitle, valueList } from '../utils/values'
 
 // A card never gets narrower than its size's minimum (or the whole row, on a
 // screen narrower than that); the row wraps instead.
-const CARD_MIN_PX = { sm: 260, big: 400 } as const;
+const CARD_MIN_PX = { sm: 260, big: 320 } as const;
 // The picture area a big card leaves at its top: the 3D preview's box shape.
 const MEDIA_ASPECT = '16 / 10';
 const CHIP_KINDS: readonly Column['spec']['kind'][] = ['enum', 'enumMulti'];
