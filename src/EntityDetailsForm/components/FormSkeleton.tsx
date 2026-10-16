@@ -15,6 +15,7 @@ import { Box, Grid, Skeleton, Stack } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material/styles';
 import type { FieldKind, FieldSpec, KindWidths, Layout, LayoutVariant, PatchedDisplay } from '../types';
 import { gridSize, marked, PATCH_MARK_COL_PX, resolveSections } from '../utils/sections';
+import { STILL_SKELETONS } from '../../shared/motion';
 
 // Placeholder geometry. Row heights track the controls they stand in for, so
 // the layout does not jump when the real inputs land.
@@ -97,8 +98,7 @@ export function FormSkeleton({
         {
           width: '100%',
           minWidth: 0,
-          // MUI's wave ships no reduced-motion guard of its own.
-          [REDUCED]: { '& .MuiSkeleton-root': { animation: 'none' } },
+          ...STILL_SKELETONS,
         },
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}

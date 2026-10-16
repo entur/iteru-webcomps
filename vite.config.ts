@@ -40,7 +40,7 @@ const isLibBuild = process.env.npm_lifecycle_event === 'build';
 export default defineConfig({
   plugins: [
     react(),
-    ...(isLibBuild ? [dts({ rollupTypes: true, tsconfigPath: './tsconfig.json' })] : []),
+    ...(isLibBuild ? [dts({ bundleTypes: true, tsconfigPath: './tsconfig.json' })] : []),
   ],
   build: isLibBuild
     ? {

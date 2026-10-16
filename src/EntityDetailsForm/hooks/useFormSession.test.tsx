@@ -9,7 +9,7 @@ import {
   type SessionState,
 } from './useFormSession';
 
-const LIVE: SessionState = { sections: ['A', 'B'], dirty: true, saving: false, editable: true };
+const LIVE: SessionState = { sections: ['A', 'B'], dirty: true, saving: false, editable: true, loading: false };
 
 let latest: FormSession;
 let hostRenders = 0;
@@ -49,6 +49,8 @@ afterEach(() => {
 describe('useFormSession', () => {
   it('is idle with no form connected: no sections, footer disabled, actions inert', () => {
     render(<Host>{() => null}</Host>);
+    expect(latest.loading).toBe(false);
+    expect(latest.toc.loading).toBe(false);
     expect(latest.toc.sections).toEqual([]);
     expect(latest.toc.active).toBeUndefined();
     expect(latest.footer).toMatchObject({ dirty: false, saving: false, disabled: true });
@@ -289,5 +291,45 @@ describe('useFormSession', () => {
       await again;
     });
     await waitFor(() => expect(latest.editable).toBe(true));
+  });
+  it('keeps the TOC through a load: the fallback holds the sections, flagged loading, and hands over', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Stands in for a generated wrapper's Pending: the layout's sections, loading.
+    const Pending = ({ session }: { session: FormSession }) => {
+      useSessionConnection(session, { ...LIVE, dirty: false, editable: false, loading: true, save: () => {}, cancel: () => {} });
+      return null;
+    };
+    const Record = ({ session, promise }: { session: FormSession; promise: Promise<void> }) => {
+      use(promise);
+      useSessionConnection(session, { ...LIVE, save: () => {}, cancel: () => {} });
+      return null;
+    };
+    let release!: () => void;
+    const promise = new Promise<void>(r => (release = r));
+    await act(async () => {
+      render(
+        <Host>
+          {s => (
+            <Suspense fallback={<Pending session={s} />}>
+              <Record session={s} promise={promise} />
+            </Suspense>
+          )}
+        </Host>
+      );
+    });
+    // Mid-load: the sections are there, so a TOC keeps its shape — as a skeleton.
+    expect(latest.toc).toMatchObject({ sections: ['A', 'B'], loading: true });
+    expect(latest.loading).toBe(true);
+    expect(latest.footer.disabled).toBe(true);
+
+    await act(async () => {
+      release();
+      await promise;
+    });
+    await waitFor(() => expect(latest.loading).toBe(false));
+    expect(latest.toc).toMatchObject({ sections: ['A', 'B'], loading: false });
+    expect(latest.editable).toBe(true);
+    // The fallback leaves in the commit the record arrives in: never two live at once.
+    expect(warn).not.toHaveBeenCalled();
   });
 });

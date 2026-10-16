@@ -67,8 +67,17 @@ describe('renderWrapperSource', () => {
     // has to sit inside the boundary, which is why the wrapper splits in two.
     expect(src).toMatch(/import \{ Suspense \} from 'react';/);
     expect(src).toMatch(
-      /<Suspense\s+fallback=\{\s+<FormSkeleton\s+\{\.\.\.skeletonProps\}\s+fields=\{FIELDS\}\s+layout=\{rest\.layout\}\s+variant=\{rest\.variant\}\s+patched=\{rest\.patched\}\s+widths=\{rest\.widths\}\s+\/>\s+\}\s+>\s+<VehicleFormRecord \{\.\.\.rest\} resource=\{resource\} \/>\s+<\/Suspense>/
+      /<Suspense\s+fallback=\{\s+<>\s+<FormSkeleton\s+\{\.\.\.skeletonProps\}\s+fields=\{FIELDS\}\s+layout=\{rest\.layout\}\s+variant=\{rest\.variant\}\s+patched=\{rest\.patched\}\s+widths=\{rest\.widths\}\s+\/>\s+<VehicleFormPending\s+session=\{rest\.session\}\s+layout=\{rest\.layout\}\s+variant=\{rest\.variant\}\s+patched=\{rest\.patched\}\s+\/>\s+<\/>\s+\}\s+>\s+<VehicleFormRecord \{\.\.\.rest\} resource=\{resource\} \/>\s+<\/Suspense>/
     );
+  });
+
+  it('holds the session while loading: the layout\'s sections, flagged loading, nothing to save', () => {
+    // So a host TOC keeps its shape through a load instead of collapsing.
+    expect(src).toMatch(
+      /function VehicleFormPending\([\s\S]*?useSessionConnection\(session, \{\s+sections: tocSections\(FIELDS, layout, variant, patched\),\s+dirty: false,\s+saving: false,\s+editable: false,\s+loading: true,\s+save: NO_ACTION,\s+cancel: NO_ACTION,\s+\}\);/
+    );
+    // The record, once in, says it has landed.
+    expect(src).toMatch(/editable: shown && mode === 'edit',\s+loading: false,/);
   });
 
   it('exposes the skeleton to the host, and fades the arriving form in', () => {

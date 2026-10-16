@@ -17,6 +17,8 @@ import { VehicleInputKeys } from '../../generated/operations/inputKeys';
 import type { EntityDetailsFormProps } from '../types';
 
 const VehicleFormPresentation = createAbstractEntityDetailsForm<Vehicle>(FIELDS);
+/** The pending stand-in offers nothing to save or cancel. */
+const NO_ACTION = () => {};
 
 // Static per entity, so it is built once rather than per render — and both
 // halves of the component below read the same one.
@@ -69,19 +71,49 @@ export function VehicleForm({ skeletonProps, ...rest }: VehicleFormProps) {
   return (
     <Suspense
       fallback={
-        <FormSkeleton
-          {...skeletonProps}
-          fields={FIELDS}
-          layout={rest.layout}
-          variant={rest.variant}
-          patched={rest.patched}
-          widths={rest.widths}
-        />
+        <>
+          <FormSkeleton
+            {...skeletonProps}
+            fields={FIELDS}
+            layout={rest.layout}
+            variant={rest.variant}
+            patched={rest.patched}
+            widths={rest.widths}
+          />
+          <VehicleFormPending
+            session={rest.session}
+            layout={rest.layout}
+            variant={rest.variant}
+            patched={rest.patched}
+          />
+        </>
       }
     >
       <VehicleFormRecord {...rest} resource={resource} />
     </Suspense>
   );
+}
+
+/** Holds the record's place in the session while it loads: the sections are
+ *  the layout's, so a host TOC keeps its shape (drawn as a skeleton) instead
+ *  of collapsing and coming back. Unmounts as the record reveals, in the same
+ *  commit the record connects in. */
+function VehicleFormPending({
+  session,
+  layout,
+  variant,
+  patched,
+}: Pick<VehicleFormProps, 'session' | 'layout' | 'variant' | 'patched'>) {
+  useSessionConnection(session, {
+    sections: tocSections(FIELDS, layout, variant, patched),
+    dirty: false,
+    saving: false,
+    editable: false,
+    loading: true,
+    save: NO_ACTION,
+    cancel: NO_ACTION,
+  });
+  return null;
 }
 
 /** The record itself. Split out so the suspending half sits *inside* the
@@ -122,6 +154,7 @@ function VehicleFormRecord(
     dirty,
     saving,
     editable: shown && mode === 'edit',
+    loading: false,
     save: handleSave,
     cancel: reset,
   });

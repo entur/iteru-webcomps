@@ -128,7 +128,7 @@ arriving form fades in via `FormArrival`, which wraps the **presentation only**
 — its keyframe animates `transform`, and a transformed ancestor becomes a
 containing block, which would break any sticky descendant for the
 length of the fade. Both honour `prefers-reduced-motion` (the guard also kills
-MUI's `wave`, which ships none). Host reach is `skeletonProps`
+MUI's `wave`, which ships none — `STILL_SKELETONS` in `src/shared/motion.ts`, root *and* `::after`, where the wave runs). Host reach is `skeletonProps`
 (`FormSkeletonHostProps` = `ariaLabel` + `sx`); the shape is deliberately not
 overridable. `Not found` and the load-error branch stay plain text — a skeleton
 means "content is coming", which misreads on a terminal state.
@@ -144,8 +144,19 @@ only), `dirty`, `saving`, `editable` (record branch rendered and
 `mode === 'edit'`; Not-found / load-error / view are not), and registers
 `handleSave` / `reset` into refs, so their per-edit identity never re-renders
 the host. Connect and publish run in **layout effects**, so the publish lands
-before paint, and when Suspense hides an already-mounted record (netexId / org
-change without a key remount) the session goes idle and reconnects on reveal.
+before paint. **While a record loads, the wrapper's Suspense fallback holds its
+place**: `<Entity>FormPending` publishes the layout's `tocSections` with
+`loading: true` (nothing editable, nothing to save), so a host TOC keeps its
+shape instead of collapsing and coming back — `SectionToc`'s `loading` draws
+each entry as a skeleton wrapping its own label (the dropdown: wrapping the
+field), so the loaded TOC lands where its placeholder stood. The fallback
+leaves in the commit the record connects in (unmount cleanups run before new
+layout effects), so there is never a second live form. `session.loading` /
+`toc.loading` is that flag — a direct load signal for the host, unlike
+inferring one from a missing `onChange` value,
+which cannot tell a slow record from a missing one. When Suspense hides an
+already-mounted record (netexId / org change without a key remount), the
+record disconnects and the fallback reconnects in its stead.
 `footer.onSave` / `onCancel` forward only when the form is `editable`, dirty and
 not saving (view, Not-found, load error, nothing connected, a clean form and an
 in-flight save are all inert), so a host binding them to Ctrl+S can neither
@@ -192,7 +203,8 @@ controlled `disabled`/`onClick`) and `sx` are the host's own props on
   in one header whose measured height is both the list column's sticky `top`
   and `html { scroll-padding-top }`, so `scrollIntoView` clears it; the
   toolbar collapses (#55) to a bar in the gutter right of the form, or below
-  `md` to one slim row beside the dropdown, and that height follows).
+  `md` to one slim row beside the dropdown, and that height follows; it starts
+  collapsed, and folded its toggle is a database icon).
 - `serverManaged` fields (`version`, `created`, `changed`, `changedBy`) hidden
   from editable model: locked even in edit, surfaced only to *see* meta/semantic
   context. Backend-owned — **not round-tripped**, never in write payload, don't

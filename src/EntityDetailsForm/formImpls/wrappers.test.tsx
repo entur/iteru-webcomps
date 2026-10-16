@@ -441,6 +441,23 @@ describe.each(manifest.map(e => [e.entity, e] as const))(
       );
     });
 
+    it('keeps the TOC through a load, as a skeleton of the same sections', async () => {
+      mockFns.request.mockReturnValueOnce(new Promise(() => {}));
+
+      await mount(
+        <Hosted Form={Form} netexId={NETEX_ID} layout={twoSections} variant="stacked" />
+      );
+
+      // Still loading: the layout's sections hold the TOC's shape, unpickable.
+      const nav = screen.getByRole('navigation', { name: 'Sections' });
+      expect(nav).toHaveAttribute('aria-busy', 'true');
+      expect([...nav.querySelectorAll('.MuiSkeleton-root')].map(b => b.textContent)).toEqual([
+        'First',
+        'Second',
+      ]);
+      expect(screen.getByLabelText('editable')).toHaveTextContent('false');
+    });
+
     it('publishes no sections for a record that is not found', async () => {
       mockFns.request.mockResolvedValueOnce(rows([]));
 
