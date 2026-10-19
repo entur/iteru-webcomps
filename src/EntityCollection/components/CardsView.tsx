@@ -11,7 +11,8 @@ import { displayValue, EMPTY_TEXT, fullTitle, valueList } from '../utils/values'
 // A card never gets narrower than its size's minimum (or the whole row, on a
 // screen narrower than that); the row wraps instead.
 const CARD_MIN_PX = { sm: 260, big: 320 } as const;
-// The picture area a big card leaves at its top: the 3D preview's box shape.
+// The picture's shape at the card's width: the 3D preview's box. A big card's
+// picture area too, unless a height is reserved for it.
 const MEDIA_ASPECT = '16 / 10';
 // The heading over a big card's picture sits at its bottom edge — on the 3D
 // shot's light ground plane — over a fade of the card's own paper rising from
@@ -57,6 +58,8 @@ export interface CardsViewProps {
   size?: CardSize;
   /** `big` only: what fills a row's picture area; blank when omitted. */
   media?: (row: unknown) => ReactNode;
+  /** `big` only: the picture area's height in px (`EntityCollectionProps`). */
+  reservedHeightForImg?: number;
   cardProps?: CardProps;
 }
 
@@ -82,13 +85,22 @@ const CardHeading = ({ row, card, labels }: HeadingProps) => (
  * The top of a big card: the picture area, always there so every card has the
  * same shape whether or not the host fills it, with the card's heading laid
  * over its bottom edge. The heading comes first in reading order; an unfilled
- * picture is hidden from assistive tech, the heading never is.
+ * picture is hidden from assistive tech, the heading never is. The picture
+ * stands on the area's bottom edge: a reserved height (which overrides the
+ * area's own 16:10) cuts its top.
  */
-const CardMediaArea = ({ media, ...heading }: HeadingProps & { media?: ReactNode }) => (
+const CardMediaArea = ({
+  media,
+  reservedHeightForImg,
+  ...heading
+}: HeadingProps & { media?: ReactNode; reservedHeightForImg?: number }) => (
   <Box
     sx={{
       position: 'relative',
+      // Explicit, or a reserved height would size the width from the ratio.
+      width: '100%',
       aspectRatio: MEDIA_ASPECT,
+      height: reservedHeightForImg,
       bgcolor: 'action.hover',
       borderBottom: 1,
       borderColor: 'divider',
@@ -115,7 +127,9 @@ const CardMediaArea = ({ media, ...heading }: HeadingProps & { media?: ReactNode
       aria-hidden={media == null || media === false ? true : undefined}
       sx={{
         position: 'absolute',
-        inset: 0,
+        insetInline: 0,
+        bottom: 0,
+        aspectRatio: MEDIA_ASPECT,
         '& > img': { display: 'block', width: '100%', height: '100%', objectFit: 'contain' },
       }}
     >
@@ -132,10 +146,19 @@ const CardMediaArea = ({ media, ...heading }: HeadingProps & { media?: ReactNode
  * @param labels    yes/no wording for switches
  * @param size      `sm` (default) or `big`: wider, the heading over a picture on top
  * @param media     `big` only: fills a row's picture area
+ * @param reservedHeightForImg `big` only: the picture area's height in px
  * @param cardProps spread onto every `Card`
  * @returns the card list
  */
-export function CardsView({ rows, card, labels, size = 'sm', media, cardProps }: CardsViewProps): React.ReactNode {
+export function CardsView({
+  rows,
+  card,
+  labels,
+  size = 'sm',
+  media,
+  reservedHeightForImg,
+  cardProps,
+}: CardsViewProps): React.ReactNode {
   const big = size === 'big';
   return (
     <Box
@@ -145,7 +168,9 @@ export function CardsView({ rows, card, labels, size = 'sm', media, cardProps }:
     >
       {rows.map(({ key, entity: row }) => (
         <Card key={key} role="listitem" variant="outlined" {...cardProps}>
-          {big ? <CardMediaArea row={row} card={card} labels={labels} media={media?.(row)} /> : null}
+          {big ? (
+            <CardMediaArea row={row} card={card} labels={labels} media={media?.(row)} reservedHeightForImg={reservedHeightForImg} />
+          ) : null}
           <CardContent>
             {big ? null : <CardHeading row={row} card={card} labels={labels} />}
             <Box

@@ -45,6 +45,9 @@ const SEED = 0x9e3779b9; // fixed PRNG seed → reproducible grid across reloads
 const VIEWS: CollectionView[] = ["grid", "cards-sm", "cards-big"];
 const TOOLS: CollectionTool[] = [...ALL_TOOLS];
 const FILTER_MODES = ["client", "server"] as const;
+// cards-big: px of each card the bus shot gets; the shot is cut from the top
+// (its empty sky) to fit, so a lower value fits more cards on screen.
+const RESERVED_IMG_PX = 190;
 // Buses are the generator's only rows with 3D geometry: start on them.
 const START_QUERY: CollectionQuery = {
   ...defaultCollectionQuery,
@@ -136,6 +139,7 @@ const meta: Meta<typeof VehicleTypeCollection> = {
       ],
     },
     cardMedia,
+    reservedHeightForImg: RESERVED_IMG_PX,
   },
   argTypes: {
     view: { control: "inline-radio", options: VIEWS },
@@ -149,6 +153,7 @@ const meta: Meta<typeof VehicleTypeCollection> = {
     query: { control: false },
     actions: { control: false },
     cardMedia: { control: false },
+    reservedHeightForImg: { control: { type: "range", min: 60, max: 240, step: 10 } },
   },
 };
 export default meta;

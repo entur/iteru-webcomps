@@ -104,6 +104,12 @@ export interface EntityCollectionProps<E, K extends string = string> {
    *  (an `<img>` fills it, scaled to fit). Omit, or return nothing, and the
    *  area is left blank, so every card keeps the same height. */
   cardMedia?: (row: E) => ReactNode;
+  /** `cards-big` only: the picture area's height in px — all the room the
+   *  picture gets, so it sets how tall a big card is. The picture keeps its
+   *  16:10 shape at the card's width and stands on the area's bottom edge;
+   *  what doesn't fit is cut from its top (a 3D shot's empty sky first).
+   *  Omit → the area is the full 16:10. */
+  reservedHeightForImg?: number;
   /** Toolbar whitelist; `false` hides the toolbar's tools. Default: all. */
   tools?: readonly CollectionTool[] | false;
   /** Host buttons at the end of the toolbar. */

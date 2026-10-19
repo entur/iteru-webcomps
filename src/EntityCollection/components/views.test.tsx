@@ -105,6 +105,28 @@ describe('CardsView', () => {
     expect(within(second).getByRole('img', { name: 'T:2' })).toBeTruthy();
   });
 
+  it('gives a big card\'s picture only the reserved height, standing on its bottom edge, the top cut', () => {
+    renderCards(ROWS, { size: 'big', reservedHeightForImg: 120 });
+    for (const item of screen.getAllByRole('listitem')) {
+      const area = item.firstElementChild as HTMLElement;
+      expect(getComputedStyle(area).height).toBe('120px');
+      // The card's full width, not 120px × 16/10 from the ratio.
+      expect(getComputedStyle(area).width).toBe('100%');
+      expect(getComputedStyle(area).overflow).toBe('hidden');
+      const media = getComputedStyle(area.querySelector('[data-card-media]')!);
+      // Its own 16:10 at the card's width, on the bottom edge — not stretched to the area.
+      expect(media.getPropertyValue('aspect-ratio')).toBe('16/10');
+      expect(media.bottom).toBe('0px');
+    }
+  });
+
+  it('sizes a big card\'s picture area by the picture\'s shape when no height is reserved', () => {
+    renderCards(ROWS, { size: 'big' });
+    const area = getComputedStyle(screen.getAllByRole('listitem')[0].firstElementChild!);
+    expect(area.getPropertyValue('aspect-ratio')).toBe('16/10');
+    expect(area.height).toBe('');
+  });
+
   it('renders one list item per row with its title', () => {
     mount();
     const items = screen.getAllByRole('listitem');
