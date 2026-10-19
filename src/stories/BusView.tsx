@@ -183,6 +183,15 @@ const Shot = ({ inp, bg }: { inp: BusInput; bg: string }) => {
     const bus = build(inp);
     stage.add(bus.group);
     mkViews(stage, () => bus)(VIEW, true); // instant: a shot stage has no frame loop
+    // Once, from whichever comes first: the shot settling, or a cleanup while
+    // it is still pending — so the next stage never coexists with this one.
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      stage.drop(bus.group);
+      stage.dispose();
+    };
     stage
       .shot()
       .then(blob => {
@@ -192,12 +201,10 @@ const Shot = ({ inp, bg }: { inp: BusInput; bg: string }) => {
         setFailed(false);
       })
       .catch(() => current && setFailed(true))
-      .finally(() => {
-        stage.drop(bus.group);
-        stage.dispose();
-      });
+      .finally(release);
     return () => {
       current = false;
+      release();
       if (made) URL.revokeObjectURL(made);
     };
   }, [inp, w, h, bg]);

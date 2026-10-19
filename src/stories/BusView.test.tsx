@@ -123,6 +123,28 @@ describe("BusView", () => {
     expect(vi.mocked(mkStageShot).mock.calls[1][0]).toMatchObject({ w: 440, h: 275 });
   });
 
+  it("disposes a still-pending shot stage before the next one is made", () => {
+    render(<BusView {...props({ mode: "bitmap" })} />);
+    resize(400, 250);
+    const first = vi.mocked(mkStageShot).mock.results[0].value;
+    resize(440, 275);
+    act(() => vi.advanceTimersByTime(300));
+    expect(first.drop).toHaveBeenCalledOnce();
+    expect(first.dispose).toHaveBeenCalledOnce();
+    expect(first.dispose.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(mkStageShot).mock.invocationCallOrder[1],
+    );
+  });
+
+  it("disposes a still-pending shot stage on unmount, once", () => {
+    const { unmount } = render(<BusView {...props({ mode: "bitmap" })} />);
+    resize(400, 250);
+    const stage = vi.mocked(mkStageShot).mock.results[0].value;
+    unmount();
+    expect(stage.drop.mock.invocationCallOrder[0]).toBeLessThan(stage.dispose.mock.invocationCallOrder[0]);
+    expect(stage.dispose).toHaveBeenCalledOnce();
+  });
+
   it("measures nothing in 3D mode — the live stage sizes its own canvas", () => {
     render(<BusView {...props()} />);
     expect(observers).toHaveLength(0);

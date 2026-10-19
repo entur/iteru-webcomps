@@ -91,6 +91,11 @@ const PREVIEW_SETTLE_MS = 250;
 /** Theme spacing above the 3D column: the form's heading (h6, 32px) plus its
  *  margin, so the two panels start level. */
 const BUS_COLUMN_TOP = 6;
+/** Narrowest the 3D column may get, px; below it the preview drops under the
+ *  form. The content row's own padding (`p: 4`) and gap (`gap: 2`), px. */
+const BUS_MIN_WIDTH = 360,
+  ROW_PAD_PX = 32,
+  ROW_GAP_PX = 16;
 /** Slow enough that the skeleton and the arrival fade are actually watchable. */
 const DEFAULT_READ_DELAY_MS = 600;
 
@@ -338,8 +343,6 @@ const GqlHostPage = ({
     if (busSeed.busMotion !== busMotion) setMotion(busMotion);
     setBusSeed({ busView, busMotion });
   }
-  // From lg up the preview is a column of its own; below, it sits under the form.
-  const busColumn = useMediaQuery(useTheme().breakpoints.up("lg"));
   const [toast, setToast] = useState<SaveToast | null>(null);
   // The form's chrome is ours to place: the TOC (column or pinned dropdown)
   // and the Save/Cancel band across the whole page, outside every column.
@@ -392,6 +395,19 @@ const GqlHostPage = ({
         : active.newLabel
       : "No record";
   const tocDropdown = toc === "dropdown" && session.toc.sections.length > 0;
+  const tocList = toc === "list" && session.toc.sections.length > 0;
+  const floatBar = !expanded && !narrow;
+  // The preview is a column of its own only where the row still leaves it
+  // BUS_MIN_WIDTH beside everything else on it (TOC + border, padding, the
+  // form, the floating bar); below, it sits under the form.
+  const busRowMin =
+    (tocList ? TOC_WIDTH + 1 : 0) +
+    2 * ROW_PAD_PX +
+    FORM_MAX_WIDTH +
+    ROW_GAP_PX +
+    BUS_MIN_WIDTH +
+    (floatBar ? ROW_GAP_PX + FLOAT_MAX_WIDTH : 0);
+  const busColumn = useMediaQuery(`(min-width: ${busRowMin}px)`);
   const recordKey = selection ? `${selection.entity}:${selection.netexId ?? NEW_KEY}` : "";
   // A Vehicle is drawn over the type it references, served from the same seed
   // the mock answers with. Memoised on the committed value, so an unrelated
@@ -553,7 +569,7 @@ const GqlHostPage = ({
 
       <Box sx={{ display: "flex", flex: 1 }}>
         {/* Left: only when the stacked form has sections to navigate. */}
-        {toc === "list" && session.toc.sections.length > 0 && (
+        {tocList && (
           <Box
             sx={{
               width: TOC_WIDTH,
@@ -632,13 +648,13 @@ const GqlHostPage = ({
               <Typography color="text.secondary">Select a record to view or edit.</Typography>
             )}
           </Box>
-          {/* Third column, from lg up: the bus, in whatever width is left. Pinned
+          {/* Third column, once the row leaves it BUS_MIN_WIDTH: the bus, in the width left. Pinned
               below the header, level with the form's panel. */}
           {busColumn && (
             <Box
               sx={{
                 flex: 1,
-                minWidth: 0,
+                minWidth: BUS_MIN_WIDTH,
                 position: "sticky",
                 top: headerHeight + FLOAT_GAP_PX,
                 mt: BUS_COLUMN_TOP,
@@ -650,7 +666,7 @@ const GqlHostPage = ({
           {/* Wide + collapsed: the toolbar floats in the gutter right of the
               form (capped at FORM_MAX_WIDTH), pinned below the header. Its own
               flex item, so it takes room instead of covering the form. */}
-          {!expanded && !narrow && (
+          {floatBar && (
             <Paper
               elevation={2}
               sx={{
