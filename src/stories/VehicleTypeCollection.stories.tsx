@@ -62,23 +62,37 @@ const cardMedia = (row: unknown) => {
   return vt.transportMode === TransportMode.Bus ? <BusShot vt={vt} /> : <GenericVehicle />;
 };
 
+type CollectionProps = Parameters<typeof VehicleTypeCollection<VehicleType>>[0];
+
+/** The collection holding its query from `START_QUERY`. A component of its
+ *  own: React state in the story's render function, beside `useArgs`, makes
+ *  every query change re-run that function outside Storybook's hook context,
+ *  where `useArgs` throws. */
+function StartsOnBuses(props: CollectionProps) {
+  const [query, setQuery] = useState(START_QUERY);
+  return (
+    <VehicleTypeCollection
+      {...props}
+      query={query}
+      onQueryChange={next => {
+        setQuery(next);
+        props.onQueryChange?.(next);
+      }}
+    />
+  );
+}
+
 const meta: Meta<typeof VehicleTypeCollection> = {
   title: "Collection/VehicleType",
   component: VehicleTypeCollection,
   // `view` is an arg, so the collection is controlled: the toolbar's switch
-  // writes its pick back to the arg, keeping it and the control in step. The
-  // query is held here, only so it can start on `START_QUERY`.
+  // writes its pick back to the arg, keeping it and the control in step.
+  // Storybook hooks only here; the query lives in `StartsOnBuses`.
   render: function Render(args) {
     const [, updateArgs] = useArgs();
-    const [query, setQuery] = useState(START_QUERY);
     return (
-      <VehicleTypeCollection
-        {...args}
-        query={query}
-        onQueryChange={next => {
-          setQuery(next);
-          args.onQueryChange?.(next);
-        }}
+      <StartsOnBuses
+        {...(args as CollectionProps)}
         onViewChange={view => {
           args.onViewChange?.(view);
           updateArgs({ view });
