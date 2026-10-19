@@ -2,18 +2,34 @@
  * The collection's own toolbar, rendered above either view (so it cannot use
  * the DataGrid's toolbar primitives, which need a mounted grid). Which tools
  * show is the host's whitelist; `columns` and `density` exist in grid view only.
+ * The view switch (grid / small cards / large cards) sits at the end, before
+ * the host's actions.
  *
  * One row when it fits; on narrower screens the tools after the query field
- * (sort, columns, density, actions) wrap onto the next line. Filters never add
+ * (sort, columns, density, view, actions) wrap onto the next line. Filters never add
  * a row: search and filter share a single `QueryField`, which carries the
  * active filters as chips inside the search box (capped, the rest folded into
  * "+N"), so a filter never pushes a tool onto a new line.
  */
 import { useState, type ReactNode } from 'react';
-import { Box, Checkbox, IconButton, Menu, MenuItem, Stack, TextField, Tooltip } from '@mui/material';
+import {
+  Box,
+  Checkbox,
+  IconButton,
+  Menu,
+  MenuItem,
+  Stack,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+} from '@mui/material';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import DensityMediumIcon from '@mui/icons-material/DensityMedium';
+import GridViewIcon from '@mui/icons-material/GridView';
+import TableRowsIcon from '@mui/icons-material/TableRows';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import type { GridDensity } from '@mui/x-data-grid';
 import type {
@@ -30,6 +46,13 @@ const DENSITIES: GridDensity[] = ['compact', 'standard', 'comfortable'];
 const GRID_ONLY: readonly CollectionTool[] = ['columns', 'density'];
 const SORT_W = 180;
 const NO_SORT = ''; // select value for "unsorted"
+// The view switch, in its order: rows, many small tiles, fewer big ones.
+const VIEW_ICONS: Record<CollectionView, ReactNode> = {
+  grid: <TableRowsIcon fontSize="small" />,
+  'cards-sm': <ViewModuleIcon fontSize="small" />,
+  'cards-big': <GridViewIcon fontSize="small" />,
+};
+const VIEWS = Object.keys(VIEW_ICONS) as CollectionView[];
 
 /** An icon button that opens a menu; owns its anchor. `children` gets `close`. */
 function ToolMenu({
@@ -66,6 +89,7 @@ function ToolMenu({
 export interface CollectionToolbarProps {
   tools: readonly CollectionTool[];
   view: CollectionView;
+  onView: (view: CollectionView) => void;
   columns: readonly Column[];
   /** What the filter reaches: `columns` plus filterable fields not shown. */
   filterColumns: readonly Column[];
@@ -84,7 +108,8 @@ export interface CollectionToolbarProps {
  * Render the toolbar.
  *
  * @param tools        which tools to show
- * @param view         active view; grid-only tools drop out in `'cards'`
+ * @param view         active view; grid-only tools drop out in either cards view
+ * @param onView       receives the view picked on the switch
  * @param columns      resolved columns
  * @param filterColumns what the filter reaches (shown columns + filterable others)
  * @param filterFields the entity's generated `<Entity>FilterFields`
@@ -101,6 +126,7 @@ export interface CollectionToolbarProps {
 export function CollectionToolbar({
   tools,
   view,
+  onView,
   columns,
   filterColumns,
   filterFields,
@@ -214,6 +240,23 @@ export function CollectionToolbar({
         </ToolMenu>
       ) : null}
       <Box sx={{ flex: 1 }} />
+      {has('view') ? (
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          value={view}
+          onChange={(_e, v: CollectionView | null) => v && onView(v)}
+          aria-label={labels.view}
+        >
+          {VIEWS.map(v => (
+            <Tooltip key={v} title={labels.views[v]}>
+              <ToggleButton value={v} aria-label={labels.views[v]}>
+                {VIEW_ICONS[v]}
+              </ToggleButton>
+            </Tooltip>
+          ))}
+        </ToggleButtonGroup>
+      ) : null}
       {actions}
     </Stack>
   );

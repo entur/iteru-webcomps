@@ -7,8 +7,11 @@ import type { CardProps } from '@mui/material';
 import type { DataGridProps, GridDensity } from '@mui/x-data-grid';
 import type { FieldEntry, FieldSpec } from '../EntityDetailsForm/types';
 
-export type CollectionView = 'grid' | 'cards';
-export type CollectionTool = 'search' | 'filter' | 'sort' | 'columns' | 'density';
+/** `cards-sm`: compact text cards. `cards-big`: wider cards with room for a
+ *  picture at the top (`cardMedia`). */
+export type CollectionView = 'grid' | 'cards-sm' | 'cards-big';
+/** `view` is the grid / small cards / large cards switch. */
+export type CollectionTool = 'search' | 'filter' | 'sort' | 'columns' | 'density' | 'view';
 export type FilterOp = 'contains' | 'anyOf';
 
 /** One filterable field: the sobek filter argument it feeds and how it matches. */
@@ -63,6 +66,10 @@ export interface CollectionLabels {
   density: string;
   /** Names of the grid densities in the density menu. */
   densities: Record<GridDensity, string>;
+  /** Accessible name of the view switch. */
+  view: string;
+  /** Names of the views on the view switch (each button's name and tooltip). */
+  views: Record<CollectionView, string>;
   empty: string;
   yes: string;
   no: string;
@@ -84,12 +91,19 @@ export interface CollectionOptions {
  *  `createEntityCollection`, so a misspelt column or card key fails to compile. */
 export interface EntityCollectionProps<E, K extends string = string> {
   rows: readonly E[];
-  /** Default `'grid'`. */
+  /** Controlled view. Omit for uncontrolled (starts on `'grid'`; the
+   *  toolbar's view switch changes it). */
   view?: CollectionView;
+  /** Fired with the view picked on the toolbar's switch. */
+  onViewChange?: (view: CollectionView) => void;
   /** Whitelist, order and labels. Omit → every eligible field. */
   columns?: readonly (K | FieldEntry<K>)[];
   /** Omit → `name` as title plus the first columns. */
   card?: CardSpec<K>;
+  /** `cards-big` only: what fills the picture area at the top of a row's card
+   *  (an `<img>` fills it, scaled to fit). Omit, or return nothing, and the
+   *  area is left blank, so every card keeps the same height. */
+  cardMedia?: (row: E) => ReactNode;
   /** Toolbar whitelist; `false` hides the toolbar's tools. Default: all. */
   tools?: readonly CollectionTool[] | false;
   /** Host buttons at the end of the toolbar. */
@@ -165,7 +179,7 @@ export const usablePageSize = (size: number): number =>
 export const pageSizesFor = (size: number): number[] =>
   PAGE_SIZES.includes(size) ? PAGE_SIZES : [...PAGE_SIZES, size].sort((a, b) => a - b);
 
-export const ALL_TOOLS: readonly CollectionTool[] = ['search', 'filter', 'sort', 'columns', 'density'];
+export const ALL_TOOLS: readonly CollectionTool[] = ['search', 'filter', 'sort', 'columns', 'density', 'view'];
 
 export const DEFAULT_LABELS: CollectionLabels = {
   search: 'Search',
@@ -182,6 +196,8 @@ export const DEFAULT_LABELS: CollectionLabels = {
   columns: 'Columns',
   density: 'Density',
   densities: { compact: 'Compact', standard: 'Standard', comfortable: 'Comfortable' },
+  view: 'View',
+  views: { grid: 'Table', 'cards-sm': 'Small cards', 'cards-big': 'Large cards' },
   empty: 'No rows',
   yes: 'Yes',
   no: 'No',

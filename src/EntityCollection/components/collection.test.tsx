@@ -97,9 +97,36 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
     expect(cols.map(c => c.key).filter(k => banned.includes(k))).toEqual([]);
   });
 
-  it('shows every row as a card', async () => {
-    await mount({ view: 'cards' });
+  it.each(['cards-sm', 'cards-big'] as const)('shows every row as a card in %s', async view => {
+    await mount({ view });
     expect(screen.getAllByRole('listitem')).toHaveLength(ROW_COUNT);
+  });
+
+  it("fills a big card's picture area from cardMedia, per row; small cards have none", async () => {
+    const cardMedia = (row: Record<string, unknown>) => <img alt={String(row[textCol.key])} />;
+    await mount({ view: 'cards-big', cardMedia });
+    const items = screen.getAllByRole('listitem');
+    items.forEach((item, i) => expect(within(item).getByRole('img').getAttribute('alt')).toBe(`${textCol.key}-${i}`));
+    cleanup();
+    await mount({ view: 'cards-sm', cardMedia });
+    expect(screen.queryAllByRole('img')).toHaveLength(0);
+  });
+
+  it('switches view from the toolbar on its own when uncontrolled', async () => {
+    const onViewChange = vi.fn();
+    await mount({ onViewChange });
+    expect(await gridRows()).toBe(ROW_COUNT);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Small cards' })));
+    expect(onViewChange).toHaveBeenCalledWith('cards-sm');
+    expect(screen.getAllByRole('listitem')).toHaveLength(ROW_COUNT);
+  });
+
+  it('only reports a picked view when controlled — the host decides', async () => {
+    const onViewChange = vi.fn();
+    await mount({ view: 'cards-sm', onViewChange });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Large cards' })));
+    expect(onViewChange).toHaveBeenCalledWith('cards-big');
+    expect(screen.getByRole('button', { name: 'Small cards' }).getAttribute('aria-pressed')).toBe('true');
   });
 
   it('shows the same rows in the grid', async () => {
@@ -109,7 +136,7 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
 
   it('applies one controlled query identically to both views', async () => {
     const query = { ...defaultCollectionQuery, search: needle };
-    await mount({ view: 'cards', query });
+    await mount({ view: 'cards-sm', query });
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
     cleanup();
     await mount({ view: 'grid', query });
@@ -118,7 +145,7 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
 
   it('narrows the cards as the user types, and emits the query', async () => {
     const onQueryChange = vi.fn();
-    await mount({ view: 'cards', onQueryChange });
+    await mount({ view: 'cards-sm', onQueryChange });
     fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), { target: { value: needle } });
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
     expect(onQueryChange).toHaveBeenLastCalledWith({ ...defaultCollectionQuery, search: needle });
@@ -126,18 +153,18 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
 
   it('returns to the first page when the query narrows', async () => {
     const onQueryChange = vi.fn();
-    await mount({ view: 'cards', onQueryChange, query: { ...defaultCollectionQuery, pageSize: 1, page: 2 } });
+    await mount({ view: 'cards-sm', onQueryChange, query: { ...defaultCollectionQuery, pageSize: 1, page: 2 } });
     fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), { target: { value: needle } });
     expect(onQueryChange).toHaveBeenLastCalledWith(expect.objectContaining({ page: 0, search: needle }));
   });
 
   it('shows the last valid page when a controlled page is out of range', async () => {
-    await mount({ view: 'cards', query: { ...defaultCollectionQuery, pageSize: 2, page: 9 } });
+    await mount({ view: 'cards-sm', query: { ...defaultCollectionQuery, pageSize: 2, page: 9 } });
     expect(screen.getAllByRole('listitem')).toHaveLength(ROW_COUNT - 2);
   });
 
   it('keeps the toolbar and says so when nothing matches', async () => {
-    await mount({ view: 'cards', query: { ...defaultCollectionQuery, search: 'no-such-row' } });
+    await mount({ view: 'cards-sm', query: { ...defaultCollectionQuery, search: 'no-such-row' } });
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
     expect(screen.getByText('No rows')).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'Search' })).toBeTruthy();
@@ -149,7 +176,7 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
   });
 
   it('enables exactly the generated filter fields in the popover', async () => {
-    await mount({ view: 'cards' });
+    await mount({ view: 'cards-sm' });
     fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
     const pop = screen.getByRole('dialog');
     const open = cols.filter(c => filterFields[c.key]);
@@ -164,10 +191,10 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
     const filterable = cols.find(c => filterFields[c.key]?.op === 'contains' && c.spec.path.length === 1);
     if (!filterable) throw new Error(`${entity} has no top-level contains filter to drive this test with`);
     const filters = { [filterable.key]: `${filterable.key}-1` };
-    await mount({ view: 'cards', query: { ...defaultCollectionQuery, filters } });
+    await mount({ view: 'cards-sm', query: { ...defaultCollectionQuery, filters } });
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
     cleanup();
-    await mount({ view: 'cards', filterMode: 'server', query: { ...defaultCollectionQuery, filters } });
+    await mount({ view: 'cards-sm', filterMode: 'server', query: { ...defaultCollectionQuery, filters } });
     expect(screen.getAllByRole('listitem')).toHaveLength(ROW_COUNT);
   });
 
@@ -199,7 +226,7 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
     await mount({ view: 'grid', query: { ...defaultCollectionQuery, pageSize: 250 } });
     expect(await gridRows()).toBe(ROW_COUNT);
     cleanup();
-    await mount({ view: 'cards', query: { ...defaultCollectionQuery, pageSize: 0 } });
+    await mount({ view: 'cards-sm', query: { ...defaultCollectionQuery, pageSize: 0 } });
     expect(screen.getAllByRole('listitem')).toHaveLength(ROW_COUNT);
     expect(screen.getByText(`1–${ROW_COUNT} of ${ROW_COUNT}`)).toBeTruthy();
   });
@@ -229,7 +256,7 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
   });
 
   it('does not find a row by a field its card does not show', async () => {
-    await mount({ view: 'cards', card: { title: textCol.key, fields: [] }, query: { ...defaultCollectionQuery, search: `${otherText.key}-1` } });
+    await mount({ view: 'cards-sm', card: { title: textCol.key, fields: [] }, query: { ...defaultCollectionQuery, search: `${otherText.key}-1` } });
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
   });
 
@@ -248,7 +275,7 @@ describe.each(manifest)('$entity collection', ({ entity }) => {
     if (!filterable) throw new Error(`${entity} has no top-level contains filter to drive this test with`);
     const shownKey = [textCol, otherText].find(c => c.key !== filterable.key)!.key;
     await mount({
-      view: 'cards',
+      view: 'cards-sm',
       columns: [shownKey],
       query: { ...defaultCollectionQuery, filters: { [filterable.key]: `${filterable.key}-1` } },
     });

@@ -280,16 +280,39 @@ parameter while another is given). One `CollectionQuery` (`filters`, `search`, `
 visible**. Both views render its output: `GridView` runs the DataGrid with
 `sortingMode`/`paginationMode="server"` and `disableColumnFilter`, so the grid
 never filters, sorts or pages on its own — that is what keeps `view: 'grid' |
-'cards'` interchangeable. The toolbar is the collection's own for the same
+'cards-sm' | 'cards-big'` interchangeable. The toolbar is the collection's own for the same
 reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
 
-- `view` is a prop; the lib ships no toggle. The story
+- `view` is switched from the toolbar's `view` tool (icons: table / small
+  cards / large cards, at the end before `actions`; names in `labels.views`).
+  Controlled like `query`: pass `view` + `onViewChange`, or omit `view` and the
+  collection keeps its own (starts on `grid`). The story
   (`VehicleTypeCollection.stories.tsx`) renders the bare component and drives
-  `view` / `tools` / `filterMode` from Storybook controls — no wrapper chrome.
-- `tools` whitelists `search | filter | sort | columns | density`; the last two
-  render in grid view only. No CSV/Print.
+  `view` / `tools` / `filterMode` from Storybook controls — no wrapper chrome;
+  its `render` writes the switch's pick back to the `view` arg (`useArgs`),
+  and holds the query itself so it starts filtered to buses (the only rows
+  3D can draw).
+- Two card sizes, one `CardsView` (`size`): `cards-sm` is text only (min
+  260px); `cards-big` is wider (min 320px — the shot width — capped at the row on a phone) and
+  leaves a 16:10 picture area at the top of every card, with the card's title
+  and subtitle laid over its bottom edge (the 3D shot's light ground plane) on
+  a fade of the card's paper, so the text below starts with the fields. The
+  picture is filled per row by the host's `cardMedia(row)` — an `<img>` there
+  is scaled to fit. Unfilled, it stays blank and `aria-hidden` (the heading
+  over it never is), so every card keeps the same shape.
+  The story fills it: a bus row → `BusShot` (`src/stories/BusShot.tsx`: a
+  wave skeleton, then its 3dbus PNG), anything else → the generic picture
+  (`src/stories/assets/no-render-data_320.png`, 320×200 like the shots), which a bus that can't be drawn also shows, captioned
+  "No 3D preview" top-left (the heading covers the bottom edge) with the reason as `title`. Every card shares **one**
+  off-screen stage (`src/stories/shotQueue.ts`: serial, cached by input, LRU over shot PNGs only,
+  released after 2 s idle, started a microtask late so one render's cards fail
+  together without WebGL) — a page of live stages would run out of contexts.
+  Bus rows of the story's generator (`genVehicleTypes.ts`) carry geometry
+  inside 3dbus's limits; a test runs the real `validate` over every one.
+- `tools` whitelists `search | filter | sort | columns | density | view`;
+  `columns` and `density` render in grid view only. No CSV/Print.
 - The toolbar is one row when it fits; on narrower screens the tools after the
-  query field (sort, columns, density, actions) wrap onto the next line —
+  query field (sort, columns, density, view, actions) wrap onto the next line —
   deliberate, chosen over folding them into a "More" menu. Filters never add a
   row. Search and filter are one internal subcomponent,
   `QueryField` (`components/QueryField.tsx`): active filters sit as chips at

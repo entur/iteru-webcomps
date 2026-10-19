@@ -8,8 +8,15 @@
  * other fields are listed disabled. Patched fields (`manufacturer`,
  * `fullCharge`, `carLoading`) are generated below but never shown: the
  * collection excludes them.
+ *
+ * In `cards-big`, a bus row's card shows its 3D bitmap (`BusShot`, shot one
+ * at a time on a shared off-screen stage); other modes show a generic picture.
+ * The query starts filtered to buses — the only rows 3D can draw — so the
+ * demo opens on them; the chip clears it.
  */
+import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useArgs } from "storybook/preview-api";
 import {
   createEntityCollection,
   vehicleTypeFields,
@@ -18,13 +25,11 @@ import {
   type CollectionView,
   type VehicleType,
 } from "../index";
-import { ALL_TOOLS } from "../EntityCollection/types";
+import { ALL_TOOLS, defaultCollectionQuery, type CollectionQuery } from "../EntityCollection/types";
 import { UNIT_LABELS } from "./initLayouts";
-import {
-  FareClass,
-  PropulsionType,
-  TransportMode,
-} from "../generated/sobekTypes";
+import { TransportMode } from "../generated/sobekTypes";
+import { BusShot, GenericVehicle } from "./BusShot";
+import { genVehicleTypes } from "./genVehicleTypes";
 
 /* ------------------------------------------------------------------ *\
    Constants
@@ -33,124 +38,54 @@ import {
 const ROW_COUNT = 250; // rows the generator emits
 const SEED = 0x9e3779b9; // fixed PRNG seed → reproducible grid across reloads
 
-/** Sample pools for the random generator. */
-const MAKERS = [
-  "Stadler",
-  "Alstom",
-  "Siemens",
-  "CAF",
-  "Škoda",
-  "Hitachi",
-  "Bombardier",
-  "Solaris",
-];
-const MODELS = [
-  "FLIRT",
-  "Coradia",
-  "Mireo",
-  "Civity",
-  "Panter",
-  "AT-200",
-  "Talent",
-  "Urbino",
-];
-const TRANSPORT = [
-  TransportMode.Rail,
-  TransportMode.Bus,
-  TransportMode.Tram,
-  TransportMode.Metro,
-  TransportMode.Ferry,
-];
-const PROPULSION = Object.values(PropulsionType);
-const FARE = Object.values(FareClass);
-
-/* ------------------------------------------------------------------ *\
-   Random row generator
-\* ------------------------------------------------------------------ */
-
-/** mulberry32 — tiny deterministic PRNG so the demo is stable per seed. */
-const mulberry32 = (seed: number): (() => number) => {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-};
-
-/**
- * Build `n` randomized `VehicleType` rows from a seeded PRNG.
- *
- * @param n    How many rows to emit.
- * @param seed PRNG seed; same seed → identical rows (reproducible showcase).
- * @returns An array of fully-populated `VehicleType` objects.
- */
-const genVehicleTypes = (n: number, seed: number): VehicleType[] => {
-  const rnd = mulberry32(seed);
-  const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rnd() * xs.length)];
-  const num = (lo: number, hi: number, dp = 1): number =>
-    Math.round((lo + rnd() * (hi - lo)) * 10 ** dp) / 10 ** dp;
-  const day = (offset: number): string =>
-    new Date(
-      Date.UTC(2018, 0, 1) + Math.floor(rnd() * offset) * 86_400_000,
-    ).toISOString();
-
-  return Array.from({ length: n }, (_, i): VehicleType => {
-    const seating = Math.floor(num(40, 320, 0));
-    const standing = Math.floor(num(0, 180, 0));
-    const total = seating + standing;
-    return {
-      netexId: `VEH:VehicleType:${1000 + i}`,
-      version: "1",
-      name: {
-        lang: "en",
-        value: `${pick(MAKERS)} ${pick(MODELS)} ${10 + (i % 90)}`,
-      },
-      transportMode: pick(TRANSPORT),
-      manufacturer: pick(MAKERS),
-      propulsionTypes: Array.from(
-        new Set([pick(PROPULSION), pick(PROPULSION)]),
-      ),
-      length: num(12, 220),
-      width: num(2.4, 3.2, 2),
-      height: num(3, 4.5, 2),
-      // In the XSD's units (`UNIT_LABELS`): kg, m and Wh.
-      weight: num(12_000, 95_000, 0),
-      maximumRange: num(180_000, 1_200_000, 0),
-      fullCharge: num(40_000, 600_000, 0),
-      lowFloor: rnd() > 0.4,
-      carLoading: rnd() > 0.8,
-      selfPropelled: rnd() > 0.3,
-      passengerCapacity: {
-        totalCapacity: total,
-        seatingCapacity: seating,
-        standingCapacity: standing,
-        fareClass: pick(FARE),
-      },
-      dataOwnerRef: '',
-      created: day(1500),
-      changed: day(2800),
-    };
-  });
-};
-
 /* ------------------------------------------------------------------ *\
    Stories
 \* ------------------------------------------------------------------ */
 
-const VIEWS: CollectionView[] = ["grid", "cards"];
+const VIEWS: CollectionView[] = ["grid", "cards-sm", "cards-big"];
 const TOOLS: CollectionTool[] = [...ALL_TOOLS];
 const FILTER_MODES = ["client", "server"] as const;
+// Buses are the generator's only rows with 3D geometry: start on them.
+const START_QUERY: CollectionQuery = {
+  ...defaultCollectionQuery,
+  filters: { transportMode: [TransportMode.Bus] },
+};
 
 const VehicleTypeCollection = createEntityCollection(vehicleTypeFields, {
   filterFields: VehicleTypeFilterFields,
 });
 
+/** A bus draws itself; anything else gets the generic picture. Read by
+ *  `cards-big` only. */
+const cardMedia = (row: unknown) => {
+  const vt = row as VehicleType;
+  return vt.transportMode === TransportMode.Bus ? <BusShot vt={vt} /> : <GenericVehicle />;
+};
+
 const meta: Meta<typeof VehicleTypeCollection> = {
   title: "Collection/VehicleType",
   component: VehicleTypeCollection,
+  // `view` is an arg, so the collection is controlled: the toolbar's switch
+  // writes its pick back to the arg, keeping it and the control in step. The
+  // query is held here, only so it can start on `START_QUERY`.
+  render: function Render(args) {
+    const [, updateArgs] = useArgs();
+    const [query, setQuery] = useState(START_QUERY);
+    return (
+      <VehicleTypeCollection
+        {...args}
+        query={query}
+        onQueryChange={next => {
+          setQuery(next);
+          args.onQueryChange?.(next);
+        }}
+        onViewChange={view => {
+          args.onViewChange?.(view);
+          updateArgs({ view });
+        }}
+      />
+    );
+  },
   args: {
     rows: genVehicleTypes(ROW_COUNT, SEED),
     view: "grid",
@@ -186,23 +121,27 @@ const meta: Meta<typeof VehicleTypeCollection> = {
         "lowFloor",
       ],
     },
+    cardMedia,
   },
   argTypes: {
     view: { control: "inline-radio", options: VIEWS },
     tools: { control: "check", options: TOOLS },
     filterMode: { control: "inline-radio", options: FILTER_MODES },
     onQueryChange: { action: "queryChange" },
-    // 250 row objects are not worth a JSON editor; `query` left unset keeps
-    // the component uncontrolled, which is the mode worth clicking through.
+    onViewChange: { action: "viewChange" },
+    // 250 row objects are not worth a JSON editor; `query` is the render's own
+    // state (see `render`).
     rows: { control: false },
     query: { control: false },
     actions: { control: false },
+    cardMedia: { control: false },
   },
 };
 export default meta;
 type Story = StoryObj<typeof VehicleTypeCollection>;
 
 export const Grid: Story = {};
-export const Cards: Story = { args: { view: "cards" } };
+export const CardsSm: Story = { args: { view: "cards-sm" } };
+export const CardsBig: Story = { args: { view: "cards-big" } };
 export const SearchOnly: Story = { args: { tools: ["search"] } };
 export const NoTools: Story = { args: { tools: [] } };

@@ -16,6 +16,7 @@ import {
   defaultCollectionQuery,
   type CollectionOptions,
   type CollectionQuery,
+  type CollectionView,
   type Column,
   type EntityCollectionProps,
   type FilterFields,
@@ -36,6 +37,7 @@ export type EntityCollection<K extends string> = (<E>(props: EntityCollectionPro
   displayName: string;
 };
 const DEFAULT_DENSITY: GridDensity = 'standard';
+const DEFAULT_VIEW: CollectionView = 'grid';
 
 /**
  * Build a collection component for one entity.
@@ -56,9 +58,11 @@ export function createEntityCollection<F extends Record<string, FieldSpec>>(
 
   const Collection = <E,>({
     rows,
-    view = 'grid',
+    view: controlledView,
+    onViewChange,
     columns,
     card,
+    cardMedia,
     tools,
     actions,
     query: controlled,
@@ -69,6 +73,12 @@ export function createEntityCollection<F extends Record<string, FieldSpec>>(
   }: EntityCollectionProps<E, K>): ReactNode => {
     const [inner, setInner] = useState<CollectionQuery>(defaultCollectionQuery);
     const [density, setDensity] = useState<GridDensity>(DEFAULT_DENSITY);
+    const [innerView, setInnerView] = useState<CollectionView>(DEFAULT_VIEW);
+    const view = controlledView ?? innerView;
+    const onView = (next: CollectionView): void => {
+      if (controlledView === undefined) setInnerView(next);
+      onViewChange?.(next);
+    };
     const [hidden, setHidden] = useState<Record<string, boolean>>({});
 
     const L = useMemo(() => ({ ...DEFAULT_LABELS, ...labels }), [labels]);
@@ -135,6 +145,7 @@ export function createEntityCollection<F extends Record<string, FieldSpec>>(
           <CollectionToolbar
             tools={activeTools}
             view={view}
+            onView={onView}
             columns={cols}
             filterColumns={filterCols}
             filterFields={filterFields}
@@ -168,7 +179,14 @@ export function createEntityCollection<F extends Record<string, FieldSpec>>(
                 {L.empty}
               </Typography>
             ) : (
-              <CardsView rows={keyed} card={resolvedCard} labels={L} cardProps={slotProps?.card} />
+              <CardsView
+                rows={keyed}
+                card={resolvedCard}
+                labels={L}
+                size={view === 'cards-big' ? 'big' : 'sm'}
+                media={cardMedia as ((row: unknown) => ReactNode) | undefined}
+                cardProps={slotProps?.card}
+              />
             )}
             <TablePagination
               component="div"

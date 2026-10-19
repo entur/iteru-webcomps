@@ -24,22 +24,17 @@ import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import ThreeSixtyIcon from "@mui/icons-material/ThreeSixty";
 import ViewInArIcon from "@mui/icons-material/ViewInAr";
 import {
-  MM,
-  faces,
-  mkBus,
   mkStage,
   mkStageShot,
   mkViews,
-  total,
   validate,
   type BusGroup,
   type ShotStage,
   type Stage,
 } from "@entur/iteru-3dbus";
-import type { BusInput, BusInputResult, MissingField } from "../index";
-import { humanize } from "../shared/humanize";
+import type { BusInput, BusInputResult } from "../index";
 import { STILL_SKELETONS } from "../shared/motion";
-import { UNIT_LABELS } from "./initLayouts";
+import { build, phrase, VIEW } from "./busScene";
 import { mkMotion, type BusMotion } from "./busMotion";
 import { useSize } from "./hooks";
 
@@ -49,7 +44,6 @@ export type BusViewMode = "bitmap" | "3d";
 // Box shape, and how long a resize must hold before the PNG is shot again
 // (each shot is a fresh WebGL context, so not one per pixel of a drag).
 const ASPECT = "16 / 10", RESHOOT_MS = 250;
-const VIEW = "quarter";
 // The in-canvas camera control: inset from the corner (px) and how much of the
 // scene shows through it.
 const CONTROL_INSET = 8, CONTROL_OPACITY = 0.92;
@@ -57,13 +51,6 @@ const CONTROL_INSET = 8, CONTROL_OPACITY = 0.92;
  *  out of contexts): the preview fails alone, never the page around it. */
 const NO_WEBGL = "No 3D here: the browser could not create a WebGL context.";
 const LOADING_LABEL = "Loading preview";
-
-/** Centre a fresh bus on the origin (3dbus puts the front at x = 0). */
-const build = (inp: BusInput): { group: BusGroup; len: number } => {
-  const group = mkBus(inp, faces(inp)), len = total(inp) * MM;
-  group.position.x = -len / 2;
-  return { group, len };
-};
 
 /** One live stage and the bus it shows (`cur.group` null until the first). */
 type Scene = {
@@ -224,16 +211,6 @@ const Shot = ({ inp, bg }: { inp: BusInput; bg: string }) => {
     </Box>
   );
 };
-
-const labelOf = (key: string): string =>
-  (UNIT_LABELS as Record<string, string>)[key] ?? humanize(key);
-
-/** "on the VehicleType: Manufacturer; on the Vehicle: Base colour" — grouped
- *  by the form that fills them, in the order they were reported. */
-const phrase = (missing: MissingField[]): string =>
-  [...new Set(missing.map(m => m.on))]
-    .map(on => `on the ${on}: ${missing.filter(m => m.on === on).map(m => labelOf(m.key)).join(", ")}`)
-    .join("; ");
 
 export interface BusViewProps {
   /** `toBusInput`'s result for the open record; `null` = nothing selected. */
