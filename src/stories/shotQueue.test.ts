@@ -162,4 +162,16 @@ describe("mkShotQueue", () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:2");
     expect(q.peek("a")).toBe("blob:1");
   });
+
+  it("counts only shot PNGs against the cap: more queued than it holds revokes none", async () => {
+    const q = queue({ cacheMax: 2 });
+    const a = q.request("a", inp);
+    q.request("b", inp);
+    q.request("c", inp);
+    await flush();
+    await settle();
+    expect(await a).toBe("blob:1");
+    expect(q.peek("a")).toBe("blob:1");
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+  });
 });

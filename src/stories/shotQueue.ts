@@ -82,10 +82,11 @@ export function mkShotQueue(opts: ShotQueueOpts): ShotQueue {
     urls.delete(key);
   };
 
-  // Only shot PNGs are dropped: a pending entry has a requester waiting on it.
+  // Only shot PNGs count and are dropped: a pending entry has a requester
+  // waiting on it, and counting it would revoke a PNG just handed out.
   const evict = () => {
     for (const key of cache.keys()) {
-      if (cache.size <= cacheMax) return;
+      if (urls.size <= cacheMax) return;
       if (urls.has(key)) forget(key);
     }
   };

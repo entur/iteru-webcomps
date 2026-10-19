@@ -16,7 +16,8 @@ import genericVehicle from "./assets/no-render-data_320.png";
 const LOADING_LABEL = "Rendering preview";
 const NO_PREVIEW = "No 3D preview";
 const NO_WEBGL = "The browser could not create a WebGL context.";
-// The caption's inset from the picture's corner (theme spacing).
+// The caption's inset from the picture's top-left corner (theme spacing):
+// the top, as a cards-big heading covers the bottom edge (and the hover there).
 const CAPTION_INSET = 1;
 
 const FILL = { position: "relative", width: "100%", height: "100%" } as const;
@@ -51,7 +52,7 @@ export function GenericVehicle({ why }: { why?: string }) {
           sx={{
             position: "absolute",
             left: t => t.spacing(CAPTION_INSET),
-            bottom: t => t.spacing(CAPTION_INSET),
+            top: t => t.spacing(CAPTION_INSET),
             px: 0.75,
             borderRadius: 1,
             bgcolor: "background.paper",

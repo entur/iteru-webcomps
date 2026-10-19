@@ -299,8 +299,8 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   The story fills it: a bus row → `BusShot` (`src/stories/BusShot.tsx`: a
   wave skeleton, then its 3dbus PNG), anything else → the generic picture
   (`src/stories/assets/no-render-data_320.png`, 320×200 like the shots), which a bus that can't be drawn also shows, captioned
-  "No 3D preview" with the reason as `title`. Every card shares **one**
-  off-screen stage (`src/stories/shotQueue.ts`: serial, cached by input, LRU,
+  "No 3D preview" top-left (the heading covers the bottom edge) with the reason as `title`. Every card shares **one**
+  off-screen stage (`src/stories/shotQueue.ts`: serial, cached by input, LRU over shot PNGs only,
   released after 2 s idle, started a microtask late so one render's cards fail
   together without WebGL) — a page of live stages would run out of contexts.
   Bus rows of the story's generator (`genVehicleTypes.ts`) carry geometry
