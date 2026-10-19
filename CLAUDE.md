@@ -202,8 +202,10 @@ controlled `disabled`/`onClick`) and `sx` are the host's own props on
   host picks the variant (Fullpage: dropdown below `md`; toolbar + TOC pinned
   in one header whose measured height is both the list column's sticky `top`
   and `html { scroll-padding-top }`, so `scrollIntoView` clears it; the
-  toolbar collapses (#55) to a bar in the gutter right of the form, or below
-  `md` to one slim row beside the dropdown, and that height follows; it starts
+  toolbar collapses (#55) to a bar in the gutter right of the form — atop the
+  3D column, in the band level with the form's heading, when that column shows,
+  so folding never resizes the preview — or below `md` to one slim row beside
+  the dropdown, and that height follows; it starts
   collapsed, and folded its toggle is a database icon).
 - `serverManaged` fields (`version`, `created`, `changed`, `changedBy`) hidden
   from editable model: locked even in edit, surfaced only to *see* meta/semantic
@@ -394,8 +396,9 @@ which caps the bus at 9.5 m rigid) — entur/iteru-3dbus#39. Tests run the real
 3dbus `validate` over every seed.
 
 The Fullpage story's preview (`src/stories/BusView.tsx`) is column 3 once the
-row leaves it `BUS_MIN_WIDTH` (360 px) beside the TOC, padding, form and
-floating bar — a width query summed from those constants, not a breakpoint
+row leaves it `BUS_MIN_WIDTH` (360 px) beside the TOC, padding and form — a
+width query summed from those constants, not a breakpoint, and blind to the
+folded toolbar
 (under the form below it): header toggle bitmap (`mkStageShot` → PNG) | 3D
 (`mkStage`), fed by the form's `onChange`, so unsaved edits redraw. **Settled
 at the source**: the page commits the form's value after 250 ms

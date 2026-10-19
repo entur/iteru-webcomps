@@ -88,8 +88,8 @@ const FLOAT_GAP_PX = 16,
   FLOAT_MAX_WIDTH = 220;
 /** How long the form's value must hold before the 3D preview follows it. */
 const PREVIEW_SETTLE_MS = 250;
-/** Theme spacing above the 3D column: the form's heading (h6, 32px) plus its
- *  margin, so the two panels start level. */
+/** Theme spacing of the band atop the 3D column (the folded toolbar's place):
+ *  the form's heading (h6, 32px) plus its margin, so the two panels start level. */
 const BUS_COLUMN_TOP = 6;
 /** Narrowest the 3D column may get, px; below it the preview drops under the
  *  form. The content row's own padding (`p: 4`) and gap (`gap: 2`), px. */
@@ -398,15 +398,11 @@ const GqlHostPage = ({
   const tocList = toc === "list" && session.toc.sections.length > 0;
   const floatBar = !expanded && !narrow;
   // The preview is a column of its own only where the row still leaves it
-  // BUS_MIN_WIDTH beside everything else on it (TOC + border, padding, the
-  // form, the floating bar); below, it sits under the form.
+  // BUS_MIN_WIDTH beside the TOC (+ border), padding and form; below, it sits
+  // under the form. The floating bar is not counted: beside the column it
+  // rides in the band above the preview, so folding the pickers moves no width.
   const busRowMin =
-    (tocList ? TOC_WIDTH + 1 : 0) +
-    2 * ROW_PAD_PX +
-    FORM_MAX_WIDTH +
-    ROW_GAP_PX +
-    BUS_MIN_WIDTH +
-    (floatBar ? ROW_GAP_PX + FLOAT_MAX_WIDTH : 0);
+    (tocList ? TOC_WIDTH + 1 : 0) + 2 * ROW_PAD_PX + FORM_MAX_WIDTH + ROW_GAP_PX + BUS_MIN_WIDTH;
   const busColumn = useMediaQuery(`(min-width: ${busRowMin}px)`);
   const recordKey = selection ? `${selection.entity}:${selection.netexId ?? NEW_KEY}` : "";
   // A Vehicle is drawn over the type it references, served from the same seed
@@ -437,6 +433,24 @@ const GqlHostPage = ({
       onToggle={() => toggleToolbar(!expanded)}
       buttonRef={toggleRef}
     />
+  );
+  // The folded toolbar: record name + toggle. Placed by the row below.
+  const floatBarEl = (
+    <Paper
+      elevation={2}
+      sx={{
+        maxWidth: FLOAT_MAX_WIDTH,
+        display: "flex",
+        alignItems: "center",
+        gap: 1,
+        pl: 1.5,
+        pr: 0.5,
+        py: 0.5,
+      }}
+    >
+      <RecordName caption={active?.label ?? "Record"} name={recordName} />
+      {toggle}
+    </Paper>
   );
 
   return (
@@ -657,34 +671,32 @@ const GqlHostPage = ({
                 minWidth: BUS_MIN_WIDTH,
                 position: "sticky",
                 top: headerHeight + FLOAT_GAP_PX,
-                mt: BUS_COLUMN_TOP,
               }}
             >
+              {/* The band level with the form's heading. It holds the folded
+                  toolbar when there is one, so the preview's width never
+                  depends on whether the pickers are folded. */}
+              <Box
+                sx={{
+                  minHeight: (t) => t.spacing(BUS_COLUMN_TOP),
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  alignItems: "flex-start",
+                }}
+              >
+                {floatBar && floatBarEl}
+              </Box>
               {preview}
             </Box>
           )}
-          {/* Wide + collapsed: the toolbar floats in the gutter right of the
-              form (capped at FORM_MAX_WIDTH), pinned below the header. Its own
-              flex item, so it takes room instead of covering the form. */}
-          {floatBar && (
-            <Paper
-              elevation={2}
-              sx={{
-                position: "sticky",
-                top: headerHeight + FLOAT_GAP_PX,
-                flexShrink: 0,
-                maxWidth: FLOAT_MAX_WIDTH,
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                pl: 1.5,
-                pr: 0.5,
-                py: 0.5,
-              }}
-            >
-              <RecordName caption={active?.label ?? "Record"} name={recordName} />
-              {toggle}
-            </Paper>
+          {/* Wide + collapsed, no 3D column: the toolbar floats in the gutter
+              right of the form (capped at FORM_MAX_WIDTH), pinned below the
+              header. Its own flex item, so it takes room instead of covering
+              the form. */}
+          {floatBar && !busColumn && (
+            <Box sx={{ position: "sticky", top: headerHeight + FLOAT_GAP_PX, flexShrink: 0 }}>
+              {floatBarEl}
+            </Box>
           )}
         </Box>
       </Box>
