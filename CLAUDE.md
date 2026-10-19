@@ -290,8 +290,10 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   (`VehicleTypeCollection.stories.tsx`) renders the bare component and drives
   `view` / `tools` / `filterMode` from Storybook controls — no wrapper chrome;
   its `render` writes the switch's pick back to the `view` arg (`useArgs`),
-  and holds the query itself so it starts filtered to buses (the only rows
-  3D can draw).
+  and renders `StartsOnBuses`, which holds the query so it starts filtered to
+  buses (the only rows 3D can draw). Never React state in that `render`
+  beside `useArgs`: a state change re-runs it outside Storybook's hook
+  context and `useArgs` throws.
 - Two card sizes, one `CardsView` (`size`): `cards-sm` is text only (min
   260px); `cards-big` is wider (min 320px — the shot width — capped at the row on a phone) and
   leaves a 16:10 picture area at the top of every card, with the card's title
