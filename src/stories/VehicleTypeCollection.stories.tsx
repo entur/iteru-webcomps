@@ -154,9 +154,6 @@ const meta: Meta<typeof VehicleTypeCollection> = {
     actions: { control: false },
     cardMedia: { control: false },
     reservedHeightForImg: { control: { type: "range", min: 60, max: 240, step: 10 } },
-    // e.g. `["#e3f2fd", "#fafafa"]`: behind the picture, behind the text.
-    // Unset → transparent.
-    bigCardBgs: { control: "object" },
   },
 };
 export default meta;

@@ -5,7 +5,7 @@
  */
 import { Fragment, type ReactNode } from 'react';
 import { alpha, Box, Card, CardContent, Chip, Typography, type CardProps, type TypographyProps } from '@mui/material';
-import type { BigCardBgs, CollectionLabels, Column, KeyedRow, ResolvedCard } from '../types';
+import type { CollectionLabels, Column, KeyedRow, ResolvedCard } from '../types';
 import { displayValue, EMPTY_TEXT, fullTitle, valueList } from '../utils/values';
 
 // A card never gets narrower than its size's minimum (or the whole row, on a
@@ -15,9 +15,8 @@ const CARD_MIN_PX = { sm: 260, big: 320 } as const;
 // picture area too, unless a height is reserved for it.
 const MEDIA_ASPECT = '16 / 10';
 // The heading over a big card's picture sits at its bottom edge — on the 3D
-// shot's light ground plane — over a fade rising from the edge (of the
-// picture's background, else paper), opaque enough at the text to read over
-// any picture.
+// shot's light ground plane — over a fade of the card's own paper rising from
+// the edge, opaque enough at the text to read over any picture.
 const SCRIM_ALPHA = 0.85;
 const CHIP_KINDS: readonly Column['spec']['kind'][] = ['enum', 'enumMulti'];
 
@@ -61,8 +60,6 @@ export interface CardsViewProps {
   media?: (row: unknown) => ReactNode;
   /** `big` only: the picture area's height in px (`EntityCollectionProps`). */
   reservedHeightForImg?: number;
-  /** `big` only: `[top, bottom]` backgrounds (`EntityCollectionProps`). */
-  bigCardBgs?: BigCardBgs;
   cardProps?: CardProps;
 }
 
@@ -90,15 +87,13 @@ const CardHeading = ({ row, card, labels }: HeadingProps) => (
  * over its bottom edge. The heading comes first in reading order; an unfilled
  * picture is hidden from assistive tech, the heading never is. The picture
  * stands on the area's bottom edge: a reserved height (which overrides the
- * area's own 16:10) cuts its top. `bg` is behind the picture and tints the
- * heading's fade.
+ * area's own 16:10) cuts its top.
  */
 const CardMediaArea = ({
   media,
   reservedHeightForImg,
-  bg,
   ...heading
-}: HeadingProps & { media?: ReactNode; reservedHeightForImg?: number; bg?: string }) => (
+}: HeadingProps & { media?: ReactNode; reservedHeightForImg?: number }) => (
   <Box
     sx={{
       position: 'relative',
@@ -109,7 +104,7 @@ const CardMediaArea = ({
       // So media can place things in the part that shows (`cqh`), not in the
       // whole picture, whose top a reserved height cuts.
       containerType: 'size',
-      bgcolor: bg ?? 'transparent',
+      bgcolor: 'action.hover',
       borderBottom: 1,
       borderColor: 'divider',
       overflow: 'hidden',
@@ -125,13 +120,7 @@ const CardMediaArea = ({
         px: 2,
         pt: 2,
         pb: 1,
-        background: t => {
-          // color-mix, not alpha(): `bg` is any CSS colour, var() included.
-          const end = bg
-            ? `color-mix(in srgb, ${bg} ${SCRIM_ALPHA * 100}%, transparent)`
-            : alpha(t.palette.background.paper, SCRIM_ALPHA);
-          return `linear-gradient(transparent, ${end})`;
-        },
+        background: t => `linear-gradient(transparent, ${alpha(t.palette.background.paper, SCRIM_ALPHA)})`,
       }}
     >
       <CardHeading {...heading} />
@@ -161,7 +150,6 @@ const CardMediaArea = ({
  * @param size      `sm` (default) or `big`: wider, the heading over a picture on top
  * @param media     `big` only: fills a row's picture area
  * @param reservedHeightForImg `big` only: the picture area's height in px
- * @param bigCardBgs `big` only: `[top, bottom]` backgrounds; omit → transparent
  * @param cardProps spread onto every `Card`
  * @returns the card list
  */
@@ -172,13 +160,9 @@ export function CardsView({
   size = 'sm',
   media,
   reservedHeightForImg,
-  bigCardBgs,
   cardProps,
 }: CardsViewProps): React.ReactNode {
   const big = size === 'big';
-  const [top, bottom] = bigCardBgs ?? [];
-  // A big card is transparent: its picture area and its text paint their own.
-  const cardSx = [big && { bgcolor: 'transparent' }, ...(Array.isArray(cardProps?.sx) ? cardProps.sx : [cardProps?.sx])];
   return (
     <Box
       role="list"
@@ -186,18 +170,11 @@ export function CardsView({
       sx={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${CARD_MIN_PX[size]}px, 100%), 1fr))`, gap: 2 }}
     >
       {rows.map(({ key, entity: row }) => (
-        <Card key={key} role="listitem" variant="outlined" {...cardProps} sx={cardSx}>
+        <Card key={key} role="listitem" variant="outlined" {...cardProps}>
           {big ? (
-            <CardMediaArea
-              row={row}
-              card={card}
-              labels={labels}
-              media={media?.(row)}
-              reservedHeightForImg={reservedHeightForImg}
-              bg={top}
-            />
+            <CardMediaArea row={row} card={card} labels={labels} media={media?.(row)} reservedHeightForImg={reservedHeightForImg} />
           ) : null}
-          <CardContent sx={big ? { bgcolor: bottom ?? 'transparent' } : undefined}>
+          <CardContent>
             {big ? null : <CardHeading row={row} card={card} labels={labels} />}
             <Box
               component="dl"

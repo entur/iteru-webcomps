@@ -64,7 +64,6 @@ export function createEntityCollection<F extends Record<string, FieldSpec>>(
     card,
     cardMedia,
     reservedHeightForImg,
-    bigCardBgs,
     tools,
     actions,
     query: controlled,
@@ -188,7 +187,6 @@ export function createEntityCollection<F extends Record<string, FieldSpec>>(
                 size={view === 'cards-big' ? 'big' : 'sm'}
                 media={cardMedia as ((row: unknown) => ReactNode) | undefined}
                 reservedHeightForImg={reservedHeightForImg}
-                bigCardBgs={bigCardBgs}
                 cardProps={slotProps?.card}
               />
             )}
