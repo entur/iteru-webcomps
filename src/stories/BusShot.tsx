@@ -16,9 +16,6 @@ import genericVehicle from "./assets/no-render-data_320.png";
 const LOADING_LABEL = "Rendering preview";
 const NO_PREVIEW = "No 3D preview";
 const NO_WEBGL = "The browser could not create a WebGL context.";
-// The caption's inset from the picture's top-left corner (theme spacing):
-// the top, as a cards-big heading covers the bottom edge (and the hover there).
-const CAPTION_INSET = 1;
 
 const FILL = { position: "relative", width: "100%", height: "100%" } as const;
 const IMG_SX = { display: "block", width: "100%", height: "100%", objectFit: "contain" } as const;
@@ -37,7 +34,8 @@ const planOf = (vt: VehicleType): Plan => {
  * The generic vehicle picture: what a card shows when there is no 3D shot.
  *
  * @param why when set, a "No 3D preview" caption over the picture, with this
- *   as its hover text
+ *   as its hover text — centred in the part of the card's picture area that
+ *   shows (the area is a size container), whatever height it is given
  * @returns the picture, filling its parent
  */
 export function GenericVehicle({ why }: { why?: string }) {
@@ -50,9 +48,13 @@ export function GenericVehicle({ why }: { why?: string }) {
           color="text.secondary"
           title={why}
           sx={{
+            // The picture stands on the area's bottom edge, so half the
+            // area's height up from the bottom is the middle of what shows.
             position: "absolute",
-            left: t => t.spacing(CAPTION_INSET),
-            top: t => t.spacing(CAPTION_INSET),
+            left: "50%",
+            bottom: "50cqh",
+            transform: "translate(-50%, 50%)",
+            whiteSpace: "nowrap",
             px: 0.75,
             borderRadius: 1,
             bgcolor: "background.paper",

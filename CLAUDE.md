@@ -302,10 +302,19 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   picture is filled per row by the host's `cardMedia(row)` — an `<img>` there
   is scaled to fit. Unfilled, it stays blank and `aria-hidden` (the heading
   over it never is), so every card keeps the same shape.
+  `reservedHeightForImg` (px) makes the picture area that tall instead —
+  all the room the picture gets, so it sets how tall a big card is: the
+  picture keeps its 16:10 at the card's width, stands on the area's bottom
+  edge, and what doesn't fit is cut from its top (a shot's empty sky first).
+  One layout either way: the area is 16:10 unless the height overrides it.
+  The area is a size container, so media can place things in the part that
+  shows (`cqh`) rather than in the whole picture.
+  The story uses 190 (a range control).
   The story fills it: a bus row → `BusShot` (`src/stories/BusShot.tsx`: a
   wave skeleton, then its 3dbus PNG), anything else → the generic picture
   (`src/stories/assets/no-render-data_320.png`, 320×200 like the shots), which a bus that can't be drawn also shows, captioned
-  "No 3D preview" top-left (the heading covers the bottom edge) with the reason as `title`. Every card shares **one**
+  "No 3D preview" centred in the part of the picture that shows (the area is a
+  size container, so `bottom: 50cqh` whatever `reservedHeightForImg` cuts) with the reason as `title`. Every card shares **one**
   off-screen stage (`src/stories/shotQueue.ts`: serial, cached by input, LRU over shot PNGs only,
   released after 2 s idle, started a microtask late so one render's cards fail
   together without WebGL) — a page of live stages would run out of contexts.
