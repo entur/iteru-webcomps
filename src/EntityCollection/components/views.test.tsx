@@ -112,6 +112,8 @@ describe('CardsView', () => {
       expect(getComputedStyle(area).height).toBe('120px');
       // The card's full width, not 120px × 16/10 from the ratio.
       expect(getComputedStyle(area).width).toBe('100%');
+      // Media measures what shows (`cqh`), not the whole picture.
+      expect(getComputedStyle(area).getPropertyValue('container-type')).toBe('size');
       expect(getComputedStyle(area).overflow).toBe('hidden');
       const media = getComputedStyle(area.querySelector('[data-card-media]')!);
       // Its own 16:10 at the card's width, on the bottom edge — not stretched to the area.

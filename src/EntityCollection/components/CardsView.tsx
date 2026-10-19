@@ -106,6 +106,9 @@ const CardMediaArea = ({
       width: '100%',
       aspectRatio: MEDIA_ASPECT,
       height: reservedHeightForImg,
+      // So media can place things in the part that shows (`cqh`), not in the
+      // whole picture, whose top a reserved height cuts.
+      containerType: 'size',
       bgcolor: bg ?? 'transparent',
       borderBottom: 1,
       borderColor: 'divider',

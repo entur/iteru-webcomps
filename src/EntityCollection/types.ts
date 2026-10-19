@@ -105,7 +105,9 @@ export interface EntityCollectionProps<E, K extends string = string> {
   card?: CardSpec<K>;
   /** `cards-big` only: what fills the picture area at the top of a row's card
    *  (an `<img>` fills it, scaled to fit). Omit, or return nothing, and the
-   *  area is left blank, so every card keeps the same height. */
+   *  area is left blank, so every card keeps the same height. The area is a
+   *  size container: `cqh` / `cqw` in the media measure the part that shows,
+   *  which a `reservedHeightForImg` cuts from the picture's top. */
   cardMedia?: (row: E) => ReactNode;
   /** `cards-big` only: the picture area's height in px — all the room the
    *  picture gets, so it sets how tall a big card is. The picture keeps its
