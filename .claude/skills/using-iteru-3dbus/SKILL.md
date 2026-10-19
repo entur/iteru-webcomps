@@ -9,14 +9,13 @@ A boxy 3D bus in three.js from **one input JSON** (contract v2.0, units **mm**).
 
 ## Install
 
-Not on a registry: install the GitHub Release tarball with three as its **peer**. 0.x caret ranges are narrow, so `three@latest` (0.186) does not satisfy `^0.180.0`.
+Public on npm: install it with three as its **peer**. 0.x caret ranges are narrow, so `three@latest` (0.186) does not satisfy `^0.180.0`.
 
 ```sh
-npm i https://github.com/entur/iteru-3dbus/releases/download/v0.1.0/entur-iteru-3dbus-0.1.0.tgz three@^0.180.0
+npm i @entur/iteru-3dbus three@^0.180.0
 ```
 
 - **In this lib:** add both to `peerDependencies` and to `EXTERNAL` in `vite.config.ts`, as with React and MUI. Then the host (hathor) owns one copy of three.
-- **Private repo:** the URL needs auth. Run `gh release download v0.1.0 -R entur/iteru-3dbus`, then `npm i ./entur-iteru-3dbus-0.1.0.tgz`.
 
 ## Types: add a shim
 
