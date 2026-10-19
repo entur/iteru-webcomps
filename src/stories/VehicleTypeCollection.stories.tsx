@@ -11,7 +11,10 @@
  *
  * In `cards-big`, a bus row's card shows its 3D bitmap (`BusShot`, shot one
  * at a time on a shared off-screen stage); other modes show a generic picture.
+ * The query starts filtered to buses — the only rows 3D can draw — so the
+ * demo opens on them; the chip clears it.
  */
+import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useArgs } from "storybook/preview-api";
 import {
@@ -22,7 +25,7 @@ import {
   type CollectionView,
   type VehicleType,
 } from "../index";
-import { ALL_TOOLS } from "../EntityCollection/types";
+import { ALL_TOOLS, defaultCollectionQuery, type CollectionQuery } from "../EntityCollection/types";
 import { UNIT_LABELS } from "./initLayouts";
 import { TransportMode } from "../generated/sobekTypes";
 import { BusShot, GenericVehicle } from "./BusShot";
@@ -42,6 +45,11 @@ const SEED = 0x9e3779b9; // fixed PRNG seed → reproducible grid across reloads
 const VIEWS: CollectionView[] = ["grid", "cards-sm", "cards-big"];
 const TOOLS: CollectionTool[] = [...ALL_TOOLS];
 const FILTER_MODES = ["client", "server"] as const;
+// Buses are the generator's only rows with 3D geometry: start on them.
+const START_QUERY: CollectionQuery = {
+  ...defaultCollectionQuery,
+  filters: { transportMode: [TransportMode.Bus] },
+};
 
 const VehicleTypeCollection = createEntityCollection(vehicleTypeFields, {
   filterFields: VehicleTypeFilterFields,
@@ -58,12 +66,19 @@ const meta: Meta<typeof VehicleTypeCollection> = {
   title: "Collection/VehicleType",
   component: VehicleTypeCollection,
   // `view` is an arg, so the collection is controlled: the toolbar's switch
-  // writes its pick back to the arg, keeping it and the control in step.
+  // writes its pick back to the arg, keeping it and the control in step. The
+  // query is held here, only so it can start on `START_QUERY`.
   render: function Render(args) {
     const [, updateArgs] = useArgs();
+    const [query, setQuery] = useState(START_QUERY);
     return (
       <VehicleTypeCollection
         {...args}
+        query={query}
+        onQueryChange={next => {
+          setQuery(next);
+          args.onQueryChange?.(next);
+        }}
         onViewChange={view => {
           args.onViewChange?.(view);
           updateArgs({ view });
@@ -114,8 +129,8 @@ const meta: Meta<typeof VehicleTypeCollection> = {
     filterMode: { control: "inline-radio", options: FILTER_MODES },
     onQueryChange: { action: "queryChange" },
     onViewChange: { action: "viewChange" },
-    // 250 row objects are not worth a JSON editor; `query` left unset keeps
-    // the component uncontrolled, which is the mode worth clicking through.
+    // 250 row objects are not worth a JSON editor; `query` is the render's own
+    // state (see `render`).
     rows: { control: false },
     query: { control: false },
     actions: { control: false },
