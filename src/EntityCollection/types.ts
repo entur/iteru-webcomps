@@ -10,9 +10,6 @@ import type { FieldEntry, FieldSpec } from '../EntityDetailsForm/types';
 /** `cards-sm`: compact text cards. `cards-big`: wider cards with room for a
  *  picture at the top (`cardMedia`). */
 export type CollectionView = 'grid' | 'cards-sm' | 'cards-big';
-/** `cards-big` backgrounds, any CSS colour: behind the picture, then behind
- *  the text below it. */
-export type BigCardBgs = readonly [top: string, bottom: string];
 /** `view` is the grid / small cards / large cards switch. */
 export type CollectionTool = 'search' | 'filter' | 'sort' | 'columns' | 'density' | 'view';
 export type FilterOp = 'contains' | 'anyOf';
@@ -115,12 +112,14 @@ export interface EntityCollectionProps<E, K extends string = string> {
    *  what doesn't fit is cut from its top (a 3D shot's empty sky first).
    *  Omit → the area is the full 16:10. */
   reservedHeightForImg?: number;
-  /** `cards-big` only: `[top, bottom]` backgrounds, any CSS colour (`var()`
-   *  included). `top` is behind the picture — what a 3D shot's transparent
-   *  sky shows — and tints the fade behind the title; `bottom` is behind the
-   *  text below. Omit → the card is transparent and the fade is paper. The
-   *  shot's ground plane is baked into its PNG and stays paper either way. */
-  bigCardBgs?: BigCardBgs;
+  /** `cards-big` only: background behind the picture (hex, e.g. `#e3f2fd`) —
+   *  what a 3D shot's transparent sky shows — which also tints the fade
+   *  behind the title. Omit → transparent, the fade paper. The shot's ground
+   *  plane is baked into its PNG and stays paper either way. */
+  bigCardsBackgroundTop?: string;
+  /** `cards-big` only: background behind the text below the title (hex).
+   *  Omit → the theme's `background.paper`. */
+  bigCardsBackgroundBottom?: string;
   /** Toolbar whitelist; `false` hides the toolbar's tools. Default: all. */
   tools?: readonly CollectionTool[] | false;
   /** Host buttons at the end of the toolbar. */

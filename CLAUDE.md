@@ -310,11 +310,13 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   The area is a size container, so media can place things in the part that
   shows (`cqh`) rather than in the whole picture.
   The story uses 190 (a range control).
-  `bigCardBgs: [top, bottom]` (any CSS colour, `var()` included) paints a big
-  card: `top` behind the picture — what a shot's transparent sky shows — and
-  the fade behind the title (`color-mix`, so no colour parsing); `bottom`
-  behind the text below. Unset → the card is transparent (no grey tint, no
-  paper) and the fade is paper. Outline and divider stay. The shot's ground
+  `bigCardsBackgroundTop` / `bigCardsBackgroundBottom` (hex) paint a big
+  card: top behind the picture — what a shot's transparent sky shows — and
+  the fade behind the title (`alpha()`); bottom behind the text below. Two
+  props, not a tuple: the story gives each a colour picker (a tuple's object
+  control crashed when edited by hand). Unset → the picture area is
+  transparent (no grey tint), the text is on the theme's `background.paper`,
+  and the fade is paper; the card itself is always transparent. Outline and divider stay. The shot's ground
   plane is baked into its PNG from `background.paper` and stays paper — on a
   coloured `top` it shows as a light band under the bus. Small cards keep
   their paper.
