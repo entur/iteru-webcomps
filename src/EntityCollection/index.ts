@@ -7,6 +7,7 @@ export { toSobekFilter } from './utils/filters';
 export { defaultCollectionQuery } from './types';
 export type {
   CollectionView,
+  BigCardBgs,
   CollectionTool,
   CollectionQuery,
   CollectionSort,

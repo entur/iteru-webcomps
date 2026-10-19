@@ -127,6 +127,46 @@ describe('CardsView', () => {
     expect(area.height).toBe('');
   });
 
+  /** A big card's backgrounds: the card, its picture area, its text, and the fade behind its title. */
+  const bigBgs = (item: HTMLElement) => ({
+    card: getComputedStyle(item).backgroundColor,
+    top: getComputedStyle(item.firstElementChild!).backgroundColor,
+    bottom: getComputedStyle(item.querySelector('.MuiCardContent-root')!).backgroundColor,
+    fade: getComputedStyle(item.querySelector('[data-card-heading]')!).backgroundImage,
+  });
+  const CLEAR = 'rgba(0, 0, 0, 0)';
+
+  it('leaves a big card transparent when no backgrounds are given, the fade behind its title paper', () => {
+    renderCards(ROWS, { size: 'big' });
+    for (const item of screen.getAllByRole('listitem')) {
+      expect(bigBgs(item)).toEqual({
+        card: CLEAR,
+        top: CLEAR,
+        bottom: CLEAR,
+        fade: 'linear-gradient(transparent, rgba(255, 255, 255, 0.85))',
+      });
+    }
+  });
+
+  it('paints a big card\'s picture area and its text with the given backgrounds, the fade from the top one', () => {
+    renderCards(ROWS, { size: 'big', bigCardBgs: ['rgb(1, 2, 3)', 'rgb(4, 5, 6)'] });
+    for (const item of screen.getAllByRole('listitem')) {
+      expect(bigBgs(item)).toEqual({
+        card: CLEAR,
+        top: 'rgb(1, 2, 3)',
+        bottom: 'rgb(4, 5, 6)',
+        fade: 'linear-gradient(transparent, color-mix(in srgb, rgb(1, 2, 3) 85%, transparent))',
+      });
+    }
+  });
+
+  it('keeps a small card on its paper', () => {
+    renderCards(ROWS, { bigCardBgs: ['rgb(1, 2, 3)', 'rgb(4, 5, 6)'] });
+    const first = screen.getAllByRole('listitem')[0];
+    expect(getComputedStyle(first).backgroundColor).toBe('rgb(255, 255, 255)');
+    expect(getComputedStyle(first.querySelector('.MuiCardContent-root')!).backgroundColor).toBe(CLEAR);
+  });
+
   it('renders one list item per row with its title', () => {
     mount();
     const items = screen.getAllByRole('listitem');

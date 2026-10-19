@@ -308,6 +308,14 @@ reason: MUI X's toolbar primitives need a mounted grid, which cards don't have.
   edge, and what doesn't fit is cut from its top (a shot's empty sky first).
   One layout either way: the area is 16:10 unless the height overrides it.
   The story uses 190 (a range control).
+  `bigCardBgs: [top, bottom]` (any CSS colour, `var()` included) paints a big
+  card: `top` behind the picture — what a shot's transparent sky shows — and
+  the fade behind the title (`color-mix`, so no colour parsing); `bottom`
+  behind the text below. Unset → the card is transparent (no grey tint, no
+  paper) and the fade is paper. Outline and divider stay. The shot's ground
+  plane is baked into its PNG from `background.paper` and stays paper — on a
+  coloured `top` it shows as a light band under the bus. Small cards keep
+  their paper.
   The story fills it: a bus row → `BusShot` (`src/stories/BusShot.tsx`: a
   wave skeleton, then its 3dbus PNG), anything else → the generic picture
   (`src/stories/assets/no-render-data_320.png`, 320×200 like the shots), which a bus that can't be drawn also shows, captioned
