@@ -43,7 +43,7 @@ export const vehicleTypeSample: VehicleType = {
   lowFloor: false, // low entry, not step-free throughout
   dataOwnerRef: "",
   vehicles: sampleVehicles,
-  sections: [{ id: "S1", length: 12.396, axles: [2.769, 9.099] }],
+  sections: [{ id: "S1", length: 12.396, axles: [2.769, 9.099], doors: 2 }],
   tyreDiameter: 1.044, // 295/80 R22.5
   baseColor: "#E9ECEC",
   roofEquipment: 0,
@@ -61,7 +61,7 @@ export const vehicleTypeSeed: Record<string, VehicleType> = {
     netexId: "VEH:VehicleType:2",
     name: { lang: "en", value: "BusNordic I:15 DD" }, // busnordic/bn-i-15-dd.json
     deckPlan: { netexId: "VEH:DeckPlan:2", dataOwnerRef: "" },
-    manufacturer: undefined, // a Bus Nordic reference body, not a make
+    manufacturer: "generic", // a Bus Nordic reference body, not a make
     modelName: "I:15 DD",
     euroClass: "EURO VI", // off the code list: still shown, kept on save
     length: 14.9,
@@ -69,7 +69,7 @@ export const vehicleTypeSeed: Record<string, VehicleType> = {
     lowFloor: false,
     vehicles: [],
     // Three axles: steer, drive, tag.
-    sections: [{ id: "S1", length: 14.9, axles: [2.7, 9.5, 10.9] }],
+    sections: [{ id: "S1", length: 14.9, axles: [2.7, 9.5, 10.9], doors: 2 }],
     tyreDiameter: 0.957, // 275/70 R22.5
     baseColor: "#1F6FB2",
   },
@@ -87,8 +87,8 @@ export const vehicleTypeSeed: Record<string, VehicleType> = {
     vehicles: [],
     // Articulated: the trailer section carries the bellows ahead of it.
     sections: [
-      { id: "S1", length: 10.6, axles: [2.7, 8.6] },
-      { id: "S2", length: 7.0, axles: [4.7], bellowsAhead: 0.6 },
+      { id: "S1", length: 10.6, axles: [2.7, 8.6], doors: 2 },
+      { id: "S2", length: 7.0, axles: [4.7], bellowsAhead: 0.6, doors: 2 },
     ],
     tyreDiameter: 0.95,
     baseColor: "#D6001C",

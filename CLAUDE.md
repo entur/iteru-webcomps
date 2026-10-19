@@ -152,8 +152,8 @@ each entry as a skeleton wrapping its own label (the dropdown: wrapping the
 field), so the loaded TOC lands where its placeholder stood. The fallback
 leaves in the commit the record connects in (unmount cleanups run before new
 layout effects), so there is never a second live form. `session.loading` /
-`toc.loading` is that flag — a direct load signal for the host, unlike
-inferring one from a missing `onChange` value,
+`toc.loading` is that flag — a direct load signal for the host (the Fullpage
+3D preview uses it), unlike inferring one from a missing `onChange` value,
 which cannot tell a slow record from a missing one. When Suspense hides an
 already-mounted record (netexId / org change without a key remount), the
 record disconnects and the fallback reconnects in its stead.
@@ -368,6 +368,55 @@ Tests: `components/collection.test.tsx` is manifest-driven like
 `wrappers.test.tsx` (rows built from the registry, filterable fields from the
 generated map). The DataGrid renders rows under jsdom only with
 `slotProps.dataGrid.disableVirtualization`.
+
+## Bus input (3D)
+
+`toBusInput(vt, v?)` (`src/BusInput/`) — VehicleType, or a Vehicle over its
+type, → `@entur/iteru-3dbus` input (contract 2.0). **Pure: the lib never
+imports 3dbus or three**, so `dist` stays three-free; the package is a
+devDependency for the story and the tests only (type shim:
+`src/types/iteru-3dbus.d.ts`). Metres → integer mm here and nowhere else. The
+Vehicle's `tyreDiameter` / `baseColor` / `roofEquipment` / `sections` win over
+the type's; `brand`/`model`/`width`/`height` are the type's; `front_display`
+is the drawn entity's name; `body` from the section count. **Nothing that
+changes the render is invented**: a required value with no source comes back
+as `{ ok: false, missing: [{ key, on }] }` — `on` the form that fills it (a
+Vehicle's own geometry is the Vehicle's; `vt: undefined` with a Vehicle →
+`transportType`). An ok result carries `lengthDrift` (metres) when the type's
+`length` disagrees with the sections it is drawn with — one value, so a view
+can never pair an input with another record's length. Unset keys are left out, never
+`undefined` (3dbus rejects unknown root keys). `BusSection.doors` (a count) →
+`doors_hint` via `doorHints`: slots front overhang → each axle gap → rear
+overhang, first N; one door single-leaf, more double; glazed/bias default.
+Required enums 3dbus never reads (`bus_class`, `floor_type`) are placeholders:
+the schema's first member its `allOf` rules leave unconstrained (`I`, not `A`,
+which caps the bus at 9.5 m rigid) — entur/iteru-3dbus#39. Tests run the real
+3dbus `validate` over every seed.
+
+The Fullpage story's preview (`src/stories/BusView.tsx`) is column 3 once the
+row leaves it `BUS_MIN_WIDTH` (360 px) beside the TOC, padding, form and
+floating bar — a width query summed from those constants, not a breakpoint
+(under the form below it): header toggle bitmap (`mkStageShot` → PNG) | 3D
+(`mkStage`), fed by the form's `onChange`, so unsaved edits redraw. **Settled
+at the source**: the page commits the form's value after 250 ms
+(`useSettledState`, `src/stories/hooks.ts`; a load's arrival and a record
+switch commit at once), so a keystroke re-renders nothing, and the result is
+memoised on that committed value — BusView takes it as given and settles
+nothing itself. An existing record with no value yet is loading: a wave
+skeleton the canvas's shape, not a missing-data note. The bitmap measures its
+own box (`useSize`, settled, so a resize drag re-shoots once) in CSS px —
+3dbus applies the pixel ratio. Unmount drops the bus before `dispose` (which
+frees all but a model still added). `BusView.test.tsx` pins these, 3dbus mocked. One live stage per mount, the bus swapped per input,
+framed once per record (BusView is keyed by record). No WebGL (off, or out of
+contexts) → an alert in the column; it must never throw into the page.
+Camera (`src/stories/busMotion.ts`, unit-tested without WebGL): `orbit` | 
+`animate`, switched by a control inside the canvas. `animate` flies an ∞ (1:2
+Lissajous on the viewing sphere) around the resting pose, run from the stage's
+`ticks`; a weight eases path *and* speed in from rest and back out to exactly
+that pose (5 s). A grab on the canvas (OrbitControls `start`) ends a flight on
+the spot, camera where it is. Reduced motion: never starts by itself, eases cut.
+3dbus installs from npm (`@entur/iteru-3dbus@^0.1.1`, public) with `three@^0.180.0`
+beside it — no URL dependency, so no `.npmrc` either.
 
 ## GraphQL → TS pipeline
 
