@@ -81,6 +81,10 @@ export interface FieldEntry<K extends string = string> {
   /** Share of the row this control takes from `sm` up (below it, every field is
    *  full width). Wins over the form's `widths` and the kind default. */
   width?: FieldWidth;
+  /** Short help text, always shown below the control (view mode too) and read
+   *  by screen readers on focus. A validation error takes its place while it
+   *  stands. Any language — localization is the client's job, as with `label`. */
+  help?: string;
   [k: string]: unknown; // future per-field overrides (e.g. slotProps)
 }
 

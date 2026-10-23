@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Autocomplete, FormControlLabel, MenuItem, Switch, TextField } from '@mui/material';
+import { Autocomplete, Box, FormControlLabel, FormHelperText, MenuItem, Switch, TextField } from '@mui/material';
 import type { TextFieldProps } from '@mui/material';
 import type { ControlSlotProps, FieldSpec, RefOption } from '../types';
 import { fromLocalInput, toLocalInput } from '../utils/datetime';
@@ -37,8 +37,30 @@ const withStored = (opts: RefOption[], cur: unknown): RefOption[] =>
     ? [{ value: cur, label: cur }, ...opts]
     : opts;
 
+/**
+ * The line under a control — a validation error while one stands, else the
+ * layout entry's help text — and the id that ties it to the control. MUI's
+ * TextField derives the same `${id}-helper-text` id for its own helper line,
+ * so every kind is described the same way.
+ *
+ * @param id    the control's id
+ * @param error server validation error, if any
+ * @param help  the layout entry's help text, if any
+ * @returns the text to show and its id, both `undefined` when there is none
+ */
+export const helperLine = (
+  id: string,
+  error?: string,
+  help?: string
+): { note?: string; noteId?: string } => {
+  const note = error ?? help;
+  return note ? { note, noteId: `${id}-helper-text` } : {};
+};
+
 export interface ControlProps {
   spec: FieldSpec;
+  /** DOM id for the control; its helper line's id is derived from it. */
+  id: string;
   label: string;
   value: unknown;
   disabled: boolean;
@@ -51,8 +73,10 @@ export interface ControlProps {
   /** Form-level per-kind MUI overrides. The slice for this field's `spec.kind`
    *  is applied to its control (see `ControlSlotProps`). */
   slotProps?: ControlSlotProps;
-  /** Server validation error for this field (if any). */
+  /** Server validation error for this field (if any). Replaces `help` while set. */
   error?: string;
+  /** The layout entry's help text, shown below the control. */
+  help?: string;
 }
 
 /**
@@ -68,6 +92,7 @@ export interface ControlProps {
  */
 export function renderControl({
   spec,
+  id,
   label,
   value,
   disabled,
@@ -75,18 +100,22 @@ export function renderControl({
   options,
   slotProps,
   error,
+  help,
 }: ControlProps): ReactNode {
+  const { note, noteId } = helperLine(id, error, help);
   // Shared TextField props. `slotProps` is set per-kind below (each TextField
   // kind merges its own override over `SHRINK_LABEL`); the bare default keeps
-  // the label shrunk when no override is supplied.
+  // the label shrunk when no override is supplied. With an `id`, TextField
+  // points the input's `aria-describedby` at its helper line by itself.
   const common = {
+    id,
     label,
     disabled,
     size: 'small' as const,
     fullWidth: true,
     slotProps: SHRINK_LABEL as TextFieldProps['slotProps'],
     error: !!error,
-    helperText: error ?? '',
+    helperText: note ?? '',
   };
 
   switch (spec.kind) {
@@ -171,22 +200,38 @@ export function renderControl({
         />
       );
 
-    case 'switch':
+    case 'switch': {
+      // No TextField here, so the helper line and its `aria-describedby` are
+      // wired by hand, onto the native checkbox the switch focuses.
+      const own = slotProps?.switch?.slotProps?.input;
       return (
-        <FormControlLabel
-          control={
-            // Consumer Switch props spread first so the controlled
-            // `checked`/`disabled`/`onChange` below always win.
-            <Switch
-              {...slotProps?.switch}
-              checked={!!value}
-              disabled={disabled}
-              onChange={e => onChange(e.target.checked)}
-            />
-          }
-          label={label}
-        />
+        <Box>
+          <FormControlLabel
+            control={
+              // Consumer Switch props spread first so the controlled
+              // `checked`/`disabled`/`onChange` below always win.
+              <Switch
+                {...slotProps?.switch}
+                id={id}
+                slotProps={{
+                  ...slotProps?.switch?.slotProps,
+                  input: { ...(typeof own === 'object' ? own : {}), 'aria-describedby': noteId },
+                }}
+                checked={!!value}
+                disabled={disabled}
+                onChange={e => onChange(e.target.checked)}
+              />
+            }
+            label={label}
+          />
+          {note && (
+            <FormHelperText id={noteId} error={!!error}>
+              {note}
+            </FormHelperText>
+          )}
+        </Box>
       );
+    }
 
     case 'enum':
       return (
@@ -212,6 +257,7 @@ export function renderControl({
       return (
         <Autocomplete
           multiple
+          id={id}
           size="small"
           disabled={disabled}
           options={[...(spec.options ?? [])]}
@@ -224,7 +270,7 @@ export function renderControl({
               label={label}
               slotProps={SHRINK_LABEL}
               error={!!error}
-              helperText={error ?? ''}
+              helperText={note ?? ''}
             />
           )}
         />
@@ -243,6 +289,7 @@ export function renderControl({
       const selected = opts.find(o => o.value === value) ?? null;
       return (
         <Autocomplete
+          id={id}
           size="small"
           disabled={disabled}
           options={opts}
@@ -256,7 +303,7 @@ export function renderControl({
               label={label}
               slotProps={SHRINK_LABEL}
               error={!!error}
-              helperText={error ?? ''}
+              helperText={note ?? ''}
             />
           )}
         />

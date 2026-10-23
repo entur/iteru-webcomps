@@ -22,14 +22,15 @@ import type {
 } from '../types';
 
 /** A field resolved for rendering: its registry key, display label, its share
- *  of the row, the optional explicit grid column entries, and (for a
- *  `reference`) the option-dataset closure — both from the layout. */
+ *  of the row, the optional explicit grid column entries, (for a `reference`)
+ *  the option-dataset closure, and the help text — all from the layout. */
 export interface ResolvedField {
   key: string;
   label: string;
   width: FieldWidth;
   cols?: FieldEntry[];
   options?: () => RefOption[];
+  help?: string;
 }
 
 /** A named group of resolved fields. `label` is `''` for the layout-less case. */
@@ -84,7 +85,7 @@ export const PATCH_MARK_COL_PX = 16;
 export const marked = (spec: FieldSpec, patched: PatchedDisplay): boolean =>
   patched === 'mark' && !!spec.patched;
 
-/** Normalize a `LayoutItem` to `{ field, label?, width?, entries?, options? }`.
+/** Normalize a `LayoutItem` to `{ field, label?, width?, entries?, options?, help? }`.
  *  Also used by the collection's column whitelist, which takes the same items. */
 export const norm = (
   item: LayoutItem
@@ -94,6 +95,7 @@ export const norm = (
   width?: FieldWidth;
   entries?: FieldEntry[];
   options?: () => RefOption[];
+  help?: string;
 } =>
   typeof item === 'string'
     ? { field: item }
@@ -103,6 +105,7 @@ export const norm = (
         width: item.width,
         entries: item.entries,
         options: item.options,
+        help: item.help,
       };
 
 /**
@@ -150,6 +153,7 @@ export function resolveSections(
           width: widthOf(e.field, e.width),
           cols: e.entries,
           options: e.options,
+          help: e.help,
         })),
     }))
     .filter(s => s.fields.length > 0);

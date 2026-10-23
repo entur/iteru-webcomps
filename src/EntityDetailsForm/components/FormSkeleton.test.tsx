@@ -83,6 +83,16 @@ describe('FormSkeleton', () => {
     expect(px(grid)).toBeGreaterThan(px(text));
   });
 
+  it('stands a field with help text taller, by its helper line', () => {
+    const { container } = render(
+      <FormSkeleton fields={FIELDS} layout={{ All: ['name', { field: 'count', help: 'How many' }] }} />
+    );
+    const [plain, helped] = Array.from(rows(container));
+
+    // Same kind of control, so the difference is the help line alone.
+    expect(px(helped)).toBeGreaterThan(px(plain));
+  });
+
   it('places each placeholder at the width its control will take', () => {
     const layout: Layout = { All: ['name', 'count', { field: 'active', width: '1/4' }, 'vehicles'] };
     const { container } = render(<FormSkeleton fields={FIELDS} layout={layout} widths={{ number: '1/2' }} />);

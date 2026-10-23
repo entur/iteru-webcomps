@@ -1,5 +1,5 @@
-import { useState, type FC, type ReactNode } from 'react';
-import { Box, Grid, Stack, Tab, Tabs, Typography } from '@mui/material';
+import { useId, useState, type FC, type ReactNode } from 'react';
+import { Box, FormHelperText, Grid, Stack, Tab, Tabs, Typography } from '@mui/material';
 import type { EntityDetailsFormProps, FieldSpec } from '../types';
 import { getPath, setPath } from '../utils/paths';
 import {
@@ -10,7 +10,7 @@ import {
   type ResolvedField,
 } from '../utils/sections';
 import { useSectionSpy } from '../hooks/useSectionSpy';
-import { renderControl } from './controls';
+import { helperLine, renderControl } from './controls';
 import { ObjectGrid } from '../../ObjectGrid';
 
 /** Theme spacing kept above a section scrolled into view by `activeSection`. */
@@ -22,6 +22,9 @@ const PATCH_HINT = 'Not saved — not yet in the backend schema';
 const PATCH_MARK_SX = { fontWeight: 'fontWeightBold', fontSize: '1.25rem', lineHeight: 1, color: 'error.main' } as const;
 /** Theme spacing between controls sharing a row, and below each row. */
 const COL_GAP = 2, ROW_GAP = 2;
+/** Height of a small MUI input. The `*` is centred on it rather than on the
+ *  whole cell, so a helper line under the control can't pull the mark down. */
+const INPUT_H = 40;
 
 /**
  * Build a presentational (dumb) entity form bound to a generated `FIELDS`
@@ -46,6 +49,8 @@ export function createAbstractEntityDetailsForm<E>(
     onActiveSectionChange,
   }) => {
     const [active, setActive] = useState(0);
+    // Unique per form, so two forms on one page never share a control's id.
+    const idBase = useId();
     // Empty sections are dropped by `resolveSections` itself, so the skeleton
     // and the form always agree on how many there are.
     const sections = resolveSections(fields, layout, patched, widths);
@@ -61,17 +66,28 @@ export function createAbstractEntityDetailsForm<E>(
 
     // One grid cell per field, its share of the row by `width`: the control,
     // then — on a marked control only — a fixed cell holding the `*`, so the
-    // mark sits after its own input, not at the end of the row.
+    // mark sits after its own input, not at the end of the row. The mark stays
+    // level with the input, whatever helper line hangs below it.
     const row = ({ key, width }: ResolvedField, control: ReactNode): ReactNode => (
       <Grid
         key={key}
         size={gridSize(width)}
         data-nmr-width={width}
-        sx={{ mb: ROW_GAP, display: 'flex', alignItems: 'center', minWidth: 0 }}
+        sx={{ mb: ROW_GAP, display: 'flex', alignItems: 'flex-start', minWidth: 0 }}
       >
         <Box sx={{ flex: 1, minWidth: 0 }}>{control}</Box>
         {marked(fields[key], patched) && (
-          <Box sx={{ width: PATCH_MARK_COL_PX, flexShrink: 0, textAlign: 'right', ...PATCH_MARK_SX }}>
+          <Box
+            sx={{
+              width: PATCH_MARK_COL_PX,
+              height: INPUT_H,
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              ...PATCH_MARK_SX,
+            }}
+          >
             <span title={PATCH_HINT} aria-label={PATCH_HINT} data-patch-mark>
               *
             </span>
@@ -81,12 +97,15 @@ export function createAbstractEntityDetailsForm<E>(
     );
 
     const field = (f: ResolvedField, _i: number, arr: ResolvedField[]): ReactNode => {
-      const { key, label, cols, options } = f;
+      const { key, label, cols, options, help } = f;
       const spec = fields[key];
+      const id = `${idBase}-${key}`;
 
       if (spec.kind === 'grid') {
-        return row(
-          f,
+        // The DataGrid takes no `aria-describedby`, so a helper line describes
+        // a named group around it instead, read as focus enters the table.
+        const { note, noteId } = helperLine(id, errors?.[key], help);
+        const grid = (
           <ObjectGrid
             rows={getPath(value, spec.path)}
             label={label}
@@ -95,11 +114,25 @@ export function createAbstractEntityDetailsForm<E>(
             dataGrid={slotProps?.grid?.dataGrid}
           />
         );
+        return row(
+          f,
+          note ? (
+            <Box role="group" aria-label={label} aria-describedby={noteId}>
+              {grid}
+              <FormHelperText id={noteId} error={!!errors?.[key]}>
+                {note}
+              </FormHelperText>
+            </Box>
+          ) : (
+            grid
+          )
+        );
       }
 
       const disabled = disabledProp || mode === 'view' || !!spec.serverManaged || !!spec.locked;
       const control = renderControl({
         spec,
+        id,
         label,
         value: getPath(value, spec.path),
         disabled,
@@ -107,6 +140,7 @@ export function createAbstractEntityDetailsForm<E>(
         options,
         slotProps,
         error: errors?.[key],
+        help,
       });
       return row(f, control);
     };

@@ -123,7 +123,8 @@ export const vehicleTypeLayout: VehicleTypeLayout = {
     "formDragCoefficient",
     "rollResistanceCoefficient",
     measured("maximumEngineEffectKW"),
-    "hybridCategory",
+    // Wording to be confirmed against NeTEx (#69).
+    { field: "hybridCategory", help: "Chargeable = can be plugged in to charge the battery." },
     // The longest captions: a third truncates them in a narrow column, so the
     // min/max pair takes a half each.
     { ...measured("minOperatingTemperature"), width: "1/2" },
