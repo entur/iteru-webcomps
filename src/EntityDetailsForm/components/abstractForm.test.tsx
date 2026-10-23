@@ -328,6 +328,86 @@ describe('createAbstractEntityDetailsForm', () => {
   });
 });
 
+describe('help text', () => {
+  interface H {
+    name?: { value?: string | null } | null;
+    active?: boolean | null;
+    tags?: string[] | null;
+    rows?: { id: string; n: number }[] | null;
+  }
+  const helpFields: Record<string, FieldSpec> = {
+    name: { kind: 'name', path: ['name'] },
+    active: { kind: 'switch', path: ['active'] },
+    tags: { kind: 'enumMulti', path: ['tags'], options: ['A', 'B'] },
+    rows: { kind: 'grid', path: ['rows'], serverManaged: true },
+  };
+  const HelpForm = createAbstractEntityDetailsForm<H>(helpFields);
+  const helped = (field: string) => ({ All: ['name', { field, help: `About ${field}` }] });
+  const describedBy = (el: HTMLElement) =>
+    document.getElementById(el.getAttribute('aria-describedby') ?? '')?.textContent;
+
+  it('shows nothing extra when the layout entry has no help', () => {
+    const { container } = render(
+      <HelpForm value={{}} onChange={() => {}} mode="edit" layout={{ All: ['name'] }} />
+    );
+    expect(container.querySelector('.MuiFormHelperText-root')).toBeNull();
+    expect(screen.getByLabelText('Name')).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('shows the help below the field and describes the input with it, in view mode too', () => {
+    render(
+      <HelpForm
+        value={{}}
+        onChange={() => {}}
+        mode="view"
+        layout={{ All: [{ field: 'name', help: 'The public name' }] }}
+      />
+    );
+    expect(screen.getByText('The public name')).toBeInTheDocument();
+    expect(describedBy(screen.getByLabelText('Name'))).toBe('The public name');
+  });
+
+  it('lets an error take the help’s place, and gives it back when the error is gone', () => {
+    const layout = { All: [{ field: 'name', help: 'The public name' }] };
+    const { rerender } = render(
+      <HelpForm value={{}} onChange={() => {}} mode="edit" layout={layout} errors={{ name: 'Too long' }} />
+    );
+    expect(screen.queryByText('The public name')).toBeNull();
+    expect(describedBy(screen.getByLabelText('Name'))).toBe('Too long');
+
+    rerender(<HelpForm value={{}} onChange={() => {}} mode="edit" layout={layout} />);
+    expect(screen.getByText('The public name')).toBeInTheDocument();
+  });
+
+  it('describes a switch with its help, though no TextField draws it', () => {
+    render(<HelpForm value={{}} onChange={() => {}} mode="edit" layout={helped('active')} />);
+    expect(describedBy(screen.getByRole('switch'))).toBe('About active');
+  });
+
+  it('describes a multi-select with its help', () => {
+    render(<HelpForm value={{}} onChange={() => {}} mode="edit" layout={helped('tags')} />);
+    expect(describedBy(screen.getByRole('combobox'))).toBe('About tags');
+  });
+
+  it('describes a grid through a named group around it', () => {
+    render(<HelpForm value={{ rows: [] }} onChange={() => {}} mode="edit" layout={helped('rows')} />);
+    expect(describedBy(screen.getByRole('group', { name: 'Rows' }))).toBe('About rows');
+  });
+
+  it('keeps ids apart when two forms share a page', () => {
+    const layout = { All: [{ field: 'name', help: 'The public name' }] };
+    render(
+      <>
+        <HelpForm value={{}} onChange={() => {}} mode="edit" layout={layout} />
+        <HelpForm value={{}} onChange={() => {}} mode="edit" layout={layout} />
+      </>
+    );
+    const [a, b] = screen.getAllByLabelText('Name');
+    expect(a.id).not.toBe(b.id);
+    expect(a.getAttribute('aria-describedby')).not.toBe(b.getAttribute('aria-describedby'));
+  });
+});
+
 describe('stacked sections ↔ host navigation', () => {
   // jsdom has neither API, so both are stood in: the observer records what it
   // was asked to watch and lets the test decide what is "in view".

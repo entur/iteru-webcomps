@@ -20,6 +20,8 @@ import { STILL_SKELETONS } from '../../shared/motion';
 // Placeholder geometry. Row heights track the controls they stand in for, so
 // the layout does not jump when the real inputs land.
 const ROW_H = 56, SWITCH_H = 30, MULTI_H = 72, GRID_H = 180;
+// One MUI helper line: 3px top margin + a caption line (0.75rem × 1.66).
+const HELP_H = 23;
 const TAB_H = 30, TAB_W = 84, HEADING_H = 18, HEADING_W = 140;
 const ROW_GAP = 2, COL_GAP = 2, SECTION_GAP = 3, TAB_GAP = 1, BAR_GAP = 2;
 // Arrival fade. Keyframe names are global in Emotion — prefix as EditFooter does.
@@ -140,7 +142,8 @@ export function FormSkeleton({
                     data-nmr-kind={fields[f.key].kind}
                     variant="rounded"
                     animation="wave"
-                    height={KIND_H[fields[f.key].kind]}
+                    // A field with help text carries a helper line below it.
+                    height={KIND_H[fields[f.key].kind] + (f.help ? HELP_H : 0)}
                     // A marked control ends in the form's `*` cell; leave that
                     // width free so the arriving control is exactly as wide.
                     sx={{ mb: ROW_GAP, mr: `${marked(fields[f.key], patched) ? PATCH_MARK_COL_PX : 0}px` }}
